@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+/* Custom styles for Pullcord */
+
+/* Bus icon styles */
+.bus-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Leaflet popup customization */
+.leaflet-popup-content {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+}
+
+/* Map container fixes */
+#map {
+  z-index: 1;
+}
+
+/* Ensure proper z-indexing for controls */
+.leaflet-control-container {
+  z-index: 1000;
+}
+
+/* Custom button hover states */
+.hover\:bg-blue-700:hover {
+  background-color: #1d4ed8;
+}
+
+.hover\:bg-gray-50:hover {
+  background-color: #f9fafb;
+}
+
+/* Loading spinner */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  #map {
+    height: 50vh;
+    min-height: 300px;
+  }
+}
+
+/* ETA card animations */
+.eta-card {
+  transition: border-color 0.2s ease;
+}
+
+.eta-card:hover {
+  border-color: #3b82f6;
+}
+
+/* Focus styles for accessibility */
+input:focus,
+button:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Utility class for z-index */
+.z-1000 {
+  z-index: 1000;
+}

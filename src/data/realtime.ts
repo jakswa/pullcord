@@ -1,0 +1,187 @@
+import { load } from "protobufjs";
+import path from "path";
+
+const VEHICLE_POSITIONS_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb";
+const TRIP_UPDATES_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb";
+const CACHE_DURATION = 30 * 1000; // 30 seconds
+
+interface VehiclePosition {
+  id: string;
+  lat: number;
+  lon: number;
+  bearing?: number;
+  speed?: number;
+  tripId: string;
+  headsign?: string;
+  staleSeconds: number;
+}
+
+interface PredictionUpdate {
+  vehicleId?: string;
+  headsign?: string;
+  etaSeconds: number;
+  staleSeconds: number;
+}
+
+interface CachedData<T> {
+  data: T;
+  timestamp: number;
+}
+
+class RealtimeDataService {
+  private protoRoot: any = null;
+  private vehicleCache: CachedData<any[]> | null = null;
+  private tripUpdatesCache: CachedData<any[]> | null = null;
+  private apiKey: string;
+
+  constructor() {
+    this.apiKey = process.env.MARTA_API_KEY!;
+    if (!this.apiKey) {
+      throw new Error("MARTA_API_KEY is required in environment");
+    }
+  }
+
+  private async loadProtoDefinitions() {
+    if (!this.protoRoot) {
+      const protoPath = path.join(process.cwd(), "gtfs-realtime.proto");
+      this.protoRoot = await load(protoPath);
+    }
+    return this.protoRoot;
+  }
+
+  private async fetchProtobufData(url: string): Promise<any[]> {
+    const response = await fetch(`${url}?apiKey=${this.apiKey}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${url}: ${response.status}`);
+    }
+
+    const buffer = await response.arrayBuffer();
+    const protoRoot = await this.loadProtoDefinitions();
+    const FeedMessage = protoRoot.lookupType("transit_realtime.FeedMessage");
+    const message = FeedMessage.decode(new Uint8Array(buffer));
+    
+    return message.entity || [];
+  }
+
+  private isCacheValid<T>(cache: CachedData<T> | null): boolean {
+    if (!cache) return false;
+    return Date.now() - cache.timestamp < CACHE_DURATION;
+  }
+
+  private async getVehiclePositions(): Promise<any[]> {
+    if (this.isCacheValid(this.vehicleCache)) {
+      return this.vehicleCache!.data;
+    }
+
+    const entities = await this.fetchProtobufData(VEHICLE_POSITIONS_URL);
+    this.vehicleCache = {
+      data: entities,
+      timestamp: Date.now()
+    };
+
+    return entities;
+  }
+
+  private async getTripUpdates(): Promise<any[]> {
+    if (this.isCacheValid(this.tripUpdatesCache)) {
+      return this.tripUpdatesCache!.data;
+    }
+
+    const entities = await this.fetchProtobufData(TRIP_UPDATES_URL);
+    this.tripUpdatesCache = {
+      data: entities,
+      timestamp: Date.now()
+    };
+
+    return entities;
+  }
+
+  async getVehicles(routeId: string, tripLookup: Map<string, any>): Promise<VehiclePosition[]> {
+    const entities = await this.getVehiclePositions();
+    const timestamp = Date.now();
+
+    return entities
+      .filter(entity => {
+        if (!entity.vehicle?.trip?.tripId || !entity.vehicle?.position) return false;
+        const trip = tripLookup.get(entity.vehicle.trip.tripId);
+        return trip?.route_id === routeId;
+      })
+      .map(entity => {
+        const vehicle = entity.vehicle;
+        const trip = tripLookup.get(vehicle.trip.tripId);
+        
+        // Calculate staleness
+        const vehicleTimestamp = vehicle.timestamp ? parseInt(vehicle.timestamp) * 1000 : timestamp;
+        const staleSeconds = Math.floor((timestamp - vehicleTimestamp) / 1000);
+
+        return {
+          id: entity.id,
+          lat: vehicle.position.latitude,
+          lon: vehicle.position.longitude,
+          bearing: vehicle.position.bearing || undefined,
+          speed: vehicle.position.speed || undefined,
+          tripId: vehicle.trip.tripId,
+          headsign: trip?.trip_headsign || "Unknown Destination",
+          staleSeconds
+        };
+      });
+  }
+
+  async getPredictions(routeId: string, stopId: string, tripLookup: Map<string, any>): Promise<PredictionUpdate[]> {
+    const entities = await this.getTripUpdates();
+    const timestamp = Date.now();
+
+    const predictions: PredictionUpdate[] = [];
+
+    for (const entity of entities) {
+      if (!entity.tripUpdate?.trip?.tripId) continue;
+      
+      const tripId = entity.tripUpdate.trip.tripId;
+      const trip = tripLookup.get(tripId);
+      
+      if (trip?.route_id !== routeId) continue;
+
+      const stopTimeUpdates = entity.tripUpdate.stopTimeUpdate || [];
+      for (const stu of stopTimeUpdates) {
+        if (stu.stopId !== stopId) continue;
+
+        // Use arrival or departure time
+        const timeUpdate = stu.arrival || stu.departure;
+        if (!timeUpdate?.time) continue;
+
+        const etaTimestamp = parseInt(timeUpdate.time) * 1000;
+        const etaSeconds = Math.max(0, Math.floor((etaTimestamp - timestamp) / 1000));
+        
+        // Calculate staleness from trip update timestamp
+        const updateTimestamp = entity.tripUpdate.timestamp ? 
+          parseInt(entity.tripUpdate.timestamp) * 1000 : timestamp;
+        const staleSeconds = Math.floor((timestamp - updateTimestamp) / 1000);
+
+        predictions.push({
+          headsign: trip.trip_headsign || "Unknown Destination",
+          etaSeconds,
+          staleSeconds
+        });
+      }
+    }
+
+    // Sort by ETA
+    predictions.sort((a, b) => a.etaSeconds - b.etaSeconds);
+    return predictions;
+  }
+}
+
+// Singleton instance
+const realtimeService = new RealtimeDataService();
+
+// Export async functions that use the singleton
+export async function getVehicles(routeId: string, tripLookup: Map<string, any>): Promise<VehiclePosition[]> {
+  return realtimeService.getVehicles(routeId, tripLookup);
+}
+
+export async function getPredictions(routeId: string, stopId: string, tripLookup: Map<string, any>): Promise<PredictionUpdate[]> {
+  return realtimeService.getPredictions(routeId, stopId, tripLookup);
+}
+
+export type { VehiclePosition, PredictionUpdate };
