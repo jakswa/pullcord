@@ -81,10 +81,10 @@ export const Layout = (props: LayoutProps) => {
         {/* App JS */}
         <script src="/public/app.js"></script>
 
-        {/* Service Worker Registration */}
+        {/* Unregister any stale service workers */}
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/public/sw.js').catch(() => {});
+            navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
           }
         `}} />
       </body>

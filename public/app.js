@@ -774,7 +774,7 @@ class PullcordApp {
       this.cordVehicleId = null;
       this.cordNotified = false;
       btn.classList.remove('cord-active', 'cord-fired');
-      text.textContent = 'Pull the Cord';
+      text.textContent = 'Notify me when bus is close';
       return;
     }
 
@@ -796,9 +796,7 @@ class PullcordApp {
     if (navigator.vibrate) navigator.vibrate(100);
 
     const mins = Math.floor(this.heroPrediction.etaSeconds / 60);
-    text.textContent = this.cordVehicleId
-      ? `Watching · ${mins} min away`
-      : `Alert set · ${mins} min`;
+    text.textContent = `🔔 Watching · ${mins} min away — tap to cancel`;
   }
 
   checkPullCord() {
@@ -822,12 +820,12 @@ class PullcordApp {
       this.cordActive = false;
       this.cordVehicleId = null;
       btn.classList.remove('cord-active');
-      text.textContent = 'Pull the Cord';
+      text.textContent = 'Notify me when bus is close';
       return;
     }
 
     const mins = Math.floor(pred.etaSeconds / 60);
-    text.textContent = `Watching · ${mins} min away`;
+    text.textContent = `🔔 Watching · ${mins} min away — tap to cancel`;
 
     // Fire notification at ≤ 2 minutes
     if (pred.etaSeconds <= 120 && !this.cordNotified) {
