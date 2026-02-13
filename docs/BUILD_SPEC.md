@@ -6,12 +6,12 @@ A real-time MARTA bus tracker. Hono SSR app on Bun with SQLite + Leaflet maps.
 User opens `pullcord.home.jake.town/?route=39&stop=204230` and sees their bus on a map with ETAs.
 
 ## Reference Files
-- `./reference/HONO_YOLO.md` — Hono SSR patterns (READ THIS FIRST)
-- `./reference/BUS_TRACKER_PLAN.md` — Product plan + UX design
-- `./reference/DATA_PIPELINE_PROOF.md` — Data pipeline proof with real numbers
-- `./reference/pipeline_prototype.js` — Working prototype script
-- `./reference/gtfs-realtime.proto` — Protobuf definitions
-- `./reference/.env` — Contains MARTA_API_KEY
+- `HONO_YOLO.md` — Hono SSR patterns (READ THIS FIRST)
+- `BUS_TRACKER_PLAN.md` — Product plan + UX design
+- `DATA_PIPELINE_PROOF.md` — Data pipeline proof with real numbers
+- `pipeline_prototype.js` — Working prototype script
+- `gtfs-realtime.proto` — Protobuf definitions
+- `.env` — Contains MARTA_API_KEY
 
 ## Stack
 - **Runtime:** Bun (installed at ~/.local/bin/bun)
@@ -23,7 +23,7 @@ User opens `pullcord.home.jake.town/?route=39&stop=204230` and sees their bus on
 - **CSV parsing:** csv-parse (already in package.json)
 
 ## Project Root
-`./`
+``
 
 package.json, tsconfig.json, and node_modules already exist.
 
@@ -127,13 +127,13 @@ CREATE INDEX idx_route_stops_stop ON route_stops(stop_id);
 
 Run with: `bun run src/data/gtfs-import.ts`
 
-1. Download MARTA GTFS from https://itsmarta.com/MARTA_GTFS_Latest_Feed.zip (or use already-downloaded at ./reference/data/gtfs/)
+1. Download MARTA GTFS from https://itsmarta.com/MARTA_GTFS_Latest_Feed.zip (or use already-downloaded at data/gtfs/)
 2. Parse CSVs with csv-parse
 3. Insert into SQLite tables
 4. Build route_stops derived table from stop_times + trips
 5. Report row counts
 
-The GTFS data is already downloaded at `./reference/data/gtfs/`. Copy or symlink it.
+The GTFS data is already downloaded at `data/gtfs/`. Copy or symlink it.
 
 ## API Endpoints (`src/routes/api.ts`)
 
@@ -195,7 +195,7 @@ ETA predictions for a specific stop. Filters trip updates to matching stop.
 
 Copy the gtfs-realtime.proto to the project root:
 ```
-cp ./reference/gtfs-realtime.proto ./
+cp gtfs-realtime.proto 
 ```
 
 ## SSR Pages
@@ -271,7 +271,7 @@ Design: Clean, mobile-first. Dark header with route info. White cards for ETAs. 
 
 ## .env
 ```
-MARTA_API_KEY=<copy from ./reference/.env>
+MARTA_API_KEY=<copy from .env>
 PORT=4200
 ```
 

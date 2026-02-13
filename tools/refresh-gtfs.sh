@@ -4,7 +4,7 @@
 # Run weekly (MARTA publishes schedule updates periodically).
 #
 # Usage: ./tools/refresh-gtfs.sh
-#   Or via cron: 0 4 * * 0  cd ./pullcord && ./tools/refresh-gtfs.sh
+#   Or via cron: 0 4 * * 0  ./tools/refresh-gtfs.sh
 
 set -euo pipefail
 
