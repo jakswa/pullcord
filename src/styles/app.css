@@ -150,13 +150,14 @@
     transition: opacity 0.5s;
   }
 
-  /* --- ETA Section --- */
+  /* --- ETA Section (bottom, near thumbs) --- */
   .tracker-etas {
     flex-shrink: 0;
     padding: 0.5rem;
     overflow-y: auto;
     max-height: 45vh;
     -webkit-overflow-scrolling: touch;
+    border-top: 1px solid #e2e8f0;
   }
 
   .tracker-eta-status {
