@@ -1210,61 +1210,53 @@
   }
 
   .home-stop-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
     background: var(--bg-surface);
     border-radius: 0.75rem;
     padding: 0.85rem 1rem;
     border: 1px solid var(--border-subtle);
     transition: background 0.15s;
+    text-decoration: none;
+    color: inherit;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .home-stop-card:active { background: var(--card-hover); }
 
-  .home-stop-name,
-  .home-stop-name-link {
+  .home-stop-info { flex: 1; min-width: 0; }
+
+  .home-stop-name {
     font-weight: 600;
     font-size: 0.95rem;
     color: var(--text-primary);
-    margin-bottom: 0.15rem;
-    text-decoration: none;
-    display: block;
+    line-height: 1.3;
   }
 
-  .home-stop-name-link:active {
-    color: var(--brand);
+  .home-stop-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.15rem;
+  }
+
+  .home-stop-routes-inline {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
   }
 
   .home-stop-distance {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
-    margin-bottom: 0.5rem;
   }
 
-  .home-stop-routes {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-  }
-
-  .home-route-chip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 3rem;
-    padding: 0.5rem 0.75rem;
-    background: var(--brand);
-    color: #fff;
-    font-size: 0.9rem;
-    font-weight: 700;
-    border-radius: 0.5rem;
-    text-decoration: none;
-    transition: background 0.15s, transform 0.1s;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .home-route-chip:hover { background: var(--brand-hover); }
-  .home-route-chip:active {
-    transform: scale(0.95);
-    background: var(--brand-active);
+  .home-stop-arrow {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    opacity: 0.5;
   }
 
   .home-footer {
@@ -1318,23 +1310,12 @@
     text-overflow: ellipsis;
   }
 
-  .home-fav-routes {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-    margin-top: 0.35rem;
-  }
-
-  .home-fav-chip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.2rem 0.5rem;
-    background: var(--brand);
-    color: #fff;
+  .home-fav-routes-inline {
+    font-family: var(--font-mono);
     font-size: 0.75rem;
-    font-weight: 700;
-    border-radius: 0.375rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-top: 0.1rem;
   }
 
   .home-fav-remove {

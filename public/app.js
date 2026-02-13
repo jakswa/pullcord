@@ -119,15 +119,19 @@ class PullcordApp {
     }
 
     container.classList.remove('hidden');
-    list.innerHTML = favs.map(fav => `
+    list.innerHTML = favs.map(fav => {
+      const favLink = fav.routes.length > 1
+        ? `${basePath}/stop?id=${fav.stopId}`
+        : `${basePath}/bus?route=${fav.routes[0]}&stop=${fav.stopId}`;
+      return `
       <div class="home-fav-card">
-        <a href="${basePath}/bus?route=${fav.routes[0]}&stop=${fav.stopId}" class="home-fav-link">
+        <a href="${favLink}" class="home-fav-link">
           <div class="home-fav-name">${this.esc(fav.stopName)}</div>
-          <div class="home-fav-routes">${fav.routes.map(r => `<span class="home-fav-chip">${r}</span>`).join('')}</div>
+          <div class="home-fav-routes-inline">${fav.routes.join(' · ')}</div>
         </a>
         <button class="home-fav-remove" data-stop="${this.esc(fav.stopId)}" aria-label="Remove favorite">✕</button>
       </div>
-    `).join('');
+    `}).join('');
 
     // Wire up remove buttons
     list.querySelectorAll('.home-fav-remove').forEach(btn => {
@@ -210,15 +214,16 @@ class PullcordApp {
         ? `${basePath}/stop?id=${stop.stop_id}`
         : `${basePath}/bus?route=${stop.routes[0]}&stop=${stop.stop_id}`;
       return `
-      <div class="home-stop-card">
-        <a href="${stopLink}" class="home-stop-name-link">${this.esc(stop.stop_name)}</a>
-        ${stop.distance ? `<div class="home-stop-distance">${Math.round(stop.distance)}m away</div>` : ''}
-        <div class="home-stop-routes">
-          ${stop.routes.map(route => `
-            <a href="${basePath}/bus?route=${route}&stop=${stop.stop_id}" class="home-route-chip">${route}</a>
-          `).join('')}
+      <a href="${stopLink}" class="home-stop-card">
+        <div class="home-stop-info">
+          <div class="home-stop-name">${this.esc(stop.stop_name)}</div>
+          <div class="home-stop-meta">
+            <span class="home-stop-routes-inline">${stop.routes.join(' · ')}</span>
+            ${stop.distance ? `<span class="home-stop-distance">${Math.round(stop.distance)}m</span>` : ''}
+          </div>
         </div>
-      </div>
+        <svg class="home-stop-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
     `}).join('');
   }
 
