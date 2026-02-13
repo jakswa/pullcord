@@ -1,17 +1,36 @@
-// Pullcord Client-Side JavaScript
-// Mobile-first MARTA bus tracker
+// Pullcord Experiment D — "The Bus Stop Screen"
+// Reimagined: hero countdown, linear progress strip, map on demand, pull the cord
 
 class PullcordApp {
   constructor() {
+    // Map state
     this.map = null;
-    this.busMarkers = new Map(); // vehicleId -> { marker, lat, lon, headsign }
+    this.mapVisible = false;
+    this.busMarkers = new Map();
     this.routePolylines = [];
-    this.stopMarkers = [];
+    this.stopMarkersList = [];
+    this.activeStopMarker = null;
+    this.focusedVehicleId = null;
+
+    // Data state
+    this.lastPredictions = [];
+    this.lastVehicles = [];
+    this.heroEtaSeconds = null;
+    this.heroVehicleId = null;
+    this.heroPrediction = null;
+
+    // Countdown timer (ticks every second between polls)
+    this.countdownTimer = null;
+
+    // Pull cord state
+    this.cordActive = false;
+    this.cordVehicleId = null;
+    this.cordNotified = false;
+
+    // Timers
     this.pollTimer = null;
     this.refreshBar = null;
-    this.focusedVehicleId = null;
-    this.lastPredictions = []; // store for click-to-focus lookups
-    
+
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => this.init());
     } else {
@@ -26,60 +45,63 @@ class PullcordApp {
   }
 
   detectPage() {
-    if (document.getElementById('map')) return 'tracker';
+    if (document.getElementById('hero-section')) return 'tracker';
     if (document.getElementById('stop-search')) return 'home';
     return 'unknown';
   }
 
-  // ===== HOME PAGE =====
+  // ═══════════════════════════════════
+  // HOME PAGE (similar to production)
+  // ═══════════════════════════════════
+
   initHomePage() {
     const searchInput = document.getElementById('stop-search');
     const locationBtn = document.getElementById('location-btn');
     const resultsContainer = document.getElementById('search-results');
     const resultsList = document.getElementById('results-list');
     const loadingDiv = document.getElementById('search-loading');
+    const basePath = window.__BASE_PATH__ || '';
 
     let searchTimeout;
     searchInput.addEventListener('input', (e) => {
       clearTimeout(searchTimeout);
-      const query = e.target.value.trim();
-      if (query.length < 2) { this.hideResults(); return; }
+      const q = e.target.value.trim();
+      if (q.length < 2) { this.hideResults(); return; }
       searchTimeout = setTimeout(() => {
-        this.searchStops(query, resultsList, resultsContainer, loadingDiv);
+        this.searchStops(q, resultsList, resultsContainer, loadingDiv, basePath);
       }, 300);
     });
 
     locationBtn.addEventListener('click', () => {
-      this.findNearbyStops(resultsList, resultsContainer, loadingDiv);
+      this.findNearbyStops(resultsList, resultsContainer, loadingDiv, basePath);
     });
   }
 
-  async searchStops(query, resultsList, resultsContainer, loadingDiv) {
+  async searchStops(query, resultsList, resultsContainer, loadingDiv, basePath) {
     try {
       this.showLoading(loadingDiv, resultsContainer);
-      const response = await fetch(`/api/stops?q=${encodeURIComponent(query)}`);
-      const stops = await response.json();
-      this.displayStops(stops, resultsList, resultsContainer, loadingDiv);
-    } catch (error) {
-      console.error('Search error:', error);
+      const res = await fetch(`/api/stops?q=${encodeURIComponent(query)}`);
+      const stops = await res.json();
+      this.displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath);
+    } catch (e) {
       this.showError('Failed to search stops', resultsList, resultsContainer, loadingDiv);
     }
   }
 
-  async findNearbyStops(resultsList, resultsContainer, loadingDiv) {
+  async findNearbyStops(resultsList, resultsContainer, loadingDiv, basePath) {
     if (!navigator.geolocation) {
       this.showError('Geolocation not supported', resultsList, resultsContainer, loadingDiv);
       return;
     }
     this.showLoading(loadingDiv, resultsContainer);
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
+      async (pos) => {
         try {
-          const { latitude, longitude } = position.coords;
-          const response = await fetch(`/api/stops?lat=${latitude}&lon=${longitude}&radius=800`);
-          const stops = await response.json();
-          this.displayStops(stops, resultsList, resultsContainer, loadingDiv);
-        } catch (error) {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(`/api/stops?lat=${latitude}&lon=${longitude}&radius=800`);
+          const stops = await res.json();
+          this.displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath);
+        } catch (e) {
           this.showError('Failed to find nearby stops', resultsList, resultsContainer, loadingDiv);
         }
       },
@@ -88,32 +110,28 @@ class PullcordApp {
     );
   }
 
-  displayStops(stops, resultsList, resultsContainer, loadingDiv) {
-    // Ensure loading is hidden and results are visible
-    this.hideLoading();
-    if (loadingDiv) loadingDiv.classList.add('hidden');
+  displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath) {
+    this.hideLoadingEl(loadingDiv);
     if (resultsContainer) resultsContainer.classList.remove('hidden');
-    
+
     const header = document.getElementById('results-header');
     if (header) {
-      header.textContent = stops.length > 0 && stops[0].distance 
-        ? `${stops.length} stops nearby`
-        : `${stops.length} results`;
+      header.textContent = stops.length > 0 && stops[0].distance
+        ? `${stops.length} stops nearby` : `${stops.length} results`;
     }
-    
+
     if (stops.length === 0) {
       resultsList.innerHTML = '<div class="home-status">No stops found</div>';
       return;
     }
+
     resultsList.innerHTML = stops.map(stop => `
       <div class="home-stop-card">
         <div class="home-stop-name">${this.esc(stop.stop_name)}</div>
         ${stop.distance ? `<div class="home-stop-distance">${Math.round(stop.distance)}m away</div>` : ''}
         <div class="home-stop-routes">
           ${stop.routes.map(route => `
-            <a href="/bus?route=${route}&stop=${stop.stop_id}" class="home-route-chip">
-              ${route}
-            </a>
+            <a href="${basePath}/bus?route=${route}&stop=${stop.stop_id}" class="home-route-chip">${route}</a>
           `).join('')}
         </div>
       </div>
@@ -125,17 +143,8 @@ class PullcordApp {
     if (resultsContainer) resultsContainer.classList.add('hidden');
   }
 
-  hideLoading() {
-    const ld = document.getElementById('search-loading');
-    const rc = document.getElementById('search-results');
-    if (ld) ld.classList.add('hidden');
-    if (rc) rc.classList.remove('hidden');
-  }
-
-  showError(message, resultsList, resultsContainer, loadingDiv) {
-    if (loadingDiv) loadingDiv.classList.add('hidden');
-    if (resultsContainer) resultsContainer.classList.remove('hidden');
-    if (resultsList) resultsList.innerHTML = `<div class="home-status" style="color:#ef4444">${message}</div>`;
+  hideLoadingEl(el) {
+    if (el) el.classList.add('hidden');
   }
 
   hideResults() {
@@ -143,178 +152,91 @@ class PullcordApp {
     if (c) c.classList.add('hidden');
   }
 
-  // ===== TRACKER PAGE =====
+  showError(msg, resultsList, resultsContainer, loadingDiv) {
+    this.hideLoadingEl(loadingDiv);
+    if (resultsContainer) resultsContainer.classList.remove('hidden');
+    if (resultsList) resultsList.innerHTML = `<div class="home-status" style="color:#ef4444">${msg}</div>`;
+  }
+
+  // ═══════════════════════════════════════
+  // TRACKER PAGE — the reimagined experience
+  // ═══════════════════════════════════════
+
   initTrackerPage() {
     if (!window.__INITIAL_DATA__ || !window.__CONFIG__) return;
     this.data = window.__INITIAL_DATA__;
     this.config = window.__CONFIG__;
     this.routeColor = this.data.route.color ? `#${this.data.route.color}` : '#2563eb';
-    this.mockMode = new URLSearchParams(window.location.search).has('mock');
+    const params = new URLSearchParams(window.location.search);
+    this.mockMode = params.has('mock');
 
-    this.initRefreshBar();
-    this.initMap();
-    this.initControls();
+    // Direction preference from URL (persists on refresh, shareable)
+    this.selectedDirection = params.has('dir') ? parseInt(params.get('dir'), 10) : null;
+
+    // Tracked vehicle (in-memory, for "I want THAT specific bus")
+    // Falls back to first-in-direction when vehicle disappears
+    this.trackedVehicleId = null;
+
+    // Set route color CSS variable on shell
+    const shell = document.querySelector('.d-shell');
+    if (shell) shell.style.setProperty('--route-color', this.routeColor);
+
+    // Fix back link for experiments
+    const basePath = window.__BASE_PATH__ || '';
+    const backLink = document.querySelector('.d-back');
+    if (backLink && basePath) backLink.href = basePath + '/';
+
+    this.refreshBar = document.getElementById('refresh-bar');
+    this.prepareStopDirections();
+    this.initPullCord();
+    this.initMapToggle();
+    this.initRefreshBtn();
+    this.discoverOtherRoutes();
     this.startPolling();
   }
 
-  // --- Refresh progress bar ---
-  initRefreshBar() {
-    this.refreshBar = document.getElementById('refresh-bar');
+  // Pre-compute direction stop lists for progress strip
+  prepareStopDirections() {
+    const stops = this.data.stops || [];
+    const myId = this.data.stop.id;
+
+    // Group by direction and sort by stop_sequence
+    this.dirStops = {};
+    stops.forEach(s => {
+      const d = String(s.direction);
+      if (!this.dirStops[d]) this.dirStops[d] = [];
+      this.dirStops[d].push(s);
+    });
+
+    // Sort each direction by sequence (from GTFS stop_times)
+    for (const dir of Object.keys(this.dirStops)) {
+      this.dirStops[dir].sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+    }
+
+    // Find which direction(s) have our stop
+    this.myStopDirections = {};
+    for (const [dir, list] of Object.entries(this.dirStops)) {
+      const idx = list.findIndex(s => s.id === myId);
+      if (idx !== -1) this.myStopDirections[dir] = idx;
+    }
   }
 
+  // ── Refresh Bar ──
   startRefreshCycle() {
     if (!this.refreshBar) return;
-    this.refreshBar.classList.remove('refreshing');
+    this.refreshBar.classList.remove('refreshing', 'refresh-flash');
     void this.refreshBar.offsetWidth;
     this.refreshBar.classList.add('refreshing');
   }
 
-  flashUpdate() {
-    if (this.refreshBar) {
-      this.refreshBar.classList.add('refresh-flash');
-      setTimeout(() => this.refreshBar.classList.remove('refresh-flash'), 600);
-    }
+  flashRefresh() {
+    if (!this.refreshBar) return;
+    this.refreshBar.classList.remove('refreshing');
+    this.refreshBar.classList.add('refresh-flash');
+    setTimeout(() => this.refreshBar.classList.remove('refresh-flash'), 500);
   }
 
-  // --- Map ---
-  initMap() {
-    const { stop } = this.data;
-    
-    this.map = L.map('map', {
-      zoomControl: false,
-      attributionControl: false
-    }).setView([stop.lat, stop.lon], 15);
-
-    // CartoDB Positron — clean, minimal
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      subdomains: 'abcd'
-    }).addTo(this.map);
-
-    L.control.attribution({ position: 'bottomright', prefix: false })
-      .addAttribution('© <a href="https://carto.com">CARTO</a> · <a href="https://osm.org">OSM</a>')
-      .addTo(this.map);
-
-    L.control.zoom({ position: 'topleft' }).addTo(this.map);
-
-    this.drawRouteShapes();
-    this.addStopMarkers();
-    this.addActiveStopMarker();
-    // Start centered on the stop at a useful zoom — not the whole route
-    this.map.setView([stop.lat, stop.lon], 15);
-  }
-
-  drawRouteShapes() {
-    const { shapes } = this.data;
-    
-    Object.values(shapes).forEach(coordinates => {
-      if (coordinates.length === 0) return;
-      
-      // White outline
-      L.polyline(coordinates, {
-        color: '#ffffff',
-        weight: 9,
-        opacity: 0.85,
-        lineCap: 'round',
-        lineJoin: 'round'
-      }).addTo(this.map);
-      
-      // Route color
-      const polyline = L.polyline(coordinates, {
-        color: this.routeColor,
-        weight: 5,
-        opacity: 1,
-        lineCap: 'round',
-        lineJoin: 'round'
-      }).addTo(this.map);
-      
-      this.routePolylines.push(polyline);
-    });
-  }
-
-  addStopMarkers() {
-    const { stops, stop: activeStop } = this.data;
-    
-    stops.forEach(s => {
-      if (s.id === activeStop.id) return;
-      
-      const icon = L.divIcon({
-        html: `<div class="route-stop-dot" style="--route-color: ${this.routeColor}"></div>`,
-        className: '',
-        iconSize: [8, 8],
-        iconAnchor: [4, 4]
-      });
-      
-      const marker = L.marker([s.lat, s.lon], { icon }).addTo(this.map);
-      marker.bindPopup(`<b>${this.esc(s.name)}</b>`);
-      this.stopMarkers.push(marker);
-    });
-  }
-
-  addActiveStopMarker() {
-    const { stop } = this.data;
-    
-    const icon = L.divIcon({
-      html: '<div class="stop-pulse"></div>',
-      className: '',
-      iconSize: [20, 20],
-      iconAnchor: [10, 10]
-    });
-    
-    this.activeStopMarker = L.marker([stop.lat, stop.lon], { icon, zIndexOffset: 1000 })
-      .addTo(this.map);
-  }
-
-  fitToRoute() {
-    if (this.routePolylines.length > 0) {
-      const group = L.featureGroup(this.routePolylines);
-      this.map.fitBounds(group.getBounds().pad(0.05));
-    }
-  }
-
-  focusOnBus(vehicleId) {
-    const busInfo = this.busMarkers.get(vehicleId);
-    if (!busInfo) return;
-    
-    // Highlight the focused bus
-    this.focusedVehicleId = vehicleId;
-    
-    // Pan + zoom to show bus and stop
-    const stopLat = this.data.stop.lat;
-    const stopLon = this.data.stop.lon;
-    const bounds = L.latLngBounds(
-      [busInfo.lat, busInfo.lon],
-      [stopLat, stopLon]
-    );
-    this.map.fitBounds(bounds.pad(0.3));
-    
-    // Open the bus popup
-    busInfo.marker.openPopup();
-    
-    // Pulse the bus marker
-    const el = busInfo.marker.getElement();
-    if (el) {
-      el.classList.add('bus-focused');
-      setTimeout(() => el.classList.remove('bus-focused'), 3000);
-    }
-    
-    // Scroll map into view on mobile
-    const mapEl = document.getElementById('map');
-    if (mapEl) {
-      mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }
-
-  initControls() {
-    const btn = document.getElementById('recenter-btn');
-    if (btn) {
-      btn.addEventListener('click', () => {
-        this.focusedVehicleId = null;
-        this.map.setView([this.data.stop.lat, this.data.stop.lon], 15);
-      });
-    }
-  }
-
+  // ── Polling ──
   async startPolling() {
     await this.updateData();
     this.pollTimer = setInterval(() => this.updateData(), this.config.pollInterval);
@@ -327,15 +249,20 @@ class PullcordApp {
         fetch(`/api/realtime/${this.config.routeId}${qs}`),
         fetch(`/api/predictions/${this.config.routeId}/${this.config.stopId}${qs}`)
       ]);
-      
+
       const vehiclesData = await vRes.json();
       const predictionsData = await pRes.json();
-      
-      this.updateBusMarkers(vehiclesData.vehicles);
+
+      this.lastVehicles = vehiclesData.vehicles || [];
       this.lastPredictions = predictionsData.predictions || [];
-      this.updateETAs(this.lastPredictions);
-      this.updateStatus(vehiclesData.vehicles.length);
-      this.flashUpdate();
+
+      this.renderHero(this.lastPredictions);
+      this.renderProgressStrip(this.lastPredictions, this.lastVehicles);
+      this.renderUpcoming(this.lastPredictions);
+      this.updateMapMarkers(this.lastVehicles);
+      this.updateTimestamp();
+      this.checkPullCord();
+      this.flashRefresh();
       this.startRefreshCycle();
       this.hideOffline();
     } catch (e) {
@@ -344,141 +271,735 @@ class PullcordApp {
     }
   }
 
-  updateBusMarkers(vehicles) {
-    // Remove old markers
+  initRefreshBtn() {
+    const btn = document.getElementById('refresh-btn');
+    if (btn) btn.addEventListener('click', () => this.updateData());
+  }
+
+  updateTimestamp() {
+    const el = document.getElementById('last-updated');
+    if (el) el.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // ──────────────────────────────
+  // HERO — massive ETA countdown
+  // ──────────────────────────────
+
+  renderHero(predictions) {
+    const loading = document.getElementById('hero-loading');
+    const empty = document.getElementById('hero-empty');
+    const eta = document.getElementById('hero-eta');
+
+    loading.style.display = 'none';
+
+    if (!predictions || predictions.length === 0) {
+      empty.style.display = '';
+      eta.style.display = 'none';
+      this.heroPrediction = null;
+      this.heroEtaSeconds = null;
+      this.stopCountdown();
+      return;
+    }
+
+    empty.style.display = 'none';
+    eta.style.display = '';
+
+    // Hero selection priority:
+    // 1. Tracked vehicle (user tapped a specific bus)
+    // 2. First prediction in selected direction
+    // 3. First prediction overall (auto-select direction)
+    let hero;
+
+    if (this.trackedVehicleId) {
+      hero = predictions.find(p => p.vehicleId === this.trackedVehicleId);
+      if (!hero) {
+        // Tracked vehicle disappeared — clear tracking, fall back to direction
+        this.trackedVehicleId = null;
+      }
+    }
+
+    if (!hero && this.selectedDirection !== null) {
+      hero = predictions.find(p => p.directionId === this.selectedDirection);
+    }
+
+    if (!hero) {
+      hero = predictions[0];
+      if (this.selectedDirection === null && hero.directionId != null) {
+        this.selectedDirection = hero.directionId;
+        this.updateDirectionUrl(hero.directionId);
+      }
+    }
+    this.heroPrediction = hero;
+    this.heroEtaSeconds = hero.etaSeconds;
+    this.heroVehicleId = hero.vehicleId;
+
+    this.renderHeroDisplay();
+    this.startCountdown();
+
+    // "See on map" link
+    const mapLink = document.getElementById('hero-map-link');
+    if (mapLink) {
+      if (hero.vehicleId && hero.tier !== 'scheduled') {
+        mapLink.style.display = '';
+        mapLink.onclick = () => {
+          this.focusedVehicleId = hero.vehicleId;
+          this.showMap();
+          this.focusOnBus(hero.vehicleId);
+        };
+      } else {
+        mapLink.style.display = 'none';
+      }
+    }
+  }
+
+  renderHeroDisplay() {
+    if (this.heroEtaSeconds === null || !this.heroPrediction) return;
+
+    const seconds = Math.max(0, this.heroEtaSeconds);
+    const minutes = Math.floor(seconds / 60);
+    const tier = this.heroPrediction.tier || 'active';
+    const isArriving = minutes < 1 && tier === 'active';
+    const isSoon = minutes < 5 && minutes >= 1 && tier === 'active';
+
+    // Number
+    const numEl = document.getElementById('hero-number');
+    const unitEl = document.getElementById('hero-unit');
+
+    if (isArriving) {
+      // Show seconds countdown for last minute
+      numEl.textContent = seconds < 30 ? 'NOW' : `<1`;
+      unitEl.textContent = seconds < 30 ? '' : 'min';
+    } else {
+      numEl.textContent = minutes;
+      unitEl.textContent = 'min';
+    }
+
+    // Style modifiers
+    numEl.className = 'd-hero-number';
+    unitEl.className = 'd-hero-unit';
+    if (isArriving) {
+      numEl.classList.add('arriving');
+      unitEl.classList.add('arriving');
+    } else if (isSoon) {
+      numEl.classList.add('arriving-soon');
+    } else if (tier === 'next') {
+      numEl.classList.add('tier-next');
+    } else if (tier === 'scheduled') {
+      numEl.classList.add('tier-scheduled');
+    }
+
+    // Tier label
+    const tierEl = document.getElementById('hero-tier');
+    if (tier === 'active') {
+      const stale = this.staleTier(this.heroPrediction.staleSeconds);
+      tierEl.innerHTML = stale.html;
+      tierEl.className = 'd-hero-tier tier-active';
+    } else if (tier === 'next') {
+      tierEl.innerHTML = '<span class="dot-next"></span> On another run';
+      tierEl.className = 'd-hero-tier tier-next';
+    } else {
+      tierEl.innerHTML = '<span class="dot-sched"></span> Scheduled';
+      tierEl.className = 'd-hero-tier tier-scheduled';
+    }
+
+    // Headsign
+    const hsEl = document.getElementById('hero-headsign');
+    hsEl.textContent = `→ ${this.heroPrediction.headsign || 'Unknown'}`;
+
+    // Meta (arrival time)
+    const metaEl = document.getElementById('hero-meta');
+    if (minutes >= 2) {
+      const arrival = new Date(Date.now() + seconds * 1000);
+      const timeStr = arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      metaEl.textContent = `arrives ~${timeStr}`;
+    } else {
+      metaEl.textContent = '';
+    }
+  }
+
+  // Countdown timer — ticks every second between polls
+  startCountdown() {
+    this.stopCountdown();
+    this.countdownTimer = setInterval(() => {
+      if (this.heroEtaSeconds !== null && this.heroEtaSeconds > 0) {
+        this.heroEtaSeconds--;
+        this.renderHeroDisplay();
+      }
+    }, 1000);
+  }
+
+  stopCountdown() {
+    if (this.countdownTimer) {
+      clearInterval(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+  }
+
+  // ─────────────────────────────────
+  // PROGRESS STRIP — linear route viz
+  // ─────────────────────────────────
+
+  renderProgressStrip(predictions, vehicles) {
+    const section = document.getElementById('progress-section');
+    const strip = document.getElementById('progress-strip');
+    const label = document.getElementById('progress-label');
+    if (!section || !strip) return;
+
+    // Only show for active predictions with a trackable vehicle
+    const hero = predictions[0];
+    if (!hero || hero.tier === 'scheduled' || !hero.vehicleId) {
+      section.style.display = 'none';
+      return;
+    }
+
+    // Find the vehicle
+    const vehicle = vehicles.find(v => v.id === hero.vehicleId || v.vehicleId === hero.vehicleId);
+    if (!vehicle) {
+      section.style.display = 'none';
+      return;
+    }
+
+    // Determine direction: find which direction list the vehicle is closest to
+    let bestDir = null;
+    let bestMyIdx = -1;
+    let bestBusIdx = -1;
+    let bestDist = Infinity;
+
+    for (const [dir, myIdx] of Object.entries(this.myStopDirections)) {
+      const stops = this.dirStops[dir];
+      const nearest = this.findNearestStop(stops, vehicle.lat, vehicle.lon);
+      if (nearest.distance < bestDist) {
+        bestDist = nearest.distance;
+        bestDir = dir;
+        bestMyIdx = myIdx;
+        bestBusIdx = nearest.index;
+      }
+    }
+
+    if (bestDir === null || bestMyIdx < 0 || bestBusIdx < 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    const stops = this.dirStops[bestDir];
+    const n = stops.length;
+    if (n < 2) { section.style.display = 'none'; return; }
+
+    section.style.display = '';
+
+    // Calculate bus fractional position between stops
+    let busFrac = 0;
+    if (bestBusIdx < n - 1) {
+      const curr = stops[bestBusIdx];
+      const next = stops[bestBusIdx + 1];
+      const dTotal = this.dist(curr.lat, curr.lon, next.lat, next.lon);
+      const dBus = this.dist(curr.lat, curr.lon, vehicle.lat, vehicle.lon);
+      busFrac = dTotal > 0 ? Math.min(1, dBus / dTotal) : 0;
+    }
+
+    // Render SVG
+    const w = strip.clientWidth || 340;
+    const h = 56;
+    const pad = 28;
+    const uw = w - pad * 2;
+    const lineY = 20;
+    const x = (i) => pad + (i / (n - 1)) * uw;
+
+    const busX = x(bestBusIdx + busFrac);
+    const myX = x(bestMyIdx);
+    const rc = this.routeColor;
+
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
+
+    // Glow filter
+    svg += `<defs><filter id="pg"><feGaussianBlur stdDeviation="3" result="b"/>` +
+           `<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+
+    // Background line
+    svg += `<line x1="${pad}" y1="${lineY}" x2="${w-pad}" y2="${lineY}" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>`;
+
+    // Active segment: bus → my stop (glowing route color)
+    if (busX < myX + 5) {
+      svg += `<line x1="${busX}" y1="${lineY}" x2="${myX}" y2="${lineY}" ` +
+             `stroke="${rc}" stroke-width="4" stroke-linecap="round" filter="url(#pg)" opacity="0.7"/>`;
+    }
+
+    // Stop dots (small)
+    for (let i = 0; i < n; i++) {
+      if (i === bestMyIdx) continue;
+      svg += `<circle cx="${x(i)}" cy="${lineY}" r="2" fill="#334155"/>`;
+    }
+
+    // My stop — pulsing marker
+    svg += `<circle cx="${myX}" cy="${lineY}" r="10" fill="none" stroke="${rc}" stroke-width="1.5" opacity="0.2">` +
+           `<animate attributeName="r" values="10;14;10" dur="2.5s" repeatCount="indefinite"/>` +
+           `<animate attributeName="opacity" values="0.2;0;0.2" dur="2.5s" repeatCount="indefinite"/></circle>`;
+    svg += `<circle cx="${myX}" cy="${lineY}" r="6" fill="${rc}" stroke="#090e1a" stroke-width="2.5"/>`;
+    svg += `<text x="${myX}" y="${lineY + 22}" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="600" font-family="Inter,sans-serif">YOU</text>`;
+
+    // Bus marker
+    svg += `<circle cx="${busX}" cy="${lineY}" r="6" fill="#f8fafc" stroke="${rc}" stroke-width="2.5" filter="url(#pg)"/>`;
+    // Bus label
+    svg += `<text x="${busX}" y="${lineY - 12}" text-anchor="middle" fill="#f8fafc" font-size="9" font-weight="700" font-family="Inter,sans-serif">`;
+    // Show mini bus icon or text
+    svg += `BUS</text>`;
+
+    svg += '</svg>';
+    strip.innerHTML = svg;
+
+    // Label: X stops away
+    const stopsAway = bestMyIdx - bestBusIdx;
+    if (stopsAway > 0) {
+      label.textContent = `${stopsAway} stop${stopsAway === 1 ? '' : 's'} away`;
+    } else if (stopsAway === 0) {
+      label.textContent = 'At your stop';
+    } else {
+      label.textContent = '';
+    }
+  }
+
+  // ─────────────────────────────
+  // UPCOMING — other predictions
+  // ─────────────────────────────
+
+  renderUpcoming(predictions) {
+    const section = document.getElementById('upcoming-section');
+    const list = document.getElementById('upcoming-list');
+    if (!section || !list) return;
+
+    // Exclude the hero prediction
+    const heroKey = this.heroPrediction
+      ? `${this.heroPrediction.vehicleId || ''}_${this.heroPrediction.tripId || ''}_${this.heroPrediction.etaSeconds}`
+      : null;
+
+    const upcoming = predictions.filter(p => {
+      const key = `${p.vehicleId || ''}_${p.tripId || ''}_${p.etaSeconds}`;
+      return key !== heroKey;
+    });
+
+    if (upcoming.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = '';
+
+    // Group by direction for visual clarity
+    const heroDir = this.heroPrediction?.directionId;
+    const sameDir = upcoming.filter(p => p.directionId === heroDir);
+    const otherDir = upcoming.filter(p => p.directionId !== heroDir);
+
+    let html = '';
+
+    // Same direction — later buses, tappable to promote to hero
+    if (sameDir.length > 0) {
+      html += sameDir.map(pred => this.renderUpcomingRow(pred)).join('');
+    }
+
+    // Other direction with header
+    if (otherDir.length > 0) {
+      const otherHeadsign = otherDir[0].headsign || 'Other direction';
+      html += `<div class="d-upcoming-dir-header">
+        <span class="d-dir-arrow">→</span> ${this.esc(otherHeadsign)}
+        <span class="d-dir-tap-hint">tap to track</span>
+      </div>`;
+      html += otherDir.map(pred => this.renderUpcomingRow(pred)).join('');
+    }
+
+    list.innerHTML = html;
+
+    // ALL rows are tappable → promote to hero
+    list.querySelectorAll('.d-upcoming-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const vid = row.dataset.vehicle || null;
+        const dir = row.dataset.dir != null ? parseInt(row.dataset.dir, 10) : null;
+
+        // Track this specific vehicle
+        this.trackedVehicleId = vid;
+
+        // Update direction if switching
+        if (dir !== null && dir !== this.selectedDirection) {
+          this.selectedDirection = dir;
+          this.updateDirectionUrl(dir);
+        }
+
+        // Re-render everything with new hero
+        this.renderHero(this.lastPredictions);
+        this.renderProgressStrip(this.lastPredictions, this.lastVehicles);
+        this.renderUpcoming(this.lastPredictions);
+
+        // Scroll to top to see new hero
+        document.getElementById('tracker-content')?.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  }
+
+  renderUpcomingRow(pred) {
+    const minutes = Math.floor(pred.etaSeconds / 60);
+    const tier = pred.tier || 'active';
+    const isOtherDir = pred.directionId !== this.heroPrediction?.directionId;
+
+    // Status
+    let statusHtml;
+    if (tier === 'active') {
+      const st = this.staleTier(pred.staleSeconds);
+      statusHtml = st.html;
+    } else if (tier === 'next') {
+      statusHtml = '<span class="dot-next"></span> Next run';
+    } else {
+      statusHtml = '<span class="dot-sched"></span> Scheduled';
+    }
+
+    // Arrival time
+    let arrivalStr = '';
+    if (minutes >= 10) {
+      const arr = new Date(Date.now() + pred.etaSeconds * 1000);
+      arrivalStr = ` · ~${arr.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+    }
+
+    // Row color
+    const rowColor = tier === 'next' ? '#60a5fa' : tier === 'scheduled' ? '#334155' : this.routeColor;
+    const swapClass = isOtherDir ? ' d-swap-row' : '';
+
+    return `
+      <div class="d-upcoming-row tier-${tier}${swapClass}"
+           style="--row-color:${rowColor}"
+           data-vehicle="${this.esc(pred.vehicleId || '')}"
+           data-dir="${pred.directionId != null ? pred.directionId : ''}">
+        <div class="d-upcoming-info">
+          <div class="d-upcoming-headsign">${this.esc(pred.headsign || 'Unknown')}</div>
+          <div class="d-upcoming-meta">${statusHtml}${arrivalStr}</div>
+        </div>
+        <div class="d-upcoming-time">
+          <div class="d-upcoming-minutes${tier !== 'active' ? ` tier-${tier}` : ''}">${minutes < 1 ? 'NOW' : minutes}</div>
+          <div class="d-upcoming-label">${minutes < 1 ? '' : 'min'}</div>
+        </div>
+        <div class="d-upcoming-chevron">${isOtherDir ? '↑' : '↑'}</div>
+      </div>
+    `;
+  }
+
+  // Update URL with direction preference (no page reload)
+  updateDirectionUrl(dir) {
+    const url = new URL(window.location);
+    url.searchParams.set('dir', dir);
+    window.history.replaceState({}, '', url);
+  }
+
+  // ────────────────────────
+  // PULL THE CORD
+  // ────────────────────────
+
+  initPullCord() {
+    const btn = document.getElementById('pull-cord-btn');
+    if (!btn) return;
+
+    btn.addEventListener('click', () => this.togglePullCord());
+  }
+
+  async togglePullCord() {
+    const btn = document.getElementById('pull-cord-btn');
+    const text = document.getElementById('pull-cord-text');
+
+    if (this.cordActive) {
+      // Cancel
+      this.cordActive = false;
+      this.cordVehicleId = null;
+      this.cordNotified = false;
+      btn.classList.remove('cord-active', 'cord-fired');
+      text.textContent = 'Pull the Cord';
+      return;
+    }
+
+    // Activate — watch the hero bus
+    if (!this.heroPrediction) return;
+
+    // Request notification permission
+    const canNotify = await this.requestNotification();
+
+    this.cordActive = true;
+    this.cordVehicleId = this.heroPrediction.vehicleId || null;
+    this.cordNotified = false;
+
+    btn.classList.add('cord-active');
+    btn.classList.add('cord-fired');
+    setTimeout(() => btn.classList.remove('cord-fired'), 600);
+
+    // Haptic feedback
+    if (navigator.vibrate) navigator.vibrate(100);
+
+    const mins = Math.floor(this.heroPrediction.etaSeconds / 60);
+    text.textContent = this.cordVehicleId
+      ? `Watching · ${mins} min away`
+      : `Alert set · ${mins} min`;
+  }
+
+  checkPullCord() {
+    if (!this.cordActive) return;
+
+    const btn = document.getElementById('pull-cord-btn');
+    const text = document.getElementById('pull-cord-text');
+
+    // Find the watched vehicle in current predictions
+    let pred = null;
+    if (this.cordVehicleId) {
+      pred = this.lastPredictions.find(p => p.vehicleId === this.cordVehicleId);
+    }
+    if (!pred && this.lastPredictions.length > 0) {
+      pred = this.lastPredictions[0]; // Fall back to first prediction
+    }
+
+    if (!pred) {
+      // Bus disappeared
+      this.sendNotification('Bus update', 'Your bus may have passed or gone out of service.');
+      this.cordActive = false;
+      this.cordVehicleId = null;
+      btn.classList.remove('cord-active');
+      text.textContent = 'Pull the Cord';
+      return;
+    }
+
+    const mins = Math.floor(pred.etaSeconds / 60);
+    text.textContent = `Watching · ${mins} min away`;
+
+    // Fire notification at ≤ 2 minutes
+    if (pred.etaSeconds <= 120 && !this.cordNotified) {
+      this.cordNotified = true;
+      this.sendNotification(
+        'Your bus is almost here!',
+        `Route ${this.config.routeShortName || ''} arriving in ~${mins} min — head to the stop.`
+      );
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+      // Visual burst
+      btn.classList.add('cord-fired');
+      setTimeout(() => btn.classList.remove('cord-fired'), 600);
+    }
+  }
+
+  async requestNotification() {
+    if (!('Notification' in window)) return false;
+    if (Notification.permission === 'granted') return true;
+    if (Notification.permission === 'denied') return false;
+    const result = await Notification.requestPermission();
+    return result === 'granted';
+  }
+
+  sendNotification(title, body) {
+    try {
+      if (Notification.permission === 'granted') {
+        new Notification(title, { body, icon: '/public/icons/favicon.svg' });
+      }
+    } catch (e) { /* silent */ }
+  }
+
+  // ───────────────────────
+  // MAP (on demand)
+  // ───────────────────────
+
+  initMapToggle() {
+    const toggleBtn = document.getElementById('map-toggle-btn');
+    const closeBtn = document.getElementById('map-close-btn');
+    const toggleText = document.getElementById('map-toggle-text');
+
+    if (toggleBtn) toggleBtn.addEventListener('click', () => this.showMap());
+    if (closeBtn) closeBtn.addEventListener('click', () => this.hideMap());
+  }
+
+  showMap() {
+    if (this.mapVisible) return;
+    this.mapVisible = true;
+    const panel = document.getElementById('map-panel');
+    if (panel) panel.classList.add('map-visible');
+
+    if (!this.map) {
+      // Delay init slightly for animation to start
+      setTimeout(() => this.initMap(), 100);
+    } else {
+      this.map.invalidateSize();
+    }
+  }
+
+  hideMap() {
+    this.mapVisible = false;
+    const panel = document.getElementById('map-panel');
+    if (panel) panel.classList.remove('map-visible');
+  }
+
+  initMap() {
+    const { stop } = this.data;
+
+    this.map = L.map('map', {
+      zoomControl: false,
+      attributionControl: false
+    }).setView([stop.lat, stop.lon], 15);
+
+    // Dark map tiles to match the dark UI
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      subdomains: 'abcd'
+    }).addTo(this.map);
+
+    L.control.attribution({ position: 'bottomright', prefix: false })
+      .addAttribution('© <a href="https://carto.com" style="color:#64748b">CARTO</a>')
+      .addTo(this.map);
+
+    L.control.zoom({ position: 'topleft' }).addTo(this.map);
+
+    this.drawRouteShapes();
+    this.addStopMarkers();
+    this.addActiveStopMarker();
+    this.updateMapMarkers(this.lastVehicles);
+    this.map.setView([stop.lat, stop.lon], 15);
+
+    // Recenter button
+    const btn = document.getElementById('recenter-btn');
+    if (btn) btn.addEventListener('click', () => {
+      this.focusedVehicleId = null;
+      this.map.setView([stop.lat, stop.lon], 15);
+    });
+  }
+
+  drawRouteShapes() {
+    const { shapes } = this.data;
+    Object.values(shapes).forEach(coords => {
+      if (coords.length === 0) return;
+      // Outline
+      L.polyline(coords, {
+        color: '#1e293b', weight: 8, opacity: 0.8,
+        lineCap: 'round', lineJoin: 'round'
+      }).addTo(this.map);
+      // Route color
+      const poly = L.polyline(coords, {
+        color: this.routeColor, weight: 4, opacity: 0.9,
+        lineCap: 'round', lineJoin: 'round'
+      }).addTo(this.map);
+      this.routePolylines.push(poly);
+    });
+  }
+
+  addStopMarkers() {
+    const { stops, stop: active } = this.data;
+    stops.forEach(s => {
+      if (s.id === active.id) return;
+      const icon = L.divIcon({
+        html: `<div class="route-stop-dot" style="--route-color:${this.routeColor}"></div>`,
+        className: '', iconSize: [8, 8], iconAnchor: [4, 4]
+      });
+      const m = L.marker([s.lat, s.lon], { icon }).addTo(this.map);
+      m.bindPopup(`<b>${this.esc(s.name)}</b>`);
+      this.stopMarkersList.push(m);
+    });
+  }
+
+  addActiveStopMarker() {
+    const { stop } = this.data;
+    const icon = L.divIcon({
+      html: '<div class="stop-pulse"></div>',
+      className: '', iconSize: [20, 20], iconAnchor: [10, 10]
+    });
+    this.activeStopMarker = L.marker([stop.lat, stop.lon], { icon, zIndexOffset: 1000 }).addTo(this.map);
+  }
+
+  updateMapMarkers(vehicles) {
+    if (!this.map) return;
+
     this.busMarkers.forEach(info => this.map.removeLayer(info.marker));
     this.busMarkers.clear();
-    
+
     vehicles.forEach(v => {
       const isFocused = this.focusedVehicleId === v.id;
       const stale = v.staleSeconds >= 90;
       const lost = v.staleSeconds >= 180;
-      
+
       const icon = L.divIcon({
-        html: `
-          <div class="bus-marker${isFocused ? ' bus-marker-focused' : ''}${stale ? ' bus-marker-stale' : ''}${lost ? ' bus-marker-lost' : ''}" style="--bus-color: ${this.routeColor}">
-            <div class="bus-marker-arrow" style="--bearing: ${v.bearing || 0}deg; --bus-color: ${this.routeColor}"></div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="18" height="16" rx="3"/><path d="M8 6v6M16 6v6M2 12h20"/><circle cx="7" cy="16" r="1" fill="#fff"/><circle cx="17" cy="16" r="1" fill="#fff"/></svg>
-          </div>`,
-        className: '',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
+        html: `<div class="bus-marker${isFocused ? ' bus-marker-focused' : ''}${stale ? ' bus-marker-stale' : ''}${lost ? ' bus-marker-lost' : ''}" style="--bus-color:${this.routeColor}">
+          <div class="bus-marker-arrow" style="--bearing:${v.bearing || 0}deg;--bus-color:${this.routeColor}"></div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="18" height="16" rx="3"/><path d="M8 6v6M16 6v6M2 12h20"/><circle cx="7" cy="16" r="1" fill="#fff"/><circle cx="17" cy="16" r="1" fill="#fff"/></svg>
+        </div>`,
+        className: '', iconSize: [32, 32], iconAnchor: [16, 16]
       });
-      
-      // Compass from bearing for popup
+
       const compass = this.bearingToCompass(v.bearing);
       const tier = this.staleTier(v.staleSeconds);
       const marker = L.marker([v.lat, v.lon], { icon, zIndexOffset: isFocused ? 900 : 500 }).addTo(this.map);
-      marker.bindPopup(`
-        <b>${this.esc(v.headsign || 'Unknown')}</b><br>
-        <small>Heading ${compass} · ${tier.level === 'live' ? 'Live' : 
-          tier.level === 'delayed' ? 'Signal delayed' :
-          `Position ${Math.floor(v.staleSeconds/60)}m stale`}</small>
-      `);
-      
-      // Store by both entity id AND internal vehicleId so predictions can find them
+      marker.bindPopup(`<b>${this.esc(v.headsign || 'Unknown')}</b><br><small>Heading ${compass} · ${tier.level === 'live' ? 'Live' : tier.level === 'delayed' ? 'Signal delayed' : `${Math.floor(v.staleSeconds/60)}m stale`}</small>`);
+
       const info = { marker, lat: v.lat, lon: v.lon, headsign: v.headsign };
       this.busMarkers.set(v.id, info);
-      if (v.vehicleId && v.vehicleId !== v.id) {
-        this.busMarkers.set(v.vehicleId, info);
-      }
+      if (v.vehicleId && v.vehicleId !== v.id) this.busMarkers.set(v.vehicleId, info);
     });
   }
 
-  updateETAs(predictions) {
-    const container = document.getElementById('eta-cards');
-    const loading = document.getElementById('eta-loading');
-    const empty = document.getElementById('eta-empty');
-    
-    loading.style.display = 'none';
-    
-    if (!predictions || predictions.length === 0) {
-      empty.style.display = '';
-      const cards = container.querySelectorAll('.eta-group');
-      cards.forEach(c => c.remove());
-      return;
-    }
-    
-    empty.style.display = 'none';
-    
-    // Group by headsign
-    const grouped = {};
-    predictions.forEach(pred => {
-      const key = pred.headsign || 'Unknown';
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(pred);
-    });
-    
-    // Remove old
-    const old = container.querySelectorAll('.eta-group');
-    old.forEach(c => c.remove());
-    
-    Object.entries(grouped).forEach(([headsign, preds]) => {
-      const group = document.createElement('div');
-      group.className = 'eta-group';
-      
-      // Direction header
-      const header = document.createElement('div');
-      header.className = 'eta-group-header';
-      header.innerHTML = `<span class="eta-group-arrow">→</span> ${this.esc(headsign)}`;
-      group.appendChild(header);
-      
-      preds.forEach((pred) => {
-        const minutes = Math.floor(pred.etaSeconds / 60);
-        const tier = pred.tier || 'active';
-        const isArriving = minutes < 2 && tier === 'active';
-        const isClickable = (tier === 'active' || tier === 'next') && !!pred.vehicleId;
-        
-        // Arrival time estimate
-        const arrivalTime = new Date(Date.now() + pred.etaSeconds * 1000);
-        const timeStr = arrivalTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        
-        const row = document.createElement('div');
-        row.className = `eta-row eta-tier-${tier} eta-row-update${isClickable ? ' eta-clickable' : ''}`;
-        row.style.setProperty('--route-color', this.routeColor);
-        
-        if (isClickable) {
-          row.addEventListener('click', () => this.focusOnBus(pred.vehicleId));
-        }
-        
-        // Status text based on tier
-        let statusHtml;
-        if (tier === 'active') {
-          const staleness = this.staleTier(pred.staleSeconds);
-          statusHtml = staleness.html;
-        } else if (tier === 'next') {
-          statusHtml = '<span class="eta-next-dot"></span> On another run';
-        } else {
-          statusHtml = '<span class="eta-sched-dot"></span> Scheduled';
-        }
-        
-        row.innerHTML = `
-          <div class="eta-direction">
-            <div class="eta-meta">
-              ${statusHtml}
-              ${minutes >= 10 ? ` · ~${timeStr}` : ''}
-            </div>
-          </div>
-          <div class="eta-time">
-            <div class="eta-minutes${isArriving ? ' arriving' : ''}">${minutes < 1 ? 'NOW' : minutes}</div>
-            <div class="eta-label">${minutes < 1 ? '' : 'min'}</div>
-          </div>
-          ${isClickable ? '<div class="eta-chevron">›</div>' : ''}
-        `;
-        group.appendChild(row);
-      });
-      
-      container.appendChild(group);
-    });
-  }
+  focusOnBus(vehicleId) {
+    if (!this.map) return;
+    const info = this.busMarkers.get(vehicleId);
+    if (!info) return;
 
-  updateStatus(count) {
-    const el = document.getElementById('last-updated');
+    this.focusedVehicleId = vehicleId;
+    const stopLat = this.data.stop.lat;
+    const stopLon = this.data.stop.lon;
+    const bounds = L.latLngBounds([info.lat, info.lon], [stopLat, stopLon]);
+    this.map.fitBounds(bounds.pad(0.3));
+    info.marker.openPopup();
+
+    const el = info.marker.getElement();
     if (el) {
-      el.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+      el.classList.add('bus-focused');
+      setTimeout(() => el.classList.remove('bus-focused'), 3000);
     }
-    const vc = document.getElementById('vehicle-count');
-    if (vc) vc.textContent = count;
+  }
+
+  // ────────────────────────────────
+  // MULTI-ROUTE DISCOVERY
+  // ────────────────────────────────
+
+  async discoverOtherRoutes() {
+    try {
+      const stopName = this.data.stop.name;
+      const res = await fetch(`/api/stops?q=${encodeURIComponent(stopName)}&limit=5`);
+      const stops = await res.json();
+
+      // Find our stop
+      const myStop = stops.find(s => s.stop_id === this.data.stop.id);
+      if (!myStop || !myStop.routes) return;
+
+      const currentRoute = this.config.routeShortName || this.data.route.shortName;
+      const otherRoutes = myStop.routes.filter(r => r !== currentRoute);
+      if (otherRoutes.length === 0) return;
+
+      this.renderRouteTabs(currentRoute, otherRoutes);
+    } catch (e) { /* silent */ }
+  }
+
+  renderRouteTabs(current, others) {
+    const container = document.getElementById('route-tabs');
+    if (!container) return;
+
+    const basePath = window.__BASE_PATH__ || '';
+    const stopId = this.config.stopId;
+
+    let html = `<a class="d-route-tab d-route-tab-active" style="--tab-color:${this.routeColor}">${this.esc(current)}</a>`;
+    others.forEach(r => {
+      html += `<a href="${basePath}/bus?route=${r}&stop=${stopId}" class="d-route-tab">${this.esc(r)}</a>`;
+    });
+
+    container.innerHTML = html;
+  }
+
+  // ──────────────
+  // UTILITIES
+  // ──────────────
+
+  staleTier(s) {
+    if (s == null || s < 45) return { level: 'live', html: '<span class="dot-live"></span> Live' };
+    if (s < 90) return { level: 'delayed', html: '<span class="dot-delayed"></span> Delayed' };
+    if (s < 180) {
+      const m = Math.floor(s / 60);
+      return { level: 'stale', html: `<span class="dot-stale"></span> ~${m}m ago` };
+    }
+    const m = Math.floor(s / 60);
+    return { level: 'lost', html: `<span class="dot-lost"></span> Last seen ${m}m ago` };
   }
 
   bearingToCompass(b) {
@@ -487,25 +1008,25 @@ class PullcordApp {
     return dirs[Math.round(b / 45) % 8];
   }
 
-  // Staleness tiers based on MARTA data analysis:
-  // Baseline lag is 23-35s (normal), buses report every ~30s, dropouts common
-  staleTier(s) {
-    if (s < 45) {
-      return { level: 'live', html: '<span class="eta-live-dot"></span> Live' };
-    } else if (s < 90) {
-      return { level: 'delayed', html: '<span class="eta-delayed-dot"></span> Delayed' };
-    } else if (s < 180) {
-      const m = Math.floor(s / 60);
-      return { level: 'stale', html: `<span class="eta-stale-dot"></span> ~${m}m ago · position may be off` };
-    } else {
-      const m = Math.floor(s / 60);
-      return { level: 'lost', html: `<span class="eta-lost-dot"></span> Last seen ${m}m ago` };
+  findNearestStop(stops, lat, lon) {
+    let minDist = Infinity;
+    let minIdx = -1;
+    for (let i = 0; i < stops.length; i++) {
+      const d = this.dist(lat, lon, stops[i].lat, stops[i].lon);
+      if (d < minDist) { minDist = d; minIdx = i; }
     }
+    return { index: minIdx, distance: minDist };
   }
 
-  fmtStale(s) {
-    if (s < 60) return `${s}s ago`;
-    return `${Math.floor(s / 60)}m ago`;
+  dist(lat1, lon1, lat2, lon2) {
+    // Simple equirectangular approximation (fine for short distances)
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const mLat = (lat1 + lat2) / 2 * Math.PI / 180;
+    const dx = dLon * Math.cos(mLat) * R;
+    const dy = dLat * R;
+    return Math.sqrt(dx * dx + dy * dy);
   }
 
   showOffline() {
