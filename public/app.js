@@ -270,6 +270,7 @@ class PullcordApp {
     // Tracked vehicle — persisted in URL via &vid=
     // Falls back to first-in-direction when vehicle disappears
     this.trackedVehicleId = params.get('vid') || null;
+    this.trackedPredictionIdx = null;
 
     // Set route color CSS variable on shell
     const shell = document.querySelector('.d-shell');
@@ -523,6 +524,12 @@ class PullcordApp {
         this.trackedVehicleId = null;
         this.updateVehicleUrl(null);
       }
+    }
+
+    // Fallback: track by index for vehicleless predictions (next-run/scheduled)
+    if (!hero && this.trackedPredictionIdx != null) {
+      hero = predictions[this.trackedPredictionIdx];
+      if (!hero) this.trackedPredictionIdx = null;
     }
 
     if (!hero && this.selectedDirection !== null) {
@@ -798,13 +805,14 @@ class PullcordApp {
     }).join('');
 
     // ALL rows are tappable → promote to hero
-    list.querySelectorAll('.d-upcoming-row').forEach(row => {
+    list.querySelectorAll('.d-upcoming-row').forEach((row, idx) => {
       row.addEventListener('click', () => {
         const vid = row.dataset.vehicle || null;
         const dir = row.dataset.dir != null ? parseInt(row.dataset.dir, 10) : null;
 
-        // Track this specific vehicle and persist in URL
+        // Track this specific vehicle (or index for vehicleless predictions)
         this.trackedVehicleId = vid;
+        this.trackedPredictionIdx = vid ? null : idx;
         this.updateVehicleUrl(vid);
 
         // Update direction if switching
@@ -1010,6 +1018,7 @@ class PullcordApp {
           routeId: this.heroPrediction.routeId || this.config.routeId,
           stopId: this.config.stopId,
           vehicleId: this.heroPrediction.vehicleId || null,
+          tripId: this.heroPrediction.tripId || null,
           thresholdMinutes,
         }),
       });

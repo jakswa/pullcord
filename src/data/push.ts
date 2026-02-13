@@ -31,6 +31,7 @@ interface ActiveCord {
   routeId: string;
   stopId: string;
   vehicleId: string | null;
+  tripId: string | null;
   thresholdSeconds: number; // notify when ETA ≤ this
   createdAt: number;
   notified: boolean;
@@ -49,6 +50,7 @@ export function registerCord(
   routeId: string,
   stopId: string,
   vehicleId: string | null,
+  tripId: string | null,
   thresholdMinutes: number = 2,
 ): string {
   // Generate a cord ID
@@ -67,13 +69,14 @@ export function registerCord(
     routeId,
     stopId,
     vehicleId,
+    tripId,
     thresholdSeconds: thresholdMinutes * 60,
     createdAt: Date.now(),
     notified: false,
     expiresAt: Date.now() + 60 * 60 * 1000, // 1 hour
   });
 
-  console.log(`🔔 Cord registered: ${id} for route ${routeId} at stop ${stopId}${vehicleId ? ` (vehicle ${vehicleId})` : ''}`);
+  console.log(`🔔 Cord registered: ${id} for route ${routeId} at stop ${stopId}${vehicleId ? ` (vehicle ${vehicleId})` : ''}${tripId ? ` (trip ${tripId})` : ''}`);
   startCordPolling(); // Ensure poll loop is running
   return id;
 }
@@ -139,13 +142,16 @@ export async function checkCords(
     // Don't fire on the first poll cycle — prevents instant re-fire on re-subscribe
     if (now - cord.createdAt < CORD_POLL_INTERVAL) continue;
 
-    // Find the relevant prediction
-    let pred = cord.vehicleId
-      ? predictions.find(p => p.vehicleId === cord.vehicleId)
-      : predictions[0];
-
+    // Find the relevant prediction — match by tripId first, then vehicleId, then soonest
+    let pred: typeof predictions[0] | undefined;
+    if (cord.tripId) {
+      pred = predictions.find(p => p.tripId === cord.tripId);
+    }
+    if (!pred && cord.vehicleId) {
+      pred = predictions.find(p => p.vehicleId === cord.vehicleId);
+    }
     if (!pred && predictions.length > 0) {
-      pred = predictions[0]; // fallback
+      pred = predictions[0]; // fallback to soonest
     }
 
     if (!pred) continue;

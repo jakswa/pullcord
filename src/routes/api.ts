@@ -244,7 +244,7 @@ app.get("/push/vapid", (c) => {
 app.post("/push/cord", async (c) => {
   try {
     const body = await c.req.json();
-    const { subscription, routeId, stopId, vehicleId, thresholdMinutes } = body;
+    const { subscription, routeId, stopId, vehicleId, tripId, thresholdMinutes } = body;
 
     if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
       return c.json({ error: "Invalid push subscription" }, 400);
@@ -254,7 +254,7 @@ app.post("/push/cord", async (c) => {
     }
 
     const threshold = Math.max(1, Math.min(30, thresholdMinutes || 2));
-    const cordId = registerCord(subscription, routeId, stopId, vehicleId || null, threshold);
+    const cordId = registerCord(subscription, routeId, stopId, vehicleId || null, tripId || null, threshold);
     return c.json({ cordId, status: "watching" });
   } catch (error) {
     console.error("Error registering cord:", error);
