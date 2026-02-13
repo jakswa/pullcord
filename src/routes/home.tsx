@@ -7,7 +7,7 @@ const app = new Hono();
 // GET / - Home page (stop discovery)
 app.get("/", (c) => {
   return c.html(
-    <Layout title="Find Your Stop — Pullcord">
+    <Layout title="Pullcord — Real-time MARTA Bus Tracker">
       <HomePage />
     </Layout>
   );
