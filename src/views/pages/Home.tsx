@@ -12,18 +12,18 @@ export const HomePage = () => (
           </svg>
           <span class="home-wordmark">Pullcord</span>
         </div>
-        <p class="home-tagline">Where's my bus?</p>
-        
+        <p class="home-tagline">Pull the cord. Catch your ride.</p>
+
         {/* Big location button — primary action */}
         <button id="location-btn" class="home-locate-btn">
           <svg class="home-locate-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          Find Stops Near Me
+          Find My Stop
         </button>
 
-        {/* Search bar — secondary */}
+        {/* Search bar */}
         <div class="home-search-wrap">
           <input
             type="text"
@@ -38,13 +38,10 @@ export const HomePage = () => (
 
     {/* Results area */}
     <div class="home-results-area">
-      {/* Loading state */}
       <div id="search-loading" class="hidden home-status">
-        <div class="tracker-spinner"></div>
+        <div class="d-spinner"></div>
         Finding stops near you...
       </div>
-
-      {/* Results container */}
       <div id="search-results" class="hidden">
         <div class="home-results-header" id="results-header">Nearby Stops</div>
         <div id="results-list" class="home-results-list"></div>
@@ -54,7 +51,7 @@ export const HomePage = () => (
     {/* Footer */}
     <div class="home-footer">
       <p>Real-time MARTA bus tracking · data updates every 30s</p>
-      <p class="home-footer-sub">Built on MARTA GTFS-RT feeds</p>
+      <p class="home-footer-sub">Built with care on MARTA GTFS-RT feeds</p>
     </div>
   </div>
 );

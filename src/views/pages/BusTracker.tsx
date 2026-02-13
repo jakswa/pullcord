@@ -9,7 +9,7 @@ export interface BusTrackerPageProps {
 
 export const BusTrackerPage = (props: BusTrackerPageProps) => {
   const { route, stop, routeDetail, initialData } = props;
-  const routeColor = route.route_color ? `#${route.route_color}` : '#2563eb';
+  const routeColor = route.route_color ? `#${route.route_color}` : '#E85D3A';
 
   return (
     <div class="d-shell" style={`--route-color: ${routeColor}`}>

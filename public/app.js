@@ -166,7 +166,7 @@ class PullcordApp {
     if (!window.__INITIAL_DATA__ || !window.__CONFIG__) return;
     this.data = window.__INITIAL_DATA__;
     this.config = window.__CONFIG__;
-    this.routeColor = this.data.route.color ? `#${this.data.route.color}` : '#2563eb';
+    this.routeColor = this.data.route.color ? `#${this.data.route.color}` : '#E85D3A';
     const params = new URLSearchParams(window.location.search);
     this.mockMode = params.has('mock');
 
@@ -509,6 +509,14 @@ class PullcordApp {
     const myX = x(bestMyIdx);
     const rc = this.routeColor;
 
+    // Adaptive colors for light/dark mode
+    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const stripLine = dark ? '#1e293b' : '#EDE5D8';
+    const stopDot = dark ? '#334155' : '#D4C4B4';
+    const myStopStroke = dark ? '#090e1a' : '#FFFFFF';
+    const labelFill = dark ? '#94a3b8' : '#7C6354';
+    const busFill = dark ? '#f8fafc' : '#3B2820';
+
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
 
     // Glow filter
@@ -516,7 +524,7 @@ class PullcordApp {
            `<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
 
     // Background line
-    svg += `<line x1="${pad}" y1="${lineY}" x2="${w-pad}" y2="${lineY}" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>`;
+    svg += `<line x1="${pad}" y1="${lineY}" x2="${w-pad}" y2="${lineY}" stroke="${stripLine}" stroke-width="3" stroke-linecap="round"/>`;
 
     // Active segment: bus → my stop (glowing route color)
     if (busX < myX + 5) {
@@ -527,20 +535,20 @@ class PullcordApp {
     // Stop dots (small)
     for (let i = 0; i < n; i++) {
       if (i === bestMyIdx) continue;
-      svg += `<circle cx="${x(i)}" cy="${lineY}" r="2" fill="#334155"/>`;
+      svg += `<circle cx="${x(i)}" cy="${lineY}" r="2" fill="${stopDot}"/>`;
     }
 
     // My stop — pulsing marker
     svg += `<circle cx="${myX}" cy="${lineY}" r="10" fill="none" stroke="${rc}" stroke-width="1.5" opacity="0.2">` +
            `<animate attributeName="r" values="10;14;10" dur="2.5s" repeatCount="indefinite"/>` +
            `<animate attributeName="opacity" values="0.2;0;0.2" dur="2.5s" repeatCount="indefinite"/></circle>`;
-    svg += `<circle cx="${myX}" cy="${lineY}" r="6" fill="${rc}" stroke="#090e1a" stroke-width="2.5"/>`;
-    svg += `<text x="${myX}" y="${lineY + 22}" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="600" font-family="Inter,sans-serif">YOU</text>`;
+    svg += `<circle cx="${myX}" cy="${lineY}" r="6" fill="${rc}" stroke="${myStopStroke}" stroke-width="2.5"/>`;
+    svg += `<text x="${myX}" y="${lineY + 22}" text-anchor="middle" fill="${labelFill}" font-size="9" font-weight="600" font-family="Inter,sans-serif">YOU</text>`;
 
     // Bus marker
-    svg += `<circle cx="${busX}" cy="${lineY}" r="6" fill="#f8fafc" stroke="${rc}" stroke-width="2.5" filter="url(#pg)"/>`;
+    svg += `<circle cx="${busX}" cy="${lineY}" r="6" fill="${busFill}" stroke="${rc}" stroke-width="2.5" filter="url(#pg)"/>`;
     // Bus label
-    svg += `<text x="${busX}" y="${lineY - 12}" text-anchor="middle" fill="#f8fafc" font-size="9" font-weight="700" font-family="Inter,sans-serif">`;
+    svg += `<text x="${busX}" y="${lineY - 12}" text-anchor="middle" fill="${busFill}" font-size="9" font-weight="700" font-family="Inter,sans-serif">`;
     // Show mini bus icon or text
     svg += `BUS</text>`;
 
@@ -834,8 +842,12 @@ class PullcordApp {
       attributionControl: false
     }).setView([stop.lat, stop.lon], 15);
 
-    // Dark map tiles to match the dark UI
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // Adaptive map tiles — dark for dark mode, light positron for light mode
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const tileUrl = prefersDark
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    L.tileLayer(tileUrl, {
       maxZoom: 19,
       subdomains: 'abcd'
     }).addTo(this.map);

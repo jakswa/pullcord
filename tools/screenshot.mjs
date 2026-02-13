@@ -7,9 +7,11 @@ const url = process.argv[2] || 'http://localhost:4200/';
 const output = process.argv[3] || 'screenshot.png';
 
 const browser = await chromium.launch({ headless: true });
+const dark = process.argv.includes('--dark');
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 }, // iPhone 14 size
   deviceScaleFactor: 2,
+  colorScheme: dark ? 'dark' : 'light',
 });
 const page = await context.newPage();
 await page.goto(url, { waitUntil: 'networkidle', timeout: 15000 });
