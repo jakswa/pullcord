@@ -157,20 +157,37 @@ class PullcordApp {
       return;
     }
     this.showLoading(loadingDiv, resultsContainer);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          const res = await fetch(`/api/stops?lat=${latitude}&lon=${longitude}&radius=800`);
-          const stops = await res.json();
-          this.displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath);
-        } catch (e) {
-          this.showError('Failed to find nearby stops', resultsList, resultsContainer, loadingDiv);
-        }
-      },
-      () => this.showError('Location access denied', resultsList, resultsContainer, loadingDiv),
-      { timeout: 10000, enableHighAccuracy: false }
-    );
+
+    // Try coarse position first (fast, cell/wifi), fall back to fine
+    const getPosition = (opts) => new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, opts);
+    });
+
+    let pos;
+    try {
+      // Fast attempt: coarse, cached up to 5 min, 5s timeout
+      pos = await getPosition({ enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 });
+    } catch (e1) {
+      try {
+        // Slower attempt: high accuracy, fresh, 15s timeout
+        pos = await getPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+      } catch (e2) {
+        const msg = e2.code === 1 ? 'Location access denied'
+          : e2.code === 3 ? 'Location timed out — try again or search instead'
+          : 'Could not determine location';
+        this.showError(msg, resultsList, resultsContainer, loadingDiv);
+        return;
+      }
+    }
+
+    try {
+      const { latitude, longitude } = pos.coords;
+      const res = await fetch(`/api/stops?lat=${latitude}&lon=${longitude}&radius=800`);
+      const stops = await res.json();
+      this.displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath);
+    } catch (e) {
+      this.showError('Failed to find nearby stops', resultsList, resultsContainer, loadingDiv);
+    }
   }
 
   displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath) {
@@ -888,7 +905,9 @@ class PullcordApp {
 
     const cordIdle = document.getElementById('cord-idle');
     const activeDisplay = document.getElementById('cord-active-display');
+    const label = document.getElementById('cord-label');
 
+    if (label) label.textContent = '🔔 Alert me';
     if (cordIdle) cordIdle.classList.remove('hidden');
     if (activeDisplay) activeDisplay.classList.add('hidden');
   }
