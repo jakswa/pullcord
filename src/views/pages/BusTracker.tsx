@@ -88,24 +88,24 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
       {/* === Bottom Action Bar (thumb zone) === */}
       <div class="d-action-bar">
         <div id="cord-section" class="d-cord-section">
-          <div id="cord-icon" class="d-cord-icon">
-            <svg width="32" height="48" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <line x1="16" y1="0" x2="16" y2="18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="cord-string"/>
-              <rect x="8" y="18" width="16" height="14" rx="5" fill="currentColor" class="cord-handle"/>
-              <rect x="11" y="23" width="10" height="5" rx="2.5" fill="var(--surface)" opacity="0.3"/>
-              <circle cx="16" cy="37" r="2" fill="currentColor" opacity="0.4" class="cord-ring"/>
-            </svg>
-          </div>
-          <div class="d-cord-label" id="cord-label">Notify me when bus is close</div>
-          <div id="cord-options" class="d-cord-options">
-            <button class="d-cord-option" data-minutes="2" type="button">2 min</button>
-            <button class="d-cord-option" data-minutes="5" type="button">5 min</button>
-            <button class="d-cord-option" data-minutes="10" type="button">10 min</button>
-            <button class="d-cord-option" data-minutes="15" type="button">15 min</button>
+          <div id="cord-idle" class="d-cord-idle">
+            <div class="d-cord-label" id="cord-label">🔔 Alert me</div>
+            <div id="cord-options" class="d-cord-options">
+              <button class="d-cord-option" data-minutes="2" type="button">2m</button>
+              <button class="d-cord-option" data-minutes="5" type="button">5m</button>
+              <button class="d-cord-option" data-minutes="10" type="button">10m</button>
+              <button class="d-cord-option" data-minutes="15" type="button">15m</button>
+            </div>
           </div>
           <div id="cord-active-display" class="d-cord-active hidden">
             <button id="cord-cancel-btn" class="d-cord-cancel" type="button">
-              <span id="cord-status-text">🔔 Watching...</span>
+              <svg class="d-cord-inline-icon" width="18" height="26" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <line x1="16" y1="0" x2="16" y2="18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                <rect x="8" y="18" width="16" height="14" rx="5" fill="currentColor"/>
+                <circle cx="16" cy="37" r="2" fill="currentColor" opacity="0.5"/>
+              </svg>
+              <span id="cord-status-text">Watching...</span>
+              <span class="d-cord-x">✕</span>
             </button>
           </div>
         </div>

@@ -802,10 +802,10 @@ class PullcordApp {
 
     // If we arrived from a fired notification, flash confirmation then reset
     if (this.cordFiredId) {
-      const label = document.querySelector('.d-cord-label');
-      if (label) label.textContent = '✅ Bus notification delivered!';
+      const label = document.getElementById('cord-label');
+      if (label) label.textContent = '✅ Notification delivered!';
       setTimeout(() => {
-        if (label) label.textContent = 'Notify me when bus is close';
+        if (label) label.textContent = '🔔 Alert me';
       }, 3000);
       this.cordFiredId = null;
     }
@@ -814,10 +814,9 @@ class PullcordApp {
   async activateCord(thresholdMinutes) {
     if (!this.heroPrediction) return;
 
-    const options = document.getElementById('cord-options');
-    const label = document.querySelector('.d-cord-label');
+    const cordIdle = document.getElementById('cord-idle');
+    const label = document.getElementById('cord-label');
     const activeDisplay = document.getElementById('cord-active-display');
-    const statusText = document.getElementById('cord-status-text');
 
     // Show setting up state
     if (label) label.textContent = 'Setting up...';
@@ -836,7 +835,7 @@ class PullcordApp {
       const perm = await Notification.requestPermission();
       if (perm !== 'granted') {
         if (label) label.textContent = 'Notifications blocked — check settings';
-        setTimeout(() => { if (label) label.textContent = 'Notify me when bus is close'; }, 3000);
+        setTimeout(() => { if (label) label.textContent = '🔔 Alert me'; }, 3000);
         return;
       }
 
@@ -861,34 +860,22 @@ class PullcordApp {
 
       const { cordId } = await cordRes.json();
 
-      // Success — animate the pull!
+      // Success — swap to active display
       this.cordActive = true;
       this.cordId = cordId;
       this.cordThreshold = thresholdMinutes;
 
-      const cordIcon = document.getElementById('cord-icon');
-
-      // Yank animation
-      if (cordIcon) {
-        cordIcon.classList.add('pulled');
-        cordIcon.addEventListener('animationend', () => {
-          cordIcon.classList.remove('pulled');
-          cordIcon.classList.add('watching');
-        }, { once: true });
-      }
-
-      if (options) options.classList.add('hidden');
-      if (label) label.classList.add('hidden');
+      if (cordIdle) cordIdle.classList.add('hidden');
       if (activeDisplay) activeDisplay.classList.remove('hidden');
 
-      if (navigator.vibrate) navigator.vibrate([50, 30, 100]); // short-pause-long, like a cord snap
+      if (navigator.vibrate) navigator.vibrate([50, 30, 100]);
 
       this.updateCordStatus();
 
     } catch (err) {
       console.error('Pull cord setup failed:', err);
       if (label) label.textContent = 'Setup failed — try again';
-      setTimeout(() => { if (label) label.textContent = 'Notify me when bus is close'; }, 3000);
+      setTimeout(() => { if (label) label.textContent = '🔔 Alert me'; }, 3000);
     }
   }
 
@@ -899,14 +886,10 @@ class PullcordApp {
     this.cordActive = false;
     this.cordId = null;
 
-    const options = document.getElementById('cord-options');
-    const label = document.querySelector('.d-cord-label');
+    const cordIdle = document.getElementById('cord-idle');
     const activeDisplay = document.getElementById('cord-active-display');
-    const cordIcon = document.getElementById('cord-icon');
 
-    if (cordIcon) { cordIcon.classList.remove('watching', 'pulled'); }
-    if (options) options.classList.remove('hidden');
-    if (label) { label.classList.remove('hidden'); label.textContent = 'Notify me when bus is close'; }
+    if (cordIdle) cordIdle.classList.remove('hidden');
     if (activeDisplay) activeDisplay.classList.add('hidden');
   }
 
@@ -917,7 +900,7 @@ class PullcordApp {
     const hero = this.heroPrediction;
     if (hero) {
       const mins = Math.floor(hero.etaSeconds / 60);
-      statusText.textContent = `🔔 Alert at ${this.cordThreshold} min · bus is ${mins} min away · tap to cancel`;
+      statusText.textContent = `${this.cordThreshold}m alert · bus ${mins}m away`;
     }
   }
 
