@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getRoutes, getRoute, searchStops, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getPairedStops, getRouteHeadsigns } from "../data/db.js";
 import { getVehicles, getPredictions } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
-import { getVapidPublicKey, registerCord, cancelCord, getActiveCordCount } from "../data/push.js";
+import { getVapidPublicKey, registerCord, cancelCord, getActiveCordCount, testFireAll } from "../data/push.js";
 
 const app = new Hono();
 
@@ -209,7 +209,7 @@ app.get("/push/vapid", (c) => {
 app.post("/push/cord", async (c) => {
   try {
     const body = await c.req.json();
-    const { subscription, routeId, stopId, vehicleId } = body;
+    const { subscription, routeId, stopId, vehicleId, thresholdMinutes } = body;
 
     if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
       return c.json({ error: "Invalid push subscription" }, 400);
@@ -218,7 +218,8 @@ app.post("/push/cord", async (c) => {
       return c.json({ error: "routeId and stopId required" }, 400);
     }
 
-    const cordId = registerCord(subscription, routeId, stopId, vehicleId || null);
+    const threshold = Math.max(1, Math.min(30, thresholdMinutes || 2));
+    const cordId = registerCord(subscription, routeId, stopId, vehicleId || null, threshold);
     return c.json({ cordId, status: "watching" });
   } catch (error) {
     console.error("Error registering cord:", error);
@@ -236,6 +237,12 @@ app.delete("/push/cord/:id", (c) => {
 // GET /api/push/status — debug: how many active cords
 app.get("/push/status", (c) => {
   return c.json({ activeCords: getActiveCordCount() });
+});
+
+// POST /api/push/test — fire a test push to all active cords
+app.post("/push/test", async (c) => {
+  const sent = await testFireAll();
+  return c.json({ sent });
 });
 
 export default app;

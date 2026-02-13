@@ -798,49 +798,66 @@
     z-index: 10;
   }
 
-  /* Pull the Cord button */
-  .d-cord-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.8rem 1.25rem;
-    background: var(--cord-red);
-    color: #fff;
+  /* Cord — notify me options */
+  .d-cord-label {
     font-family: var(--font-mono);
-    font-size: 0.9rem;
-    font-weight: 700;
+    font-size: 0.7rem;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border-radius: 0.75rem;
-    transition: transform 0.1s, background 0.15s, box-shadow 0.15s;
-    box-shadow: 0 4px 16px rgba(220, 38, 38, 0.25);
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 0.4rem;
+  }
+
+  .d-cord-options {
+    display: flex;
+    gap: 0.4rem;
     margin-bottom: 0.5rem;
   }
 
-  .d-cord-btn:active {
-    transform: scale(0.97) translateY(1px);
+  .d-cord-option {
+    flex: 1;
+    padding: 0.65rem 0.5rem;
+    background: var(--cord-red);
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+    border-radius: 0.5rem;
+    transition: transform 0.1s, background 0.15s, box-shadow 0.15s;
     box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2);
+    text-align: center;
   }
 
-  .d-cord-btn.cord-active {
+  .d-cord-option:active {
+    transform: scale(0.95);
+    box-shadow: 0 1px 4px rgba(220, 38, 38, 0.15);
+  }
+
+  .d-cord-active {
+    margin-bottom: 0.5rem;
+  }
+
+  .d-cord-cancel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0.65rem 1rem;
     background: var(--cord-active);
-    box-shadow: 0 4px 16px rgba(5, 150, 105, 0.25);
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.2);
     animation: d-cord-glow 3s ease-in-out infinite;
   }
 
-  .d-cord-btn.cord-active:active {
-    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.2);
-  }
-
-  .d-cord-btn.cord-fired {
-    background: var(--cord-fired);
-    animation: d-cord-fire 0.6s ease;
-  }
-
-  .d-cord-icon {
-    flex-shrink: 0;
+  .d-cord-cancel:active {
+    transform: scale(0.97);
+    box-shadow: 0 1px 4px rgba(5, 150, 105, 0.15);
   }
 
   /* Secondary action buttons */

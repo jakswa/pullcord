@@ -31,6 +31,7 @@ interface ActiveCord {
   routeId: string;
   stopId: string;
   vehicleId: string | null;
+  thresholdSeconds: number; // notify when ETA ≤ this
   createdAt: number;
   notified: boolean;
   expiresAt: number; // auto-expire after 1 hour
@@ -48,6 +49,7 @@ export function registerCord(
   routeId: string,
   stopId: string,
   vehicleId: string | null,
+  thresholdMinutes: number = 2,
 ): string {
   // Generate a cord ID
   const id = Math.random().toString(36).slice(2, 10);
@@ -65,6 +67,7 @@ export function registerCord(
     routeId,
     stopId,
     vehicleId,
+    thresholdSeconds: thresholdMinutes * 60,
     createdAt: Date.now(),
     notified: false,
     expiresAt: Date.now() + 60 * 60 * 1000, // 1 hour
@@ -83,6 +86,32 @@ export function cancelCord(id: string): boolean {
 
 export function getActiveCordCount(): number {
   return activeCords.size;
+}
+
+// Test: fire a push to all active cords (for debugging)
+export async function testFireAll(): Promise<number> {
+  let sent = 0;
+  for (const [id, cord] of activeCords) {
+    try {
+      await webpush.sendNotification(
+        cord.subscription,
+        JSON.stringify({
+          title: '🚌 Test push from Pullcord!',
+          body: 'If you see this, push notifications are working.',
+          tag: `test-${id}`,
+          url: '/',
+        }),
+      );
+      console.log(`🔔 Test push sent for cord ${id}`);
+      sent++;
+    } catch (err: any) {
+      console.error(`Test push failed for ${id}:`, err.statusCode || err.message);
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        activeCords.delete(id);
+      }
+    }
+  }
+  return sent;
 }
 
 // Called by the server during each poll cycle
@@ -118,8 +147,8 @@ export async function checkCords(
 
     if (!pred) continue;
 
-    // Fire at ≤ 2 minutes
-    if (pred.etaSeconds <= 120) {
+    // Fire when ETA ≤ threshold
+    if (pred.etaSeconds <= cord.thresholdSeconds) {
       cord.notified = true;
       const mins = Math.max(1, Math.floor(pred.etaSeconds / 60));
       const routeName = cord.routeId;

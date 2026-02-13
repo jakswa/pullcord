@@ -87,13 +87,20 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
 
       {/* === Bottom Action Bar (thumb zone) === */}
       <div class="d-action-bar">
-        <button id="pull-cord-btn" class="d-cord-btn" type="button">
-          <svg class="d-cord-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-            <path d="M13.73 21a2 2 0 01-3.46 0"/>
-          </svg>
-          <span id="pull-cord-text">Notify me when bus is close</span>
-        </button>
+        <div id="cord-section">
+          <div class="d-cord-label">🔔 Notify me</div>
+          <div id="cord-options" class="d-cord-options">
+            <button class="d-cord-option" data-minutes="2" type="button">2 min</button>
+            <button class="d-cord-option" data-minutes="5" type="button">5 min</button>
+            <button class="d-cord-option" data-minutes="10" type="button">10 min</button>
+            <button class="d-cord-option" data-minutes="15" type="button">15 min</button>
+          </div>
+          <div id="cord-active-display" class="d-cord-active hidden">
+            <button id="cord-cancel-btn" class="d-cord-cancel" type="button">
+              <span id="cord-status-text">🔔 Watching...</span>
+            </button>
+          </div>
+        </div>
         <div class="d-action-row">
           <button id="map-toggle-btn" class="d-action-btn" type="button">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -758,38 +758,39 @@ class PullcordApp {
   // ────────────────────────
 
   initPullCord() {
-    const btn = document.getElementById('pull-cord-btn');
-    if (!btn) return;
+    const section = document.getElementById('cord-section');
+    if (!section) return;
 
     // Check if push is supported
     this.pushSupported = 'serviceWorker' in navigator && 'PushManager' in window;
     if (!this.pushSupported) {
-      btn.style.display = 'none'; // Hide on unsupported browsers
+      section.style.display = 'none';
       return;
     }
 
-    btn.addEventListener('click', () => this.togglePullCord());
+    // Wire up minute option buttons
+    section.querySelectorAll('.d-cord-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const minutes = parseInt(btn.dataset.minutes, 10);
+        this.activateCord(minutes);
+      });
+    });
+
+    // Wire up cancel button
+    const cancelBtn = document.getElementById('cord-cancel-btn');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => this.cancelCord());
   }
 
-  async togglePullCord() {
-    const btn = document.getElementById('pull-cord-btn');
-    const text = document.getElementById('pull-cord-text');
-
-    if (this.cordActive) {
-      // Cancel — tell server to stop watching
-      if (this.cordId) {
-        fetch(`/api/push/cord/${this.cordId}`, { method: 'DELETE' }).catch(() => {});
-      }
-      this.cordActive = false;
-      this.cordId = null;
-      btn.classList.remove('cord-active', 'cord-fired');
-      text.textContent = 'Notify me when bus is close';
-      return;
-    }
-
+  async activateCord(thresholdMinutes) {
     if (!this.heroPrediction) return;
 
-    text.textContent = 'Setting up...';
+    const options = document.getElementById('cord-options');
+    const label = document.querySelector('.d-cord-label');
+    const activeDisplay = document.getElementById('cord-active-display');
+    const statusText = document.getElementById('cord-status-text');
+
+    // Show setting up state
+    if (label) label.textContent = 'Setting up...';
 
     try {
       // 1. Register push-only service worker
@@ -804,8 +805,8 @@ class PullcordApp {
       // 3. Request notification permission
       const perm = await Notification.requestPermission();
       if (perm !== 'granted') {
-        text.textContent = 'Notifications blocked — check browser settings';
-        setTimeout(() => { text.textContent = 'Notify me when bus is close'; }, 3000);
+        if (label) label.textContent = 'Notifications blocked — check settings';
+        setTimeout(() => { if (label) label.textContent = '🔔 Notify me'; }, 3000);
         return;
       }
 
@@ -815,7 +816,7 @@ class PullcordApp {
         applicationServerKey: this.urlBase64ToUint8Array(publicKey),
       });
 
-      // 5. Register cord on server
+      // 5. Register cord on server with threshold
       const cordRes = await fetch('/api/push/cord', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -824,44 +825,62 @@ class PullcordApp {
           routeId: this.config.routeId,
           stopId: this.config.stopId,
           vehicleId: this.heroPrediction.vehicleId || null,
+          thresholdMinutes,
         }),
       });
 
       const { cordId } = await cordRes.json();
 
-      // Success
+      // Success — swap to active display
       this.cordActive = true;
       this.cordId = cordId;
-      btn.classList.add('cord-active');
-      btn.classList.add('cord-fired');
-      setTimeout(() => btn.classList.remove('cord-fired'), 600);
+      this.cordThreshold = thresholdMinutes;
+
+      if (options) options.classList.add('hidden');
+      if (label) label.classList.add('hidden');
+      if (activeDisplay) activeDisplay.classList.remove('hidden');
 
       if (navigator.vibrate) navigator.vibrate(100);
 
-      const mins = Math.floor(this.heroPrediction.etaSeconds / 60);
-      text.textContent = `🔔 Watching · ${mins} min away — tap to cancel`;
+      this.updateCordStatus();
 
     } catch (err) {
       console.error('Pull cord setup failed:', err);
-      text.textContent = 'Setup failed — try again';
-      setTimeout(() => { text.textContent = 'Notify me when bus is close'; }, 3000);
+      if (label) label.textContent = 'Setup failed — try again';
+      setTimeout(() => { if (label) label.textContent = '🔔 Notify me'; }, 3000);
     }
   }
 
-  // Update the cord button display on each poll (show updated ETA)
-  checkPullCord() {
-    if (!this.cordActive) return;
+  cancelCord() {
+    if (this.cordId) {
+      fetch(`/api/push/cord/${this.cordId}`, { method: 'DELETE' }).catch(() => {});
+    }
+    this.cordActive = false;
+    this.cordId = null;
 
-    const text = document.getElementById('pull-cord-text');
-    if (!text) return;
+    const options = document.getElementById('cord-options');
+    const label = document.querySelector('.d-cord-label');
+    const activeDisplay = document.getElementById('cord-active-display');
 
-    // Show the hero ETA on the button
+    if (options) options.classList.remove('hidden');
+    if (label) { label.classList.remove('hidden'); label.textContent = '🔔 Notify me'; }
+    if (activeDisplay) activeDisplay.classList.add('hidden');
+  }
+
+  updateCordStatus() {
+    const statusText = document.getElementById('cord-status-text');
+    if (!statusText || !this.cordActive) return;
+
     const hero = this.heroPrediction;
     if (hero) {
       const mins = Math.floor(hero.etaSeconds / 60);
-      text.textContent = `🔔 Watching · ${mins} min away — tap to cancel`;
+      statusText.textContent = `🔔 Alert at ${this.cordThreshold} min · bus is ${mins} min away · tap to cancel`;
     }
-    // Server handles the actual push notification — client just shows status
+  }
+
+  checkPullCord() {
+    if (!this.cordActive) return;
+    this.updateCordStatus();
   }
 
   // Convert VAPID key from base64url to Uint8Array
