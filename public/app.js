@@ -793,7 +793,7 @@ class PullcordApp {
 
     try {
       // 1. Register push-only service worker
-      const reg = await navigator.serviceWorker.register('/public/push-sw.js');
+      const reg = await navigator.serviceWorker.register('/push-sw.js', { scope: '/' });
       await navigator.serviceWorker.ready;
 
       // 2. Get VAPID public key from server

@@ -37,6 +37,17 @@ app.route("/v", experimentRoutes);
 app.route("/", homeRoutes);
 app.route("/", busRoutes);
 
+// Serve push SW from root scope (SW scope = path of the file)
+app.get("/push-sw.js", async (c) => {
+  const file = Bun.file("./public/push-sw.js");
+  return new Response(await file.arrayBuffer(), {
+    headers: {
+      "Content-Type": "application/javascript",
+      "Service-Worker-Allowed": "/",
+    },
+  });
+});
+
 // Health check endpoint
 app.get("/health", (c) => {
   return c.json({ 
