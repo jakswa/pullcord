@@ -4,6 +4,7 @@ import path from "path";
 const VEHICLE_POSITIONS_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb";
 const TRIP_UPDATES_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb";
 const CACHE_DURATION = 30 * 1000; // 30 seconds
+const STALE_SERVE_LIMIT = 90 * 1000; // serve stale up to 90s while refreshing
 
 interface VehiclePosition {
   id: string;         // entity.id = vehicle label (display ID)
@@ -74,17 +75,32 @@ class RealtimeDataService {
     return Date.now() - cache.timestamp < CACHE_DURATION;
   }
 
+  private isCacheServable<T>(cache: CachedData<T> | null): boolean {
+    if (!cache) return false;
+    return Date.now() - cache.timestamp < STALE_SERVE_LIMIT;
+  }
+
+  // Flags to prevent duplicate concurrent fetches
+  private vehicleFetching = false;
+  private tripUpdatesFetching = false;
+
   private async getVehiclePositions(): Promise<any[]> {
     if (this.isCacheValid(this.vehicleCache)) {
       return this.vehicleCache!.data;
     }
 
-    const entities = await this.fetchProtobufData(VEHICLE_POSITIONS_URL);
-    this.vehicleCache = {
-      data: entities,
-      timestamp: Date.now()
-    };
+    // Stale-while-revalidate: serve stale, refresh in background
+    if (this.isCacheServable(this.vehicleCache) && !this.vehicleFetching) {
+      this.vehicleFetching = true;
+      this.fetchProtobufData(VEHICLE_POSITIONS_URL).then(entities => {
+        this.vehicleCache = { data: entities, timestamp: Date.now() };
+        this.vehicleFetching = false;
+      }).catch(() => { this.vehicleFetching = false; });
+      return this.vehicleCache!.data;
+    }
 
+    const entities = await this.fetchProtobufData(VEHICLE_POSITIONS_URL);
+    this.vehicleCache = { data: entities, timestamp: Date.now() };
     return entities;
   }
 
@@ -93,12 +109,18 @@ class RealtimeDataService {
       return this.tripUpdatesCache!.data;
     }
 
-    const entities = await this.fetchProtobufData(TRIP_UPDATES_URL);
-    this.tripUpdatesCache = {
-      data: entities,
-      timestamp: Date.now()
-    };
+    // Stale-while-revalidate: serve stale, refresh in background
+    if (this.isCacheServable(this.tripUpdatesCache) && !this.tripUpdatesFetching) {
+      this.tripUpdatesFetching = true;
+      this.fetchProtobufData(TRIP_UPDATES_URL).then(entities => {
+        this.tripUpdatesCache = { data: entities, timestamp: Date.now() };
+        this.tripUpdatesFetching = false;
+      }).catch(() => { this.tripUpdatesFetching = false; });
+      return this.tripUpdatesCache!.data;
+    }
 
+    const entities = await this.fetchProtobufData(TRIP_UPDATES_URL);
+    this.tripUpdatesCache = { data: entities, timestamp: Date.now() };
     return entities;
   }
 

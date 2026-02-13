@@ -263,17 +263,26 @@ class MARTADatabase {
     const stop = this.getStop(stopId);
     if (!stop) return [];
 
-    // Get all stops for this route with their direction + headsign
-    const routeStops = this.db.prepare(`
-      SELECT DISTINCT rs.stop_id, rs.direction_id, s.stop_lat, s.stop_lon, t.trip_headsign
+    // Bounding box filter (~150m ≈ 0.0015° at Atlanta latitude)
+    const delta = 0.0015;
+    const latMin = stop.stop_lat - delta;
+    const latMax = stop.stop_lat + delta;
+    const lonMin = stop.stop_lon - delta;
+    const lonMax = stop.stop_lon + delta;
+
+    // Fast: get nearby stops on this route (no trip join — get headsign separately)
+    const nearbyStops = this.db.prepare(`
+      SELECT DISTINCT rs.stop_id, rs.direction_id, s.stop_lat, s.stop_lon
       FROM route_stops rs
       JOIN stops s ON rs.stop_id = s.stop_id
-      JOIN trips t ON t.route_id = rs.route_id AND t.direction_id = rs.direction_id
       WHERE rs.route_id = ?
-      GROUP BY rs.stop_id, rs.direction_id
-    `).all(routeId) as Array<{ stop_id: string; direction_id: number; stop_lat: number; stop_lon: number; trip_headsign: string }>;
+        AND s.stop_lat BETWEEN ? AND ?
+        AND s.stop_lon BETWEEN ? AND ?
+    `).all(routeId, latMin, latMax, lonMin, lonMax) as Array<{
+      stop_id: string; direction_id: number; stop_lat: number; stop_lon: number;
+    }>;
 
-    // Haversine
+    // Haversine for precise 150m filter
     const toRad = (d: number) => d * Math.PI / 180;
     const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
       const dLat = toRad(lat2 - lat1);
@@ -283,10 +292,23 @@ class MARTADatabase {
       return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
-    // Find all stops within 150m (including the original stop itself)
-    return routeStops
+    // Get headsign per direction (small separate query, much cheaper than joining in main query)
+    const hsRows = this.db.prepare(`
+      SELECT DISTINCT direction_id, trip_headsign FROM trips
+      WHERE route_id = ? AND trip_headsign != '' ORDER BY direction_id
+    `).all(routeId) as Array<{ direction_id: number; trip_headsign: string }>;
+    const headsigns: Record<number, string> = {};
+    for (const r of hsRows) {
+      if (!(r.direction_id in headsigns)) headsigns[r.direction_id] = r.trip_headsign;
+    }
+
+    return nearbyStops
       .filter(rs => haversine(stop.stop_lat, stop.stop_lon, rs.stop_lat, rs.stop_lon) < 150)
-      .map(rs => ({ stop_id: rs.stop_id, direction_id: rs.direction_id, trip_headsign: rs.trip_headsign }));
+      .map(rs => ({
+        stop_id: rs.stop_id,
+        direction_id: rs.direction_id,
+        trip_headsign: headsigns[rs.direction_id] || 'Unknown',
+      }));
   }
 
   close() {
