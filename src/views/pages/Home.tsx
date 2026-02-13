@@ -4,13 +4,11 @@ export const HomePage = () => (
     <div class="home-hero">
       <div class="home-hero-inner">
         <div class="home-brand">
-          <svg class="home-logo-icon" width="40" height="40" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="2" width="24" height="24" rx="5" fill="#2563eb"/>
-            <rect x="8" y="6" width="16" height="8" rx="2" fill="#fff" opacity="0.9"/>
-            <line x1="16" y1="6" x2="16" y2="14" stroke="#2563eb" stroke-width="1.5"/>
-            <rect x="8" y="16" width="16" height="2" rx="1" fill="#fff" opacity="0.4"/>
-            <circle cx="10" cy="22" r="2" fill="#fff"/>
-            <circle cx="22" cy="22" r="2" fill="#fff"/>
+          <svg class="home-logo-icon" width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="22" y1="2" x2="22" y2="16" stroke="#E85D3A" stroke-width="3" stroke-linecap="round"/>
+            <rect x="12" y="16" width="20" height="18" rx="6" fill="#E85D3A"/>
+            <rect x="16" y="22" width="12" height="6" rx="3" fill="#fff" opacity="0.3"/>
+            <circle cx="22" cy="40" r="2" fill="#F0A030" opacity="0.6"/>
           </svg>
           <span class="home-wordmark">Pullcord</span>
         </div>
