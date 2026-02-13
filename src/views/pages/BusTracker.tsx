@@ -68,14 +68,6 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
             </div>
             <div class="d-hero-headsign" id="hero-headsign"></div>
             <div class="d-hero-meta" id="hero-meta"></div>
-            <button class="d-hero-map-link" id="hero-map-link" style="display:none" type="button">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
-                <line x1="8" y1="2" x2="8" y2="18"/>
-                <line x1="16" y1="6" x2="16" y2="22"/>
-              </svg>
-              See on map
-            </button>
           </div>
         </section>
 
@@ -109,7 +101,12 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
               <line x1="8" y1="2" x2="8" y2="18"/>
               <line x1="16" y1="6" x2="16" y2="22"/>
             </svg>
-            <span id="map-toggle-text">See on Map</span>
+            <span id="map-toggle-text">Map</span>
+          </button>
+          <span class="d-action-divider"></span>
+          <button id="fav-btn" class="d-action-btn" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            Save Stop
           </button>
           <span class="d-action-divider"></span>
           <button id="refresh-btn" class="d-action-btn" type="button">

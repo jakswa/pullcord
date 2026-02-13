@@ -339,6 +339,17 @@
     color: #fff;
   }
 
+  .d-route-tab-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    padding-right: 0.25rem;
+  }
+
   /* ── Scrollable Content ── */
   .d-content {
     flex: 1;
@@ -591,7 +602,7 @@
     align-items: center;
     background: transparent;
     border-radius: 0;
-    padding: 0.65rem 0.75rem;
+    padding: 0.85rem 0.75rem;
     border-left: 5px solid var(--row-color, var(--route-color));
     border-bottom: 1px solid var(--border);
     transition: background 0.15s, transform 0.1s;
@@ -613,7 +624,7 @@
 
   .d-upcoming-headsign {
     font-weight: 600;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     color: var(--text-heading);
     white-space: nowrap;
     overflow: hidden;
@@ -622,12 +633,12 @@
 
   .d-upcoming-meta {
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: 0.72rem;
     color: var(--text-muted);
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    margin-top: 0.15rem;
+    margin-top: 0.2rem;
   }
 
   .d-upcoming-time {
@@ -638,7 +649,7 @@
 
   .d-upcoming-minutes {
     font-family: var(--font-mono);
-    font-size: 1.75rem;
+    font-size: 2rem;
     font-weight: 800;
     line-height: 1;
     font-variant-numeric: tabular-nums;
@@ -1222,6 +1233,84 @@
   .home-footer-sub {
     color: var(--text-dim);
     margin-top: 0.15rem;
+  }
+
+  /* ── Favorites ── */
+  .home-fav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-bottom: 1rem;
+  }
+
+  .home-fav-card {
+    display: flex;
+    align-items: center;
+    background: var(--bg-surface);
+    border-radius: 0.75rem;
+    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+    transition: background 0.15s;
+  }
+
+  .home-fav-card:active {
+    background: var(--card-hover);
+  }
+
+  .home-fav-link {
+    flex: 1;
+    padding: 0.85rem 1rem;
+    text-decoration: none;
+    color: inherit;
+    min-width: 0;
+  }
+
+  .home-fav-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .home-fav-routes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.35rem;
+  }
+
+  .home-fav-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem 0.5rem;
+    background: var(--brand);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 0.375rem;
+  }
+
+  .home-fav-remove {
+    flex-shrink: 0;
+    padding: 0.85rem 1rem;
+    color: var(--text-muted);
+    font-size: 1rem;
+    transition: color 0.15s;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .home-fav-remove:active {
+    color: var(--dot-lost);
+  }
+
+  /* Fav button active state in tracker */
+  .fav-active {
+    color: var(--brand) !important;
   }
 
   /* Also need tracker-spinner for home loading (legacy class) */

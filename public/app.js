@@ -1,5 +1,5 @@
-// Pullcord Experiment D — "The Bus Stop Screen"
-// Reimagined: hero countdown, linear progress strip, map on demand, pull the cord
+// Pullcord — Real-time MARTA bus tracker
+// Hero countdown, linear progress strip, map on demand, pull the cord, favorites
 
 class PullcordApp {
   constructor() {
@@ -66,7 +66,7 @@ class PullcordApp {
     searchInput.addEventListener('input', (e) => {
       clearTimeout(searchTimeout);
       const q = e.target.value.trim();
-      if (q.length < 2) { this.hideResults(); return; }
+      if (q.length < 2) { this.hideResults(); this.renderFavorites(basePath); return; }
       searchTimeout = setTimeout(() => {
         this.searchStops(q, resultsList, resultsContainer, loadingDiv, basePath);
       }, 300);
@@ -74,6 +74,69 @@ class PullcordApp {
 
     locationBtn.addEventListener('click', () => {
       this.findNearbyStops(resultsList, resultsContainer, loadingDiv, basePath);
+    });
+
+    // Render favorites on load
+    this.renderFavorites(basePath);
+  }
+
+  // ── Favorites ──
+  getFavorites() {
+    try {
+      return JSON.parse(localStorage.getItem('pullcord_favorites') || '[]');
+    } catch { return []; }
+  }
+
+  saveFavorites(favs) {
+    localStorage.setItem('pullcord_favorites', JSON.stringify(favs));
+  }
+
+  addFavorite(stopId, stopName, routes) {
+    const favs = this.getFavorites();
+    if (favs.find(f => f.stopId === stopId)) return; // already saved
+    favs.push({ stopId, stopName, routes, addedAt: Date.now() });
+    this.saveFavorites(favs);
+  }
+
+  removeFavorite(stopId) {
+    const favs = this.getFavorites().filter(f => f.stopId !== stopId);
+    this.saveFavorites(favs);
+  }
+
+  isFavorite(stopId) {
+    return this.getFavorites().some(f => f.stopId === stopId);
+  }
+
+  renderFavorites(basePath) {
+    const container = document.getElementById('favorites-section');
+    const list = document.getElementById('favorites-list');
+    if (!container || !list) return;
+
+    const favs = this.getFavorites();
+    if (favs.length === 0) {
+      container.classList.add('hidden');
+      return;
+    }
+
+    container.classList.remove('hidden');
+    list.innerHTML = favs.map(fav => `
+      <div class="home-fav-card">
+        <a href="${basePath}/bus?route=${fav.routes[0]}&stop=${fav.stopId}" class="home-fav-link">
+          <div class="home-fav-name">${this.esc(fav.stopName)}</div>
+          <div class="home-fav-routes">${fav.routes.map(r => `<span class="home-fav-chip">${r}</span>`).join('')}</div>
+        </a>
+        <button class="home-fav-remove" data-stop="${this.esc(fav.stopId)}" aria-label="Remove favorite">✕</button>
+      </div>
+    `).join('');
+
+    // Wire up remove buttons
+    list.querySelectorAll('.home-fav-remove').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.removeFavorite(btn.dataset.stop);
+        this.renderFavorites(basePath);
+      });
     });
   }
 
@@ -191,6 +254,7 @@ class PullcordApp {
     this.initPullCord();
     this.initMapToggle();
     this.initRefreshBtn();
+    this.initFavoriteBtn();
     this.discoverOtherRoutes();
     this.startPolling();
   }
@@ -276,6 +340,34 @@ class PullcordApp {
     if (btn) btn.addEventListener('click', () => this.updateData());
   }
 
+  initFavoriteBtn() {
+    const btn = document.getElementById('fav-btn');
+    if (!btn) return;
+
+    const stopId = this.config.stopId;
+    const update = () => {
+      const isFav = this.isFavorite(stopId);
+      btn.innerHTML = isFav
+        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Saved'
+        : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Save Stop';
+      btn.classList.toggle('fav-active', isFav);
+    };
+
+    btn.addEventListener('click', () => {
+      const stopId = this.config.stopId;
+      if (this.isFavorite(stopId)) {
+        this.removeFavorite(stopId);
+      } else {
+        // Gather routes from tabs or current route
+        const routes = [this.config.routeShortName];
+        this.addFavorite(stopId, this.data.stop.name, routes);
+      }
+      update();
+    });
+
+    update();
+  }
+
   updateTimestamp() {
     const el = document.getElementById('last-updated');
     if (el) el.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -336,19 +428,9 @@ class PullcordApp {
     this.renderHeroDisplay();
     this.startCountdown();
 
-    // "See on map" link
-    const mapLink = document.getElementById('hero-map-link');
-    if (mapLink) {
-      if (hero.vehicleId && hero.tier !== 'scheduled') {
-        mapLink.style.display = '';
-        mapLink.onclick = () => {
-          this.focusedVehicleId = hero.vehicleId;
-          this.showMap();
-          this.focusOnBus(hero.vehicleId);
-        };
-      } else {
-        mapLink.style.display = 'none';
-      }
+    // Track hero vehicle for map focus (when user opens map via bottom action bar)
+    if (hero.vehicleId && hero.tier !== 'scheduled') {
+      this.focusedVehicleId = hero.vehicleId;
     }
   }
 
@@ -592,29 +674,9 @@ class PullcordApp {
 
     section.style.display = '';
 
-    // Group by direction for visual clarity
-    const heroDir = this.heroPrediction?.directionId;
-    const sameDir = upcoming.filter(p => p.directionId === heroDir);
-    const otherDir = upcoming.filter(p => p.directionId !== heroDir);
-
-    let html = '';
-
-    // Same direction — later buses, tappable to promote to hero
-    if (sameDir.length > 0) {
-      html += sameDir.map(pred => this.renderUpcomingRow(pred)).join('');
-    }
-
-    // Other direction with header
-    if (otherDir.length > 0) {
-      const otherHeadsign = otherDir[0].headsign || 'Other direction';
-      html += `<div class="d-upcoming-dir-header">
-        <span class="d-dir-arrow">→</span> ${this.esc(otherHeadsign)}
-        <span class="d-dir-tap-hint">tap to track</span>
-      </div>`;
-      html += otherDir.map(pred => this.renderUpcomingRow(pred)).join('');
-    }
-
-    list.innerHTML = html;
+    // Flat list sorted by arrival time — no direction grouping
+    const sorted = [...upcoming].sort((a, b) => a.etaSeconds - b.etaSeconds);
+    list.innerHTML = sorted.map(pred => this.renderUpcomingRow(pred)).join('');
 
     // ALL rows are tappable → promote to hero
     list.querySelectorAll('.d-upcoming-row').forEach(row => {
@@ -645,7 +707,6 @@ class PullcordApp {
   renderUpcomingRow(pred) {
     const minutes = Math.floor(pred.etaSeconds / 60);
     const tier = pred.tier || 'active';
-    const isOtherDir = pred.directionId !== this.heroPrediction?.directionId;
 
     // Status
     let statusHtml;
@@ -660,29 +721,27 @@ class PullcordApp {
 
     // Arrival time
     let arrivalStr = '';
-    if (minutes >= 10) {
+    if (minutes >= 5) {
       const arr = new Date(Date.now() + pred.etaSeconds * 1000);
       arrivalStr = ` · ~${arr.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
     }
 
     // Row color
     const rowColor = tier === 'next' ? '#60a5fa' : tier === 'scheduled' ? '#334155' : this.routeColor;
-    const swapClass = isOtherDir ? ' d-swap-row' : '';
 
     return `
-      <div class="d-upcoming-row tier-${tier}${swapClass}"
+      <div class="d-upcoming-row clickable tier-${tier}"
            style="--row-color:${rowColor}"
            data-vehicle="${this.esc(pred.vehicleId || '')}"
            data-dir="${pred.directionId != null ? pred.directionId : ''}">
         <div class="d-upcoming-info">
-          <div class="d-upcoming-headsign">${this.esc(pred.headsign || 'Unknown')}</div>
+          <div class="d-upcoming-headsign">→ ${this.esc(pred.headsign || 'Unknown')}</div>
           <div class="d-upcoming-meta">${statusHtml}${arrivalStr}</div>
         </div>
         <div class="d-upcoming-time">
           <div class="d-upcoming-minutes${tier !== 'active' ? ` tier-${tier}` : ''}">${minutes < 1 ? 'NOW' : minutes}</div>
           <div class="d-upcoming-label">${minutes < 1 ? '' : 'min'}</div>
         </div>
-        <div class="d-upcoming-chevron">${isOtherDir ? '↑' : '↑'}</div>
       </div>
     `;
   }
@@ -988,10 +1047,16 @@ class PullcordApp {
     const container = document.getElementById('route-tabs');
     if (!container) return;
 
+    // Only show tabs if there ARE other routes — no need to show just the current one
+    if (others.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
     const basePath = window.__BASE_PATH__ || '';
     const stopId = this.config.stopId;
 
-    let html = `<a class="d-route-tab d-route-tab-active" style="--tab-color:${this.routeColor}">${this.esc(current)}</a>`;
+    let html = `<span class="d-route-tab-label">Also here:</span>`;
     others.forEach(r => {
       html += `<a href="${basePath}/bus?route=${r}&stop=${stopId}" class="d-route-tab">${this.esc(r)}</a>`;
     });

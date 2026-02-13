@@ -36,7 +36,15 @@ export const HomePage = () => (
       </div>
     </div>
 
-    {/* Results area */}
+    {/* Favorites — fast flow for saved stops */}
+    <div class="home-results-area">
+      <div id="favorites-section" class="hidden">
+        <div class="home-results-header">⭐ Saved Stops</div>
+        <div id="favorites-list" class="home-fav-list"></div>
+      </div>
+    </div>
+
+    {/* Search results */}
     <div class="home-results-area">
       <div id="search-loading" class="hidden home-status">
         <div class="d-spinner"></div>
