@@ -269,28 +269,15 @@
     flex-wrap: wrap;
   }
 
-  .d-hero-badge {
+  .d-hero-route {
     font-family: var(--font-mono);
     font-weight: 800;
-    font-size: 1rem;
-    padding: 0.15rem 0.5rem;
-    border-radius: 0.3rem;
-    color: #fff;
-    margin-right: 0.5rem;
-    vertical-align: middle;
   }
 
-  .d-upcoming-badge {
+  .d-upcoming-route {
     font-family: var(--font-mono);
     font-weight: 800;
-    font-size: 0.7rem;
-    padding: 0.2rem 0.4rem;
-    border-radius: 0.25rem;
-    color: #fff;
-    min-width: 2rem;
-    text-align: center;
-    flex-shrink: 0;
-    line-height: 1;
+    margin-right: 0.3rem;
   }
 
   .d-header-info {
@@ -595,9 +582,6 @@
   }
 
   .d-progress-strip {
-    background: var(--bg-surface);
-    border-radius: 0.75rem;
-    padding: 0.75rem 0;
     overflow: hidden;
   }
 
@@ -643,7 +627,7 @@
     align-items: center;
     background: transparent;
     border-radius: 0;
-    padding: 0.85rem 0.75rem;
+    padding: 1rem 0.85rem;
     border-left: 5px solid var(--row-color, var(--route-color));
     border-bottom: 1px solid var(--border);
     transition: background 0.15s, transform 0.1s;
@@ -655,7 +639,13 @@
 
   .d-upcoming-row.d-upcoming-hero {
     background: var(--bg-secondary);
-    border-left-width: 5px;
+    border-left-width: 6px;
+    border-left-color: var(--color-brand);
+    position: relative;
+  }
+
+  .d-upcoming-row.d-upcoming-hero .d-upcoming-minutes {
+    color: var(--color-brand);
   }
 
   .d-upcoming-row.clickable:active {
@@ -862,6 +852,16 @@
     color: var(--text-muted);
     text-align: center;
     margin-bottom: 0.35rem;
+  }
+
+  .d-cord-install-hint {
+    background: none;
+    border: none;
+    color: var(--color-brand);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   .d-cord-options {
@@ -1133,11 +1133,15 @@
   }
 
   .home-hero {
-    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2rem 1.25rem;
+    padding: 2.5rem 1.25rem 1.5rem;
+  }
+
+  /* Center hero vertically only when no favorites/results are showing */
+  .home-shell:not(.has-content) .home-hero {
+    flex: 1;
   }
 
   .home-hero-inner {

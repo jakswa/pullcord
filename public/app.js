@@ -113,12 +113,15 @@ class PullcordApp {
     if (!container || !list) return;
 
     const favs = this.getFavorites();
+    const shell = document.querySelector('.home-shell');
     if (favs.length === 0) {
       container.classList.add('hidden');
+      if (shell) shell.classList.remove('has-content');
       return;
     }
 
     container.classList.remove('hidden');
+    if (shell) shell.classList.add('has-content');
     list.innerHTML = favs.map(fav => {
       const favLink = fav.routes.length > 1
         ? `${basePath}/bus?stop=${fav.stopId}`
@@ -197,6 +200,7 @@ class PullcordApp {
   displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath) {
     this.hideLoadingEl(loadingDiv);
     if (resultsContainer) resultsContainer.classList.remove('hidden');
+    document.querySelector('.home-shell')?.classList.add('has-content');
 
     const header = document.getElementById('results-header');
     if (header) {
@@ -263,9 +267,9 @@ class PullcordApp {
     // Direction preference from URL (persists on refresh, shareable)
     this.selectedDirection = params.has('dir') ? parseInt(params.get('dir'), 10) : null;
 
-    // Tracked vehicle (in-memory, for "I want THAT specific bus")
+    // Tracked vehicle — persisted in URL via &vid=
     // Falls back to first-in-direction when vehicle disappears
-    this.trackedVehicleId = null;
+    this.trackedVehicleId = params.get('vid') || null;
 
     // Set route color CSS variable on shell
     const shell = document.querySelector('.d-shell');
@@ -466,8 +470,10 @@ class PullcordApp {
       if (this.isFavorite(stopId)) {
         this.removeFavorite(stopId);
       } else {
-        // Gather routes from tabs or current route
-        const routes = [this.config.routeShortName];
+        // Gather routes — multi-route mode has full route list in initial data
+        const routes = this.multiRoute
+          ? (this.data.routes || []).map(r => r.shortName)
+          : [this.config.routeShortName].filter(Boolean);
         this.addFavorite(stopId, this.data.stop.name, routes);
       }
       update();
@@ -515,6 +521,7 @@ class PullcordApp {
       if (!hero) {
         // Tracked vehicle disappeared — clear tracking, fall back to direction
         this.trackedVehicleId = null;
+        this.updateVehicleUrl(null);
       }
     }
 
@@ -592,19 +599,18 @@ class PullcordApp {
       tierEl.className = 'd-hero-tier tier-scheduled';
     }
 
-    // Route badge (multi-route hero)
+    // Hide the old badge element
     const badgeEl = document.getElementById('hero-badge');
-    if (badgeEl && this.multiRoute && this.heroPrediction.routeBadge) {
-      badgeEl.textContent = this.heroPrediction.routeBadge;
-      badgeEl.style.background = `#${this.heroPrediction.routeColor || 'E85D3A'}`;
-      badgeEl.style.display = '';
-    } else if (badgeEl) {
-      badgeEl.style.display = 'none';
-    }
+    if (badgeEl) badgeEl.style.display = 'none';
 
-    // Headsign
+    // Headsign with inline route number for multi-route
     const hsEl = document.getElementById('hero-headsign');
-    hsEl.textContent = `→ ${this.heroPrediction.headsign || 'Unknown'}`;
+    const routePrefix = this.multiRoute && this.heroPrediction.routeBadge
+      ? `${this.heroPrediction.routeBadge} `
+      : '';
+    hsEl.innerHTML = this.multiRoute && this.heroPrediction.routeBadge
+      ? `<span class="d-hero-route" style="color:#${this.heroPrediction.routeColor || 'E85D3A'}">${this.esc(this.heroPrediction.routeBadge)}</span> → ${this.esc(this.heroPrediction.headsign || 'Unknown')}`
+      : `→ ${this.esc(this.heroPrediction.headsign || 'Unknown')}`;
 
     // Meta (arrival time)
     const metaEl = document.getElementById('hero-meta');
@@ -645,8 +651,8 @@ class PullcordApp {
     const label = document.getElementById('progress-label');
     if (!section || !strip) return;
 
-    // Only show for active predictions with a trackable vehicle
-    const hero = predictions[0];
+    // Use the current hero prediction (respects tracked vehicle / direction)
+    const hero = this.heroPrediction;
     if (!hero || hero.tier === 'scheduled' || !hero.vehicleId) {
       section.style.display = 'none';
       return;
@@ -697,12 +703,21 @@ class PullcordApp {
       busFrac = dTotal > 0 ? Math.min(1, dBus / dTotal) : 0;
     }
 
-    // Render SVG
+    // Stops away text
+    const stopsAway = bestMyIdx - bestBusIdx;
+    let stopsText = '';
+    if (stopsAway > 0) {
+      stopsText = `${stopsAway} stop${stopsAway === 1 ? '' : 's'} away`;
+    } else if (stopsAway === 0) {
+      stopsText = 'At your stop';
+    }
+
+    // Render compact SVG strip
     const w = strip.clientWidth || 340;
-    const h = 56;
-    const pad = 28;
+    const h = 40;
+    const pad = 20;
     const uw = w - pad * 2;
-    const lineY = 20;
+    const lineY = 16;
     const x = (i) => pad + (i / (n - 1)) * uw;
 
     const busX = x(bestBusIdx + busFrac);
@@ -714,56 +729,44 @@ class PullcordApp {
     const stripLine = dark ? '#1e293b' : '#EDE5D8';
     const stopDot = dark ? '#334155' : '#D4C4B4';
     const myStopStroke = dark ? '#090e1a' : '#FFFFFF';
-    const labelFill = dark ? '#94a3b8' : '#7C6354';
+    const labelFill = dark ? '#64748b' : '#9C8474';
     const busFill = dark ? '#f8fafc' : '#3B2820';
 
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
 
     // Glow filter
-    svg += `<defs><filter id="pg"><feGaussianBlur stdDeviation="3" result="b"/>` +
+    svg += `<defs><filter id="pg"><feGaussianBlur stdDeviation="2" result="b"/>` +
            `<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
 
     // Background line
-    svg += `<line x1="${pad}" y1="${lineY}" x2="${w-pad}" y2="${lineY}" stroke="${stripLine}" stroke-width="3" stroke-linecap="round"/>`;
+    svg += `<line x1="${pad}" y1="${lineY}" x2="${w-pad}" y2="${lineY}" stroke="${stripLine}" stroke-width="2" stroke-linecap="round"/>`;
 
-    // Active segment: bus → my stop (glowing route color)
+    // Active segment: bus → my stop
     if (busX < myX + 5) {
       svg += `<line x1="${busX}" y1="${lineY}" x2="${myX}" y2="${lineY}" ` +
-             `stroke="${rc}" stroke-width="4" stroke-linecap="round" filter="url(#pg)" opacity="0.7"/>`;
+             `stroke="${rc}" stroke-width="3" stroke-linecap="round" filter="url(#pg)" opacity="0.7"/>`;
     }
 
-    // Stop dots (small)
+    // Stop dots
     for (let i = 0; i < n; i++) {
       if (i === bestMyIdx) continue;
-      svg += `<circle cx="${x(i)}" cy="${lineY}" r="2" fill="${stopDot}"/>`;
+      svg += `<circle cx="${x(i)}" cy="${lineY}" r="1.5" fill="${stopDot}"/>`;
     }
 
-    // My stop — pulsing marker
-    svg += `<circle cx="${myX}" cy="${lineY}" r="10" fill="none" stroke="${rc}" stroke-width="1.5" opacity="0.2">` +
-           `<animate attributeName="r" values="10;14;10" dur="2.5s" repeatCount="indefinite"/>` +
-           `<animate attributeName="opacity" values="0.2;0;0.2" dur="2.5s" repeatCount="indefinite"/></circle>`;
-    svg += `<circle cx="${myX}" cy="${lineY}" r="6" fill="${rc}" stroke="${myStopStroke}" stroke-width="2.5"/>`;
-    svg += `<text x="${myX}" y="${lineY + 22}" text-anchor="middle" fill="${labelFill}" font-size="9" font-weight="600" font-family="Inter,sans-serif">YOU</text>`;
+    // My stop marker
+    svg += `<circle cx="${myX}" cy="${lineY}" r="5" fill="${rc}" stroke="${myStopStroke}" stroke-width="2"/>`;
 
     // Bus marker
-    svg += `<circle cx="${busX}" cy="${lineY}" r="6" fill="${busFill}" stroke="${rc}" stroke-width="2.5" filter="url(#pg)"/>`;
-    // Bus label
-    svg += `<text x="${busX}" y="${lineY - 12}" text-anchor="middle" fill="${busFill}" font-size="9" font-weight="700" font-family="Inter,sans-serif">`;
-    // Show mini bus icon or text
-    svg += `BUS</text>`;
+    svg += `<circle cx="${busX}" cy="${lineY}" r="5" fill="${busFill}" stroke="${rc}" stroke-width="2" filter="url(#pg)"/>`;
+
+    // Stops-away label centered below
+    if (stopsText) {
+      svg += `<text x="${w/2}" y="${h - 2}" text-anchor="middle" fill="${labelFill}" font-size="11" font-weight="600" font-family="'JetBrains Mono',monospace" letter-spacing="0.5">${stopsText.toUpperCase()}</text>`;
+    }
 
     svg += '</svg>';
     strip.innerHTML = svg;
-
-    // Label: X stops away
-    const stopsAway = bestMyIdx - bestBusIdx;
-    if (stopsAway > 0) {
-      label.textContent = `${stopsAway} stop${stopsAway === 1 ? '' : 's'} away`;
-    } else if (stopsAway === 0) {
-      label.textContent = 'At your stop';
-    } else {
-      label.textContent = '';
-    }
+    label.textContent = '';
   }
 
   // ─────────────────────────────
@@ -800,8 +803,9 @@ class PullcordApp {
         const vid = row.dataset.vehicle || null;
         const dir = row.dataset.dir != null ? parseInt(row.dataset.dir, 10) : null;
 
-        // Track this specific vehicle
+        // Track this specific vehicle and persist in URL
         this.trackedVehicleId = vid;
+        this.updateVehicleUrl(vid);
 
         // Update direction if switching
         if (dir !== null && dir !== this.selectedDirection) {
@@ -847,8 +851,9 @@ class PullcordApp {
     const rowColor = tier === 'next' ? '#60a5fa' : tier === 'scheduled' ? '#334155' : predColor;
 
     // Route badge for multi-route mode
-    const badgeHtml = this.multiRoute && pred.routeBadge
-      ? `<span class="d-upcoming-badge" style="background:#${pred.routeColor || 'E85D3A'}">${this.esc(pred.routeBadge)}</span>`
+    // Route number for multi-route mode — bold colored text, no pill
+    const routeNum = this.multiRoute && pred.routeBadge
+      ? `<span class="d-upcoming-route" style="color:#${pred.routeColor || 'E85D3A'}">${this.esc(pred.routeBadge)}</span>`
       : '';
 
     return `
@@ -857,9 +862,8 @@ class PullcordApp {
            data-vehicle="${this.esc(pred.vehicleId || '')}"
            data-dir="${pred.directionId != null ? pred.directionId : ''}"
            data-route="${this.esc(pred.routeId || '')}">
-        ${badgeHtml}
         <div class="d-upcoming-info">
-          <div class="d-upcoming-headsign">→ ${this.esc(pred.headsign || 'Unknown')}</div>
+          <div class="d-upcoming-headsign">${routeNum}→ ${this.esc(pred.headsign || 'Unknown')}</div>
           <div class="d-upcoming-meta">${statusHtml}${arrivalStr}</div>
         </div>
         <div class="d-upcoming-time">
@@ -874,6 +878,16 @@ class PullcordApp {
   updateDirectionUrl(dir) {
     const url = new URL(window.location);
     url.searchParams.set('dir', dir);
+    window.history.replaceState({}, '', url);
+  }
+
+  updateVehicleUrl(vid) {
+    const url = new URL(window.location);
+    if (vid) {
+      url.searchParams.set('vid', vid);
+    } else {
+      url.searchParams.delete('vid');
+    }
     window.history.replaceState({}, '', url);
   }
 
@@ -904,8 +918,27 @@ class PullcordApp {
     const section = document.getElementById('cord-section');
     if (!section) return;
 
+    // Detect iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+
     // Check if push is supported
     this.pushSupported = 'serviceWorker' in navigator && 'PushManager' in window;
+
+    // iOS Safari (not installed as PWA) — show install prompt
+    if (isIOS && !isStandalone) {
+      const label = document.getElementById('cord-label');
+      const options = document.getElementById('cord-options');
+      if (options) options.style.display = 'none';
+      if (label) {
+        label.innerHTML = '📲 <button class="d-cord-install-hint" type="button">Add to Home Screen for alerts</button>';
+        label.querySelector('.d-cord-install-hint')?.addEventListener('click', () => {
+          label.innerHTML = 'Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>, then open from there';
+        });
+      }
+      return;
+    }
+
     if (!this.pushSupported) {
       section.style.display = 'none';
       return;
