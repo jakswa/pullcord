@@ -121,7 +121,7 @@ class PullcordApp {
     container.classList.remove('hidden');
     list.innerHTML = favs.map(fav => {
       const favLink = fav.routes.length > 1
-        ? `${basePath}/stop?id=${fav.stopId}`
+        ? `${basePath}/bus?stop=${fav.stopId}`
         : `${basePath}/bus?route=${fav.routes[0]}&stop=${fav.stopId}`;
       return `
       <div class="home-fav-card">
@@ -211,7 +211,7 @@ class PullcordApp {
 
     resultsList.innerHTML = stops.map(stop => {
       const stopLink = stop.routes.length > 1
-        ? `${basePath}/stop?id=${stop.stop_id}`
+        ? `${basePath}/bus?stop=${stop.stop_id}`
         : `${basePath}/bus?route=${stop.routes[0]}&stop=${stop.stop_id}`;
       return `
       <a href="${stopLink}" class="home-stop-card">
@@ -255,7 +255,8 @@ class PullcordApp {
     if (!window.__INITIAL_DATA__ || !window.__CONFIG__) return;
     this.data = window.__INITIAL_DATA__;
     this.config = window.__CONFIG__;
-    this.routeColor = this.data.route.color ? `#${this.data.route.color}` : '#E85D3A';
+    this.multiRoute = !!this.config.multiRoute;
+    this.routeColor = this.data.route?.color ? `#${this.data.route.color}` : '#E85D3A';
     const params = new URLSearchParams(window.location.search);
     this.mockMode = params.has('mock');
 
@@ -268,7 +269,7 @@ class PullcordApp {
 
     // Set route color CSS variable on shell
     const shell = document.querySelector('.d-shell');
-    if (shell) shell.style.setProperty('--route-color', this.routeColor);
+    if (shell && !this.multiRoute) shell.style.setProperty('--route-color', this.routeColor);
 
     // Fix back link for experiments
     const basePath = window.__BASE_PATH__ || '';
@@ -276,13 +277,13 @@ class PullcordApp {
     if (backLink && basePath) backLink.href = basePath + '/';
 
     this.refreshBar = document.getElementById('refresh-bar');
-    this.prepareStopDirections();
+    if (!this.multiRoute) this.prepareStopDirections();
     this.checkCordFired(params);
     this.initPullCord();
-    this.initMapToggle();
+    if (!this.multiRoute) this.initMapToggle();
     this.initRefreshBtn();
     this.initFavoriteBtn();
-    this.discoverOtherRoutes();
+    if (!this.multiRoute) this.discoverOtherRoutes();
     this.startPolling();
   }
 
@@ -336,21 +337,34 @@ class PullcordApp {
   async updateData() {
     try {
       const qs = this.mockMode ? '?mock=1' : '';
-      const [vRes, pRes] = await Promise.all([
-        fetch(`/api/realtime/${this.config.routeId}${qs}`),
-        fetch(`/api/predictions/${this.config.routeId}/${this.config.stopId}${qs}`)
-      ]);
 
-      const vehiclesData = await vRes.json();
-      const predictionsData = await pRes.json();
-
-      this.lastVehicles = vehiclesData.vehicles || [];
-      this.lastPredictions = predictionsData.predictions || [];
+      if (this.multiRoute) {
+        // Multi-route: fetch all arrivals at this stop
+        const res = await fetch(`/api/stops/${this.config.stopId}/arrivals`);
+        const data = await res.json();
+        this.lastPredictions = (data.arrivals || []).map(a => ({
+          ...a,
+          // Normalize fields for shared render methods
+          routeBadge: a.routeShortName,
+          routeColor: a.routeColor,
+        }));
+        this.lastVehicles = [];
+      } else {
+        // Single route: fetch vehicles + predictions
+        const [vRes, pRes] = await Promise.all([
+          fetch(`/api/realtime/${this.config.routeId}${qs}`),
+          fetch(`/api/predictions/${this.config.routeId}/${this.config.stopId}${qs}`)
+        ]);
+        const vehiclesData = await vRes.json();
+        const predictionsData = await pRes.json();
+        this.lastVehicles = vehiclesData.vehicles || [];
+        this.lastPredictions = predictionsData.predictions || [];
+      }
 
       this.renderHero(this.lastPredictions);
-      this.renderProgressStrip(this.lastPredictions, this.lastVehicles);
+      if (!this.multiRoute) this.renderProgressStrip(this.lastPredictions, this.lastVehicles);
       this.renderUpcoming(this.lastPredictions);
-      this.updateMapMarkers(this.lastVehicles);
+      if (!this.multiRoute) this.updateMapMarkers(this.lastVehicles);
       this.updateTimestamp();
       this.checkPullCord();
       this.flashRefresh();
@@ -509,6 +523,16 @@ class PullcordApp {
     } else {
       tierEl.innerHTML = '<span class="dot-sched"></span> Scheduled';
       tierEl.className = 'd-hero-tier tier-scheduled';
+    }
+
+    // Route badge (multi-route hero)
+    const badgeEl = document.getElementById('hero-badge');
+    if (badgeEl && this.multiRoute && this.heroPrediction.routeBadge) {
+      badgeEl.textContent = this.heroPrediction.routeBadge;
+      badgeEl.style.background = `#${this.heroPrediction.routeColor || 'E85D3A'}`;
+      badgeEl.style.display = '';
+    } else if (badgeEl) {
+      badgeEl.style.display = 'none';
     }
 
     // Headsign
@@ -753,14 +777,22 @@ class PullcordApp {
       arrivalStr = ` · ~${arr.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
     }
 
-    // Row color
-    const rowColor = tier === 'next' ? '#60a5fa' : tier === 'scheduled' ? '#334155' : this.routeColor;
+    // Row color — use route color in multi-route, otherwise by tier
+    const predColor = pred.routeColor ? `#${pred.routeColor}` : this.routeColor;
+    const rowColor = tier === 'next' ? '#60a5fa' : tier === 'scheduled' ? '#334155' : predColor;
+
+    // Route badge for multi-route mode
+    const badgeHtml = this.multiRoute && pred.routeBadge
+      ? `<span class="d-upcoming-badge" style="background:#${pred.routeColor || 'E85D3A'}">${this.esc(pred.routeBadge)}</span>`
+      : '';
 
     return `
       <div class="d-upcoming-row clickable tier-${tier}"
            style="--row-color:${rowColor}"
            data-vehicle="${this.esc(pred.vehicleId || '')}"
-           data-dir="${pred.directionId != null ? pred.directionId : ''}">
+           data-dir="${pred.directionId != null ? pred.directionId : ''}"
+           data-route="${this.esc(pred.routeId || '')}">
+        ${badgeHtml}
         <div class="d-upcoming-info">
           <div class="d-upcoming-headsign">→ ${this.esc(pred.headsign || 'Unknown')}</div>
           <div class="d-upcoming-meta">${statusHtml}${arrivalStr}</div>
@@ -877,7 +909,7 @@ class PullcordApp {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subscription: sub.toJSON(),
-          routeId: this.config.routeId,
+          routeId: this.heroPrediction.routeId || this.config.routeId,
           stopId: this.config.stopId,
           vehicleId: this.heroPrediction.vehicleId || null,
           thresholdMinutes,

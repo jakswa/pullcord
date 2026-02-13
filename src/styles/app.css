@@ -252,6 +252,47 @@
     line-height: 1.3;
   }
 
+  .d-badge-mini {
+    font-family: var(--font-mono);
+    font-weight: 800;
+    font-size: 0.7rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.25rem;
+    color: #fff;
+    line-height: 1.2;
+  }
+
+  .d-header-routes {
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .d-hero-badge {
+    font-family: var(--font-mono);
+    font-weight: 800;
+    font-size: 1rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.3rem;
+    color: #fff;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+  }
+
+  .d-upcoming-badge {
+    font-family: var(--font-mono);
+    font-weight: 800;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+    color: #fff;
+    min-width: 2rem;
+    text-align: center;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
   .d-header-info {
     flex: 1;
     min-width: 0;
@@ -1211,8 +1252,9 @@
 
   .home-stop-card {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     gap: 0.75rem;
+    width: 100%;
     background: var(--bg-surface);
     border-radius: 0.75rem;
     padding: 0.85rem 1rem;
@@ -1220,12 +1262,26 @@
     transition: background 0.15s;
     text-decoration: none;
     color: inherit;
+    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
 
   .home-stop-card:active { background: var(--card-hover); }
 
-  .home-stop-info { flex: 1; min-width: 0; }
+  .home-stop-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .home-stop-arrow {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    opacity: 0.5;
+    align-self: center;
+  }
 
   .home-stop-name {
     font-weight: 600;
@@ -1251,12 +1307,6 @@
   .home-stop-distance {
     font-size: 0.7rem;
     color: var(--text-muted);
-  }
-
-  .home-stop-arrow {
-    flex-shrink: 0;
-    color: var(--text-muted);
-    opacity: 0.5;
   }
 
   .home-footer {

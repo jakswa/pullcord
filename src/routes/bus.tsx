@@ -1,18 +1,55 @@
 import { Hono } from "hono";
 import { Layout } from "../views/Layout.js";
 import { BusTrackerPage } from "../views/pages/BusTracker.js";
-import { StopViewPage } from "../views/pages/StopView.js";
 import { getRoute, getStop, getRouteDetail, getRoutesForStop } from "../data/db.js";
 
 const app = new Hono();
 
-// GET /bus?route=39&stop=204230 - Bus tracker page
+// GET /bus?stop=204230 — multi-route stop view
+// GET /bus?route=39&stop=204230 — single-route tracker
 app.get("/bus", async (c) => {
   const routeId = c.req.query("route");
   const stopId = c.req.query("stop");
 
-  if (!routeId || !stopId) {
+  if (!stopId) {
     return c.redirect("/");
+  }
+
+  // No route specified → multi-route mode
+  if (!routeId) {
+    try {
+      const stop = getStop(stopId);
+      if (!stop) return c.redirect("/");
+
+      const routes = getRoutesForStop(stopId);
+      if (routes.length === 0) return c.redirect("/");
+
+      // Single route? Redirect to route-specific view
+      if (routes.length === 1) {
+        return c.redirect(`/bus?route=${routes[0].route_id}&stop=${stopId}`);
+      }
+
+      const initialData = {
+        multiRoute: true,
+        stop: { id: stop.stop_id, name: stop.stop_name, lat: stop.stop_lat, lon: stop.stop_lon },
+        routes: routes.map(r => ({ id: r.route_id, shortName: r.route_short_name, longName: r.route_long_name, color: r.route_color })),
+        timestamp: Date.now(),
+      };
+
+      return c.html(
+        <Layout title={`${stop.stop_name} — Pullcord`} description={`Live bus arrivals at ${stop.stop_name}. Routes: ${routes.map(r => r.route_short_name).join(', ')}.`}>
+          <BusTrackerPage
+            route={null}
+            stop={stop}
+            routeDetail={null}
+            initialData={initialData}
+          />
+        </Layout>
+      );
+    } catch (error) {
+      console.error("Error rendering multi-route view:", error);
+      return c.redirect("/");
+    }
   }
 
   try {
@@ -116,33 +153,10 @@ app.get("/bus", async (c) => {
   }
 });
 
-// GET /stop?id=104012 — Multi-route stop view
-app.get("/stop", async (c) => {
+// Redirect old /stop URLs to /bus
+app.get("/stop", (c) => {
   const stopId = c.req.query("id");
-  if (!stopId) return c.redirect("/");
-
-  try {
-    const stop = getStop(stopId);
-    if (!stop) return c.redirect("/");
-
-    const routes = getRoutesForStop(stopId);
-    if (routes.length === 0) return c.redirect("/");
-
-    // If only one bus route serves this stop, go straight to route tracker
-    if (routes.length === 1) {
-      return c.redirect(`/bus?route=${routes[0].route_id}&stop=${stopId}`);
-    }
-
-    return c.html(
-      <StopViewPage
-        stop={{ stop_id: stop.stop_id, stop_name: stop.stop_name, stop_lat: stop.stop_lat, stop_lon: stop.stop_lon }}
-        routes={routes.map(r => ({ route_id: r.route_id, route_short_name: r.route_short_name, route_long_name: r.route_long_name, route_color: r.route_color }))}
-      />
-    );
-  } catch (error) {
-    console.error("Error rendering stop view:", error);
-    return c.redirect("/");
-  }
+  return stopId ? c.redirect(`/bus?stop=${stopId}`) : c.redirect("/");
 });
 
 export default app;
