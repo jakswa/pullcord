@@ -1,0 +1,863 @@
+@import "tailwindcss";
+
+/* Scan public/ for classes used in client-side JS */
+@source "../../public";
+
+/* ===== THEME — DEPARTURE BOARD ===== */
+/* High-contrast, sunlight-readable, infrastructure aesthetic */
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Cascadia Code", ui-monospace, "DejaVu Sans Mono", monospace;
+  --color-brand: #2563eb;
+  --color-brand-hover: #1d4ed8;
+  --color-brand-active: #1e40af;
+}
+
+/* ===== BASE ===== */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  input[type="text"],
+  input[type="email"] {
+    appearance: none;
+  }
+
+  button {
+    appearance: none;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+  }
+}
+
+/* ===== COMPONENTS ===== */
+@layer components {
+
+  /* ============================
+     TRACKER PAGE — DEPARTURE BOARD
+     ============================ */
+
+  .tracker-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    background: #ffffff;
+    overflow: hidden;
+  }
+
+  /* --- Header: thin dark strip like a platform indicator --- */
+  .tracker-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: #111827;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .tracker-home {
+    color: #6B7280;
+    text-decoration: none;
+    font-size: 1.25rem;
+    padding: 0.3rem;
+    line-height: 1;
+    border-radius: 0.25rem;
+    transition: color 0.15s;
+  }
+
+  .tracker-home:active {
+    color: #fff;
+  }
+
+  .tracker-route-badge {
+    font-family: var(--font-mono);
+    font-weight: 800;
+    font-size: 1.3rem;
+    padding: 0.15rem 0.6rem;
+    border-radius: 0.25rem;
+    color: #fff;
+    flex-shrink: 0;
+    line-height: 1.4;
+    letter-spacing: 0.03em;
+  }
+
+  .tracker-header-info {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .tracker-stop-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tracker-route-name {
+    font-size: 0.7rem;
+    color: #9CA3AF;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tracker-updated {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: #9CA3AF;
+    flex-shrink: 0;
+    text-align: right;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- Refresh Progress Bar --- */
+  .refresh-bar {
+    height: 3px;
+    background: #E5E7EB;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .refresh-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    background: #22c55e;
+    transition: none;
+  }
+
+  .refresh-bar.refreshing::after {
+    animation: refresh-fill 30s linear forwards;
+  }
+
+  .refresh-bar.refresh-flash::after {
+    width: 100% !important;
+    background: #22c55e;
+    animation: none;
+    transition: opacity 0.5s;
+  }
+
+  /* --- ETA Section: the actual departure board --- */
+  .tracker-etas {
+    flex-shrink: 0;
+    overflow-y: auto;
+    max-height: 50vh;
+    -webkit-overflow-scrolling: touch;
+    background: #ffffff;
+  }
+
+  /* When map is collapsed, ETAs can grow */
+  .tracker-etas.etas-expanded {
+    max-height: none;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .tracker-eta-status {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: #6B7280;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .tracker-spinner {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2.5px solid #E5E7EB;
+    border-top-color: #111827;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* --- ETA Groups — direction sections --- */
+  .eta-group {
+    /* No margin — departure boards are dense */
+  }
+
+  .eta-group-header {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #6B7280;
+    padding: 0.4rem 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    background: #F3F4F6;
+    border-top: 1px solid #E5E7EB;
+    border-bottom: 1px solid #E5E7EB;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .eta-group-arrow {
+    color: #9CA3AF;
+    font-size: 0.9rem;
+  }
+
+  /* --- ETA Rows — departure board lines --- */
+  .eta-row {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem 0.5rem 1rem;
+    border-bottom: 1px solid #F3F4F6;
+    border-left: 6px solid var(--route-color, var(--color-brand));
+    background: #ffffff;
+    min-height: 4rem;
+    transition: background 0.1s;
+  }
+
+  .eta-clickable {
+    cursor: pointer;
+  }
+
+  .eta-clickable:active {
+    background: #F9FAFB;
+  }
+
+  .eta-direction {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* No headsign needed in rows — it's in the group header */
+  .eta-headsign {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .eta-meta {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: #9CA3AF;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+    letter-spacing: 0.02em;
+  }
+
+  .eta-time {
+    text-align: right;
+    flex-shrink: 0;
+    margin-left: 0.75rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.2rem;
+  }
+
+  /* === THE BIG NUMBER — departure board hero === */
+  .eta-minutes {
+    font-family: var(--font-mono);
+    font-size: 3.75rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #111827;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+
+  .eta-minutes.arriving {
+    color: #16a34a;
+    animation: arriving-pulse 1.2s ease-in-out infinite;
+  }
+
+  .eta-label {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: #9CA3AF;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    align-self: flex-end;
+    padding-bottom: 0.4rem;
+  }
+
+  .eta-chevron {
+    color: #D1D5DB;
+    font-size: 1.75rem;
+    margin-left: 0.4rem;
+    font-weight: 300;
+    flex-shrink: 0;
+    transition: color 0.15s;
+  }
+
+  .eta-clickable:active .eta-chevron {
+    color: #6B7280;
+  }
+
+  /* --- Staleness Dots — color-coded, no words needed --- */
+  .eta-live-dot, .eta-delayed-dot, .eta-stale-dot, .eta-lost-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+
+  .eta-live-dot {
+    background: #22c55e;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.15);
+    animation: live-blink 2s ease-in-out infinite;
+  }
+
+  .eta-delayed-dot {
+    background: #eab308;
+    box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.15);
+    animation: live-blink 2s ease-in-out infinite;
+  }
+
+  .eta-stale-dot {
+    background: #f97316;
+  }
+
+  .eta-lost-dot {
+    background: #ef4444;
+  }
+
+  /* --- Prediction Tiers: visual hierarchy through size --- */
+
+  /* Next tier — slightly smaller, blue-tinted */
+  .eta-tier-next {
+    border-left-color: #93c5fd !important;
+    background: #FAFCFF;
+  }
+
+  .eta-tier-next .eta-minutes {
+    color: #1e40af;
+    font-size: 2.75rem;
+  }
+
+  .eta-tier-next .eta-meta {
+    color: #93c5fd;
+  }
+
+  /* Scheduled tier — smallest, muted */
+  .eta-tier-scheduled {
+    border-left-color: #D1D5DB !important;
+    background: #FAFAFA;
+  }
+
+  .eta-tier-scheduled .eta-minutes {
+    color: #9CA3AF;
+    font-size: 2.25rem;
+  }
+
+  .eta-tier-scheduled .eta-meta {
+    color: #D1D5DB;
+  }
+
+  .eta-next-dot, .eta-sched-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+
+  .eta-next-dot { background: #60a5fa; }
+  .eta-sched-dot { background: #D1D5DB; }
+
+  .eta-stale {
+    color: #ef4444;
+    opacity: 0.7;
+  }
+
+  .eta-stale .eta-minutes {
+    color: #ef4444;
+  }
+
+  /* Update flash — subtle green blink */
+  .eta-row-update {
+    animation: eta-flash 0.5s ease;
+  }
+
+  /* --- Map Toggle — thin bar between ETAs and map --- */
+  .map-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.45rem 1rem;
+    background: #F9FAFB;
+    border: none;
+    border-top: 1px solid #E5E7EB;
+    color: #6B7280;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+
+  .map-toggle:active {
+    background: #F3F4F6;
+  }
+
+  .map-toggle-arrow {
+    display: inline-block;
+    transition: transform 0.3s ease;
+    font-size: 0.55rem;
+    line-height: 1;
+  }
+
+  .map-toggle-arrow.collapsed {
+    transform: rotate(180deg);
+  }
+
+  /* --- Map Section --- */
+  .tracker-map-wrap {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+    transition: flex 0.3s ease, min-height 0.3s ease;
+  }
+
+  .tracker-map-wrap.map-collapsed {
+    flex: 0 0 0px !important;
+    min-height: 0 !important;
+    overflow: hidden;
+  }
+
+  .tracker-map {
+    width: 100%;
+    height: 100%;
+  }
+
+  .tracker-recenter {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 1000;
+    background: #fff;
+    border: 2px solid #E5E7EB;
+    border-radius: 0.375rem;
+    box-shadow: none;
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #374151;
+    transition: background 0.15s;
+  }
+
+  .tracker-recenter:active {
+    background: #F3F4F6;
+  }
+
+  .tracker-offline {
+    position: absolute;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    z-index: 1000;
+    background: #ef4444;
+    color: #fff;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .tracker-footer {
+    flex-shrink: 0;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: #9CA3AF;
+    padding: 0.35rem;
+    background: #F9FAFB;
+    border-top: 1px solid #E5E7EB;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* --- Bus Markers (Map) --- */
+  .bus-icon {
+    background: transparent !important;
+    border: none !important;
+  }
+
+  .bus-marker {
+    background: var(--bus-color, #111827);
+    color: #fff;
+    font-weight: 800;
+    font-size: 13px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    line-height: 1;
+    transition: opacity 0.3s, filter 0.3s;
+  }
+
+  .bus-marker-stale {
+    opacity: 0.6;
+    filter: saturate(0.4);
+  }
+
+  .bus-marker-lost {
+    opacity: 0.3;
+    filter: saturate(0) brightness(1.2);
+  }
+
+  .bus-marker-arrow {
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(var(--bearing, 0deg));
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 6px solid var(--bus-color, #111827);
+  }
+
+  .bus-marker-focused {
+    transform: scale(1.3);
+    box-shadow: 0 0 0 4px rgba(255,255,255,0.8), 0 2px 8px rgba(0,0,0,0.4);
+  }
+
+  .bus-focused .bus-marker {
+    animation: bus-bounce 0.6s ease;
+  }
+
+  /* --- Stop Markers --- */
+  .stop-pulse {
+    width: 20px;
+    height: 20px;
+    background: #111827;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 rgba(17, 24, 39, 0.5);
+    animation: pulse-ring 2s ease-out infinite;
+  }
+
+  .route-stop-dot {
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border: 2px solid var(--route-color, #6B7280);
+    border-radius: 50%;
+  }
+
+  /* ============================
+     HOME PAGE — TRANSIT KIOSK
+     ============================ */
+
+  .home-shell {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+  }
+
+  .home-hero {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1.25rem 2rem;
+    background: #111827;
+  }
+
+  .home-hero-inner {
+    width: 100%;
+    max-width: 480px;
+    text-align: center;
+  }
+
+  .home-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .home-logo-icon {
+    flex-shrink: 0;
+  }
+
+  .home-wordmark {
+    font-family: var(--font-mono);
+    font-size: 2rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.02em;
+  }
+
+  .home-tagline {
+    font-size: 1rem;
+    color: #9CA3AF;
+    margin-bottom: 1.75rem;
+    font-weight: 400;
+  }
+
+  .home-locate-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.9rem 1.5rem;
+    background: #ffffff;
+    color: #111827;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .home-locate-btn:hover {
+    background: #F3F4F6;
+  }
+
+  .home-locate-btn:active {
+    transform: scale(0.98);
+    background: #E5E7EB;
+  }
+
+  .home-locate-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  .home-search-wrap {
+    position: relative;
+  }
+
+  .home-search {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    font-size: 1rem;
+    font-family: inherit;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 0.5rem;
+    color: #fff;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .home-search::placeholder {
+    color: #6B7280;
+  }
+
+  .home-search:focus {
+    background: rgba(255,255,255,0.12);
+    border-color: #ffffff;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.1);
+  }
+
+  /* --- Results Area — clean table rows on white --- */
+  .home-results-area {
+    flex: 1;
+    padding: 0;
+    max-width: 480px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .home-status {
+    text-align: center;
+    padding: 1.5rem;
+    color: #6B7280;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .home-results-header {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #9CA3AF;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    padding: 0.65rem 1rem 0.5rem;
+    border-bottom: 1px solid #E5E7EB;
+    background: #F9FAFB;
+  }
+
+  .home-results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding-bottom: 1.5rem;
+  }
+
+  /* --- Stop Cards — flat rows, no cards --- */
+  .home-stop-card {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #F3F4F6;
+    background: #ffffff;
+    transition: background 0.15s;
+  }
+
+  .home-stop-card:active {
+    background: #F9FAFB;
+  }
+
+  .home-stop-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #111827;
+    margin-bottom: 0.1rem;
+  }
+
+  .home-stop-distance {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: #9CA3AF;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.02em;
+  }
+
+  .home-stop-routes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .home-route-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3rem;
+    padding: 0.45rem 0.7rem;
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 800;
+    border-radius: 0.375rem;
+    text-decoration: none;
+    transition: opacity 0.15s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+    letter-spacing: 0.02em;
+  }
+
+  .home-route-chip:active {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+
+  /* --- Footer --- */
+  .home-footer {
+    padding: 0.75rem;
+    text-align: center;
+    color: #9CA3AF;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-top: 1px solid #F3F4F6;
+  }
+
+  .home-footer-sub {
+    color: #D1D5DB;
+    margin-top: 0.15rem;
+  }
+
+} /* end @layer components */
+
+/* ===== ANIMATIONS ===== */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes refresh-fill {
+  0% { width: 0%; background: #22c55e; }
+  80% { background: #22c55e; }
+  95% { background: #eab308; }
+  100% { width: 100%; background: #eab308; }
+}
+
+@keyframes arriving-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes eta-flash {
+  0% { background: #F0FDF4; }
+  100% { background: #ffffff; }
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(17, 24, 39, 0.5); }
+  70% { box-shadow: 0 0 0 10px rgba(17, 24, 39, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(17, 24, 39, 0); }
+}
+
+@keyframes bus-bounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.4); }
+  60% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+/* ===== OVERRIDES ===== */
+.hidden {
+  display: none !important;
+}

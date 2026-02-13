@@ -3,6 +3,7 @@ import { serveStatic } from "hono/bun";
 import homeRoutes from "./routes/home.js";
 import busRoutes from "./routes/bus.js";
 import apiRoutes from "./routes/api.js";
+import experimentRoutes from "./routes/experiments.js";
 
 type Env = {
   Variables: {
@@ -28,6 +29,9 @@ app.use("/public/*", serveStatic({ root: "./" }));
 
 // API routes
 app.route("/api", apiRoutes);
+
+// Experiment routes (must be before page routes)
+app.route("/v", experimentRoutes);
 
 // Page routes
 app.route("/", homeRoutes);
