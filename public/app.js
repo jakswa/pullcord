@@ -761,6 +761,13 @@ class PullcordApp {
     const btn = document.getElementById('pull-cord-btn');
     if (!btn) return;
 
+    // Check if push is supported
+    this.pushSupported = 'serviceWorker' in navigator && 'PushManager' in window;
+    if (!this.pushSupported) {
+      btn.style.display = 'none'; // Hide on unsupported browsers
+      return;
+    }
+
     btn.addEventListener('click', () => this.togglePullCord());
   }
 
@@ -769,93 +776,102 @@ class PullcordApp {
     const text = document.getElementById('pull-cord-text');
 
     if (this.cordActive) {
-      // Cancel
+      // Cancel — tell server to stop watching
+      if (this.cordId) {
+        fetch(`/api/push/cord/${this.cordId}`, { method: 'DELETE' }).catch(() => {});
+      }
       this.cordActive = false;
-      this.cordVehicleId = null;
-      this.cordNotified = false;
+      this.cordId = null;
       btn.classList.remove('cord-active', 'cord-fired');
       text.textContent = 'Notify me when bus is close';
       return;
     }
 
-    // Activate — watch the hero bus
     if (!this.heroPrediction) return;
 
-    // Request notification permission
-    const canNotify = await this.requestNotification();
+    text.textContent = 'Setting up...';
 
-    this.cordActive = true;
-    this.cordVehicleId = this.heroPrediction.vehicleId || null;
-    this.cordNotified = false;
+    try {
+      // 1. Register push-only service worker
+      const reg = await navigator.serviceWorker.register('/public/push-sw.js');
+      await navigator.serviceWorker.ready;
 
-    btn.classList.add('cord-active');
-    btn.classList.add('cord-fired');
-    setTimeout(() => btn.classList.remove('cord-fired'), 600);
+      // 2. Get VAPID public key from server
+      const vapidRes = await fetch('/api/push/vapid');
+      const { publicKey } = await vapidRes.json();
+      if (!publicKey) throw new Error('No VAPID key');
 
-    // Haptic feedback
-    if (navigator.vibrate) navigator.vibrate(100);
+      // 3. Request notification permission
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') {
+        text.textContent = 'Notifications blocked — check browser settings';
+        setTimeout(() => { text.textContent = 'Notify me when bus is close'; }, 3000);
+        return;
+      }
 
-    const mins = Math.floor(this.heroPrediction.etaSeconds / 60);
-    text.textContent = `🔔 Watching · ${mins} min away — tap to cancel`;
+      // 4. Subscribe to push
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: this.urlBase64ToUint8Array(publicKey),
+      });
+
+      // 5. Register cord on server
+      const cordRes = await fetch('/api/push/cord', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscription: sub.toJSON(),
+          routeId: this.config.routeId,
+          stopId: this.config.stopId,
+          vehicleId: this.heroPrediction.vehicleId || null,
+        }),
+      });
+
+      const { cordId } = await cordRes.json();
+
+      // Success
+      this.cordActive = true;
+      this.cordId = cordId;
+      btn.classList.add('cord-active');
+      btn.classList.add('cord-fired');
+      setTimeout(() => btn.classList.remove('cord-fired'), 600);
+
+      if (navigator.vibrate) navigator.vibrate(100);
+
+      const mins = Math.floor(this.heroPrediction.etaSeconds / 60);
+      text.textContent = `🔔 Watching · ${mins} min away — tap to cancel`;
+
+    } catch (err) {
+      console.error('Pull cord setup failed:', err);
+      text.textContent = 'Setup failed — try again';
+      setTimeout(() => { text.textContent = 'Notify me when bus is close'; }, 3000);
+    }
   }
 
+  // Update the cord button display on each poll (show updated ETA)
   checkPullCord() {
     if (!this.cordActive) return;
 
-    const btn = document.getElementById('pull-cord-btn');
     const text = document.getElementById('pull-cord-text');
+    if (!text) return;
 
-    // Find the watched vehicle in current predictions
-    let pred = null;
-    if (this.cordVehicleId) {
-      pred = this.lastPredictions.find(p => p.vehicleId === this.cordVehicleId);
+    // Show the hero ETA on the button
+    const hero = this.heroPrediction;
+    if (hero) {
+      const mins = Math.floor(hero.etaSeconds / 60);
+      text.textContent = `🔔 Watching · ${mins} min away — tap to cancel`;
     }
-    if (!pred && this.lastPredictions.length > 0) {
-      pred = this.lastPredictions[0]; // Fall back to first prediction
-    }
-
-    if (!pred) {
-      // Bus disappeared
-      this.sendNotification('Bus update', 'Your bus may have passed or gone out of service.');
-      this.cordActive = false;
-      this.cordVehicleId = null;
-      btn.classList.remove('cord-active');
-      text.textContent = 'Notify me when bus is close';
-      return;
-    }
-
-    const mins = Math.floor(pred.etaSeconds / 60);
-    text.textContent = `🔔 Watching · ${mins} min away — tap to cancel`;
-
-    // Fire notification at ≤ 2 minutes
-    if (pred.etaSeconds <= 120 && !this.cordNotified) {
-      this.cordNotified = true;
-      this.sendNotification(
-        'Your bus is almost here!',
-        `Route ${this.config.routeShortName || ''} arriving in ~${mins} min — head to the stop.`
-      );
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-
-      // Visual burst
-      btn.classList.add('cord-fired');
-      setTimeout(() => btn.classList.remove('cord-fired'), 600);
-    }
+    // Server handles the actual push notification — client just shows status
   }
 
-  async requestNotification() {
-    if (!('Notification' in window)) return false;
-    if (Notification.permission === 'granted') return true;
-    if (Notification.permission === 'denied') return false;
-    const result = await Notification.requestPermission();
-    return result === 'granted';
-  }
-
-  sendNotification(title, body) {
-    try {
-      if (Notification.permission === 'granted') {
-        new Notification(title, { body, icon: '/public/icons/favicon.svg' });
-      }
-    } catch (e) { /* silent */ }
+  // Convert VAPID key from base64url to Uint8Array
+  urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
   }
 
   // ───────────────────────

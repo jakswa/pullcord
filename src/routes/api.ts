@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { getRoutes, getRoute, searchStops, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getPairedStops, getRouteHeadsigns } from "../data/db.js";
 import { getVehicles, getPredictions } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
+import { getVapidPublicKey, registerCord, cancelCord, checkCords, getActiveCordCount } from "../data/push.js";
 
 const app = new Hono();
 
@@ -180,6 +181,9 @@ app.get("/predictions/:routeId/:stopId", async (c) => {
     
     // Sort by ETA
     allPredictions.sort((a, b) => a.etaSeconds - b.etaSeconds);
+
+    // Check active cords (async, non-blocking — don't delay the response)
+    checkCords(routeId, stopId, allPredictions).catch(e => console.error('Cord check error:', e));
     
     return c.json({
       stop: {
@@ -195,6 +199,46 @@ app.get("/predictions/:routeId/:stopId", async (c) => {
     console.error("Error fetching predictions:", error);
     return c.json({ error: "Failed to fetch predictions" }, 500);
   }
+});
+
+// ── Push / Pull the Cord ──
+
+// GET /api/push/vapid — public key for client subscription
+app.get("/push/vapid", (c) => {
+  return c.json({ publicKey: getVapidPublicKey() });
+});
+
+// POST /api/push/cord — register a cord (subscribe to push for a bus)
+app.post("/push/cord", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { subscription, routeId, stopId, vehicleId } = body;
+
+    if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+      return c.json({ error: "Invalid push subscription" }, 400);
+    }
+    if (!routeId || !stopId) {
+      return c.json({ error: "routeId and stopId required" }, 400);
+    }
+
+    const cordId = registerCord(subscription, routeId, stopId, vehicleId || null);
+    return c.json({ cordId, status: "watching" });
+  } catch (error) {
+    console.error("Error registering cord:", error);
+    return c.json({ error: "Failed to register cord" }, 500);
+  }
+});
+
+// DELETE /api/push/cord/:id — cancel a cord
+app.delete("/push/cord/:id", (c) => {
+  const id = c.req.param("id");
+  const cancelled = cancelCord(id);
+  return c.json({ cancelled });
+});
+
+// GET /api/push/status — debug: how many active cords
+app.get("/push/status", (c) => {
+  return c.json({ activeCords: getActiveCordCount() });
 });
 
 export default app;

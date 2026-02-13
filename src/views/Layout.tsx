@@ -81,12 +81,7 @@ export const Layout = (props: LayoutProps) => {
         {/* App JS */}
         <script src="/public/app.js"></script>
 
-        {/* Unregister any stale service workers */}
-        <script dangerouslySetInnerHTML={{ __html: `
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
-          }
-        `}} />
+        {/* Push SW is registered on-demand by Pull the Cord — no page-load SW */}
       </body>
     </html>
   );

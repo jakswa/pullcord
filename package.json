@@ -21,6 +21,7 @@
     "hono": "^4.11.9",
     "playwright": "^1.58.2",
     "protobufjs": "^8.0.0",
-    "tailwindcss": "^4.1.18"
+    "tailwindcss": "^4.1.18",
+    "web-push": "^3.6.7"
   }
 }
