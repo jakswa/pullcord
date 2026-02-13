@@ -5,3 +5,5 @@ data/marta.db
 dist/
 public/styles.css
 *.proto
+timestamp-raw-data.json
+investigate-*.ts

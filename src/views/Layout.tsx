@@ -12,6 +12,14 @@ export const Layout = (props: LayoutProps) => (
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>{props.title || "Pullcord — Real-time MARTA Bus Tracker"}</title>
       
+      {/* Inter font — preconnect for speed */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+      <link 
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" 
+        rel="stylesheet" 
+      />
+      
       {/* Leaflet CSS */}
       <link 
         rel="stylesheet" 
@@ -20,7 +28,7 @@ export const Layout = (props: LayoutProps) => (
         crossorigin="" 
       />
       
-      {/* Tailwind CSS */}
+      {/* Tailwind CSS (built) */}
       <link rel="stylesheet" href="/public/styles.css" />
       
       {/* Mobile viewport optimizations */}
@@ -29,12 +37,12 @@ export const Layout = (props: LayoutProps) => (
       
       {/* PWA meta tags */}
       <meta name="description" content="Real-time MARTA bus tracker with live positions and ETA predictions" />
-      <meta name="theme-color" content="#1f2937" />
+      <meta name="theme-color" content="#0f172a" />
       
       {/* Favicon */}
       <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚌</text></svg>" />
     </head>
-    <body class="bg-gray-50 font-sans">
+    <body class="bg-slate-50 font-sans antialiased">
       {props.children}
       
       {/* Leaflet JS */}

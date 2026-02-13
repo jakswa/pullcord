@@ -6,21 +6,26 @@ const TRIP_UPDATES_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/
 const CACHE_DURATION = 30 * 1000; // 30 seconds
 
 interface VehiclePosition {
-  id: string;
+  id: string;         // entity.id = vehicle label (display ID)
+  vehicleId: string;  // vehicle.vehicle.id (internal, matches trip updates)
   lat: number;
   lon: number;
   bearing?: number;
   speed?: number;
   tripId: string;
   headsign?: string;
+  directionId?: number;
   staleSeconds: number;
 }
 
 interface PredictionUpdate {
   vehicleId?: string;
+  tripId?: string;
   headsign?: string;
+  directionId?: number;
   etaSeconds: number;
   staleSeconds: number;
+  tier?: string;
 }
 
 interface CachedData<T> {
@@ -115,14 +120,41 @@ class RealtimeDataService {
         const vehicleTimestamp = vehicle.timestamp ? parseInt(vehicle.timestamp) * 1000 : timestamp;
         const staleSeconds = Math.floor((timestamp - vehicleTimestamp) / 1000);
 
+        // MARTA pre-assigns buses to their next trip before they reach its first stop.
+        // When that happens, the static trip headsign is the NEXT destination,
+        // but the bus is still physically heading to the start point.
+        // Use the realtime direction_id from the protobuf as ground truth.
+        const realtimeDirectionId = vehicle.trip.directionId;
+        const staticDirectionId = trip?.direction_id;
+        
+        let headsign = trip?.trip_headsign || "Unknown Destination";
+        let directionId = staticDirectionId;
+        
+        // If realtime and static disagree on direction, the bus is likely
+        // heading to the start of its next trip. Find the correct headsign
+        // for the realtime direction.
+        if (realtimeDirectionId !== undefined && staticDirectionId !== undefined && 
+            realtimeDirectionId !== staticDirectionId) {
+          // Look up any trip with the realtime direction to get the right headsign
+          for (const [, t] of tripLookup) {
+            if (t.route_id === routeId && t.direction_id === realtimeDirectionId) {
+              headsign = t.trip_headsign + " (returning)";
+              directionId = realtimeDirectionId;
+              break;
+            }
+          }
+        }
+
         return {
           id: entity.id,
+          vehicleId: vehicle.vehicle?.id || entity.id,
           lat: vehicle.position.latitude,
           lon: vehicle.position.longitude,
           bearing: vehicle.position.bearing || undefined,
           speed: vehicle.position.speed || undefined,
           tripId: vehicle.trip.tripId,
-          headsign: trip?.trip_headsign || "Unknown Destination",
+          headsign,
+          directionId,
           staleSeconds
         };
       });
@@ -160,6 +192,9 @@ class RealtimeDataService {
 
         predictions.push({
           headsign: trip.trip_headsign || "Unknown Destination",
+          directionId: trip.direction_id,
+          vehicleId: entity.tripUpdate.vehicle?.id || undefined,
+          tripId,
           etaSeconds,
           staleSeconds
         });

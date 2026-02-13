@@ -48,6 +48,9 @@ interface RouteDetail {
   stops: RouteStop[];
 }
 
+// MARTA rail route short names — not part of the bus tracker
+const RAIL_ROUTES = new Set(['BLUE', 'GREEN', 'RED', 'GOLD']);
+
 class MARTADatabase {
   private db: Database;
   private tripLookupCache: Map<string, Trip> | null = null;
@@ -97,28 +100,39 @@ class MARTADatabase {
   }
 
   // Get stops near a location
-  getNearbyStops(lat: number, lon: number, radiusMeters: number = 500, limit: number = 20): Stop[] {
-    // Simple distance calculation using Haversine approximation
+  getNearbyStops(lat: number, lon: number, radiusMeters: number = 500, limit: number = 20): (Stop & { distance: number })[] {
+    // Bounding box filter in SQL, precise Haversine in JS
+    // ~111,000 meters per degree latitude; longitude varies by cos(lat)
+    const latDelta = radiusMeters / 111000;
+    const lonDelta = radiusMeters / (111000 * Math.cos(lat * Math.PI / 180));
+
     const stmt = this.db.prepare(`
-      SELECT 
-        stop_id, 
-        stop_name, 
-        stop_lat, 
-        stop_lon,
-        (
-          6371000 * acos(
-            cos(radians(?)) * cos(radians(stop_lat)) * 
-            cos(radians(stop_lon) - radians(?)) + 
-            sin(radians(?)) * sin(radians(stop_lat))
-          )
-        ) as distance
+      SELECT stop_id, stop_name, stop_lat, stop_lon
       FROM stops
-      HAVING distance <= ?
-      ORDER BY distance
-      LIMIT ?
+      WHERE stop_lat BETWEEN ? AND ?
+        AND stop_lon BETWEEN ? AND ?
     `);
-    
-    return stmt.all(lat, lon, lat, radiusMeters, limit) as Stop[];
+
+    const candidates = stmt.all(
+      lat - latDelta, lat + latDelta,
+      lon - lonDelta, lon + lonDelta
+    ) as Stop[];
+
+    // Haversine distance
+    const toRad = (d: number) => d * Math.PI / 180;
+    const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    return candidates
+      .map(s => ({ ...s, distance: haversine(lat, lon, s.stop_lat, s.stop_lon) }))
+      .filter(s => s.distance <= radiusMeters)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, limit);
   }
 
   // Get single stop
@@ -130,15 +144,16 @@ class MARTADatabase {
     `).get(stopId) as Stop | null;
   }
 
-  // Get routes serving a stop
+  // Get routes serving a stop (bus only, excludes rail)
   getRoutesForStop(stopId: string): Route[] {
-    return this.db.prepare(`
+    const routes = this.db.prepare(`
       SELECT DISTINCT r.route_id, r.route_short_name, r.route_long_name, r.route_color, r.route_text_color
       FROM routes r
       JOIN route_stops rs ON r.route_id = rs.route_id
       WHERE rs.stop_id = ?
       ORDER BY CAST(r.route_short_name AS INTEGER), r.route_short_name
     `).all(stopId) as Route[];
+    return routes.filter(r => !RAIL_ROUTES.has(r.route_short_name));
   }
 
   // Get route detail with shapes and stops
@@ -230,6 +245,37 @@ class MARTADatabase {
     };
   }
 
+  // Find paired stops: same route, different direction, within ~150m of the given stop
+  getPairedStops(stopId: string, routeId: string): Array<{ stop_id: string; direction_id: number; trip_headsign: string }> {
+    const stop = this.getStop(stopId);
+    if (!stop) return [];
+
+    // Get all stops for this route with their direction + headsign
+    const routeStops = this.db.prepare(`
+      SELECT DISTINCT rs.stop_id, rs.direction_id, s.stop_lat, s.stop_lon, t.trip_headsign
+      FROM route_stops rs
+      JOIN stops s ON rs.stop_id = s.stop_id
+      JOIN trips t ON t.route_id = rs.route_id AND t.direction_id = rs.direction_id
+      WHERE rs.route_id = ?
+      GROUP BY rs.stop_id, rs.direction_id
+    `).all(routeId) as Array<{ stop_id: string; direction_id: number; stop_lat: number; stop_lon: number; trip_headsign: string }>;
+
+    // Haversine
+    const toRad = (d: number) => d * Math.PI / 180;
+    const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    // Find all stops within 150m (including the original stop itself)
+    return routeStops
+      .filter(rs => haversine(stop.stop_lat, stop.stop_lon, rs.stop_lat, rs.stop_lon) < 150)
+      .map(rs => ({ stop_id: rs.stop_id, direction_id: rs.direction_id, trip_headsign: rs.trip_headsign }));
+  }
+
   close() {
     this.db.close();
   }
@@ -273,6 +319,10 @@ export function getTripLookup(routeId?: string): Map<string, Trip> {
 
 export function getStopWithRoutes(stopId: string) {
   return db.getStopWithRoutes(stopId);
+}
+
+export function getPairedStops(stopId: string, routeId: string) {
+  return db.getPairedStops(stopId, routeId);
 }
 
 export type { Route, Stop, Trip, RouteStop, RouteDetail };

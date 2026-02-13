@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getRoutes, getRoute, searchStops, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop } from "../data/db.js";
+import { getRoutes, getRoute, searchStops, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getPairedStops } from "../data/db.js";
 import { getVehicles, getPredictions } from "../data/realtime.js";
 
 const app = new Hono();
@@ -29,14 +29,11 @@ app.get("/stops", (c) => {
       // Text search
       const stops = searchStops(query, limit);
       
-      // Enrich with routes for each stop
+      // Enrich with bus routes, filter out rail-only stops
       const enrichedStops = stops.map(stop => {
         const routes = getRoutesForStop(stop.stop_id);
-        return {
-          ...stop,
-          routes: routes.map(r => r.route_short_name)
-        };
-      });
+        return { ...stop, routes: routes.map(r => r.route_short_name) };
+      }).filter(stop => stop.routes.length > 0);
       
       return c.json(enrichedStops);
       
@@ -51,14 +48,11 @@ app.get("/stops", (c) => {
       
       const stops = getNearbyStops(latitude, longitude, radius, limit);
       
-      // Enrich with routes
+      // Enrich with bus routes, filter out rail-only stops
       const enrichedStops = stops.map(stop => {
         const routes = getRoutesForStop(stop.stop_id);
-        return {
-          ...stop,
-          routes: routes.map(r => r.route_short_name)
-        };
-      });
+        return { ...stop, routes: routes.map(r => r.route_short_name) };
+      }).filter(stop => stop.routes.length > 0);
       
       return c.json(enrichedStops);
       
@@ -118,29 +112,52 @@ app.get("/realtime/:routeId", async (c) => {
   }
 });
 
-// GET /api/predictions/:routeId/:stopId - ETA predictions for a specific stop
+// GET /api/predictions/:routeId/:stopId - ETA predictions for a stop (both directions)
 app.get("/predictions/:routeId/:stopId", async (c) => {
   try {
     const routeId = c.req.param("routeId");
     const stopId = c.req.param("stopId");
     
-    // Verify route and stop exist
     const route = getRoute(routeId);
     const stop = getStop(stopId);
     
-    if (!route) {
-      return c.json({ error: "Route not found" }, 404);
-    }
+    if (!route) return c.json({ error: "Route not found" }, 404);
+    if (!stop) return c.json({ error: "Stop not found" }, 404);
     
-    if (!stop) {
-      return c.json({ error: "Stop not found" }, 404);
-    }
-    
-    // Get trip lookup for this route
     const tripLookup = getTripLookup(route.route_id);
     
-    // Get predictions
-    const predictions = await getPredictions(route.route_id, stopId, tripLookup);
+    // Get vehicle positions to classify prediction tiers
+    const vehicles = await getVehicles(route.route_id, tripLookup);
+    const activeVehicleIds = new Set(vehicles.map(v => v.vehicleId));
+    const activeTripIds = new Set(vehicles.map(v => v.tripId));
+    
+    // Find paired stops (same physical location, both directions)
+    const pairedStops = getPairedStops(stopId, route.route_id);
+    
+    // Get predictions for ALL paired stops
+    const allPredictions = [];
+    const stopIds = pairedStops.length > 0 
+      ? pairedStops.map(ps => ps.stop_id)
+      : [stopId];
+    
+    for (const sid of [...new Set(stopIds)]) {
+      const preds = await getPredictions(route.route_id, sid, tripLookup);
+      allPredictions.push(...preds);
+    }
+    
+    // Classify each prediction into tiers
+    for (const pred of allPredictions) {
+      if (pred.vehicleId && activeVehicleIds.has(pred.vehicleId) && pred.tripId && activeTripIds.has(pred.tripId)) {
+        pred.tier = 'active';  // Bus on the road, this is its current trip
+      } else if (pred.vehicleId && activeVehicleIds.has(pred.vehicleId)) {
+        pred.tier = 'next';    // Bus exists but this is its future trip
+      } else {
+        pred.tier = 'scheduled'; // No bus assigned yet
+      }
+    }
+    
+    // Sort by ETA
+    allPredictions.sort((a, b) => a.etaSeconds - b.etaSeconds);
     
     return c.json({
       stop: {
@@ -149,7 +166,7 @@ app.get("/predictions/:routeId/:stopId", async (c) => {
         lat: stop.stop_lat,
         lon: stop.stop_lon
       },
-      predictions
+      predictions: allPredictions
     });
     
   } catch (error) {
