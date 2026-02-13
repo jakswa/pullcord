@@ -1,6 +1,7 @@
 import { Hono } from "hono";
-import { getRoutes, getRoute, searchStops, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getPairedStops } from "../data/db.js";
+import { getRoutes, getRoute, searchStops, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getPairedStops, getRouteHeadsigns } from "../data/db.js";
 import { getVehicles, getPredictions } from "../data/realtime.js";
+import { getMockVehicles, getMockPredictions } from "../data/mock.js";
 
 const app = new Hono();
 
@@ -95,6 +96,15 @@ app.get("/realtime/:routeId", async (c) => {
       return c.json({ error: "Route not found" }, 404);
     }
     
+    // Mock mode for testing/screenshots
+    const mock = c.req.query("mock");
+    if (mock) {
+      const detail = getRouteDetail(route.route_id);
+      const stops = detail?.stops || [];
+      const headsigns = getRouteHeadsigns(route.route_id);
+      return c.json({ timestamp: Math.floor(Date.now() / 1000), vehicles: getMockVehicles(route.route_id, stops, headsigns) });
+    }
+
     // Get trip lookup for this route
     const tripLookup = getTripLookup(route.route_id);
     
@@ -124,6 +134,18 @@ app.get("/predictions/:routeId/:stopId", async (c) => {
     if (!route) return c.json({ error: "Route not found" }, 404);
     if (!stop) return c.json({ error: "Stop not found" }, 404);
     
+    // Mock mode for testing/screenshots
+    const mock = c.req.query("mock");
+    if (mock) {
+      const detail = getRouteDetail(route.route_id);
+      const stops = detail?.stops || [];
+      const headsigns = getRouteHeadsigns(route.route_id);
+      return c.json({
+        stop: { stop_id: stop.stop_id, name: stop.stop_name, lat: stop.stop_lat, lon: stop.stop_lon },
+        predictions: getMockPredictions(route.route_id, stopId, stops, headsigns),
+      });
+    }
+
     const tripLookup = getTripLookup(route.route_id);
     
     // Get vehicle positions to classify prediction tiers

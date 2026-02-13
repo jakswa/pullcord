@@ -1,18 +1,19 @@
 import type { Child } from "hono/jsx";
 
-export interface LayoutProps {
+export interface ExperimentLayoutProps {
   title?: string;
+  variant: string;
   children: Child;
 }
 
-export const Layout = (props: LayoutProps) => (
+export const ExperimentLayout = (props: ExperimentLayoutProps) => (
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>{props.title || "Pullcord — Real-time MARTA Bus Tracker"}</title>
+      <title>{props.title || "Pullcord — Experiment"}</title>
       
-      {/* Inter font — preconnect for speed */}
+      {/* Inter font */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
       <link 
@@ -28,21 +29,21 @@ export const Layout = (props: LayoutProps) => (
         crossorigin="" 
       />
       
-      {/* Tailwind CSS (built) */}
-      <link rel="stylesheet" href="/public/styles.css" />
+      {/* Experiment CSS */}
+      <link rel="stylesheet" href={`/public/experiments/${props.variant}/styles.css`} />
       
-      {/* Mobile viewport optimizations */}
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-      
-      {/* PWA meta tags */}
-      <meta name="description" content="Real-time MARTA bus tracker with live positions and ETA predictions" />
       <meta name="theme-color" content="#0f172a" />
-      
-      {/* Favicon */}
       <link rel="icon" type="image/svg+xml" href="/public/icons/favicon.svg" />
     </head>
-    <body class="bg-slate-50 font-sans antialiased">
+    <body class="font-sans antialiased">
+      {/* Experiment badge + base path for link rewriting */}
+      <div style="position:fixed;top:0.5rem;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(0,0,0,0.7);color:#fff;padding:0.2rem 0.75rem;border-radius:1rem;font-size:0.7rem;font-weight:600;letter-spacing:0.05em;pointer-events:none;">
+        EXPERIMENT {props.variant.toUpperCase()}
+      </div>
+      <script dangerouslySetInnerHTML={{ __html: `window.__BASE_PATH__ = "/v/${props.variant}";` }} />
+
       {props.children}
       
       {/* Leaflet JS */}
@@ -52,8 +53,8 @@ export const Layout = (props: LayoutProps) => (
         crossorigin=""
       ></script>
       
-      {/* App JS */}
-      <script src="/public/app.js"></script>
+      {/* Experiment JS */}
+      <script src={`/public/experiments/${props.variant}/app.js`}></script>
     </body>
   </html>
 );
