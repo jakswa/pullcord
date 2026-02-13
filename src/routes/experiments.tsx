@@ -9,11 +9,14 @@ import { HomePage as HomeB } from "../views/experiments/b/Home.js";
 import { BusTrackerPage as BusTrackerB } from "../views/experiments/b/BusTracker.js";
 import { HomePage as HomeC } from "../views/experiments/c/Home.js";
 import { BusTrackerPage as BusTrackerC } from "../views/experiments/c/BusTracker.js";
+import { HomePage as HomeD } from "../views/experiments/d/Home.js";
+import { BusTrackerPage as BusTrackerD } from "../views/experiments/d/BusTracker.js";
 
 const experiments: Record<string, { Home: any; BusTracker: any }> = {
   a: { Home: HomeA, BusTracker: BusTrackerA },
   b: { Home: HomeB, BusTracker: BusTrackerB },
   c: { Home: HomeC, BusTracker: BusTrackerC },
+  d: { Home: HomeD, BusTracker: BusTrackerD },
 };
 
 const app = new Hono();
@@ -69,7 +72,8 @@ app.get("/:variant/bus", async (c) => {
         name: s.stop_name,
         lat: s.stop_lat,
         lon: s.stop_lon,
-        direction: s.direction_id
+        direction: s.direction_id,
+        sequence: s.stop_sequence ?? 0
       })),
       timestamp: Date.now()
     };

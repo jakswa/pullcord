@@ -149,6 +149,7 @@ class PullcordApp {
     this.data = window.__INITIAL_DATA__;
     this.config = window.__CONFIG__;
     this.routeColor = this.data.route.color ? `#${this.data.route.color}` : '#2563eb';
+    this.mockMode = new URLSearchParams(window.location.search).has('mock');
 
     this.initRefreshBar();
     this.initMap();
@@ -321,9 +322,10 @@ class PullcordApp {
 
   async updateData() {
     try {
+      const qs = this.mockMode ? '?mock=1' : '';
       const [vRes, pRes] = await Promise.all([
-        fetch(`/api/realtime/${this.config.routeId}`),
-        fetch(`/api/predictions/${this.config.routeId}/${this.config.stopId}`)
+        fetch(`/api/realtime/${this.config.routeId}${qs}`),
+        fetch(`/api/predictions/${this.config.routeId}/${this.config.stopId}${qs}`)
       ]);
       
       const vehiclesData = await vRes.json();

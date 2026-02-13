@@ -40,6 +40,7 @@ interface RouteStop {
   stop_name: string;
   stop_lat: number;
   stop_lon: number;
+  stop_sequence?: number;
 }
 
 interface RouteDetail {
@@ -181,20 +182,32 @@ class MARTADatabase {
       shapes[direction_id.toString()] = points.map(p => [p.shape_pt_lat, p.shape_pt_lon]);
     }
 
-    // Get stops for this route
-    const stops = this.db.prepare(`
-      SELECT 
-        rs.route_id,
-        rs.stop_id, 
-        rs.direction_id,
-        s.stop_name,
-        s.stop_lat,
-        s.stop_lon
-      FROM route_stops rs
-      JOIN stops s ON rs.stop_id = s.stop_id
-      WHERE rs.route_id = ?
-      ORDER BY rs.direction_id, s.stop_name
-    `).all(routeId) as RouteStop[];
+    // Get stops for this route, ordered by stop_sequence from a representative trip per direction
+    // First, find a representative trip for each direction
+    const repTrips = this.db.prepare(`
+      SELECT direction_id, trip_id FROM trips
+      WHERE route_id = ?
+      GROUP BY direction_id
+    `).all(routeId) as Array<{ direction_id: number; trip_id: string }>;
+
+    let stops: RouteStop[] = [];
+    for (const { direction_id, trip_id } of repTrips) {
+      const dirStops = this.db.prepare(`
+        SELECT 
+          ? as route_id,
+          st.stop_id, 
+          ? as direction_id,
+          s.stop_name,
+          s.stop_lat,
+          s.stop_lon,
+          st.stop_sequence
+        FROM stop_times st
+        JOIN stops s ON st.stop_id = s.stop_id
+        WHERE st.trip_id = ?
+        ORDER BY st.stop_sequence
+      `).all(routeId, direction_id, trip_id) as RouteStop[];
+      stops = stops.concat(dirStops);
+    }
 
     return {
       route,
@@ -315,6 +328,23 @@ export function getRouteDetail(routeId: string): RouteDetail | null {
 
 export function getTripLookup(routeId?: string): Map<string, Trip> {
   return db.getTripLookup(routeId);
+}
+
+export function getRouteHeadsigns(routeId: string): Record<number, string> {
+  const rows = db.db.prepare(`
+    SELECT DISTINCT direction_id, trip_headsign 
+    FROM trips WHERE route_id = ? AND trip_headsign != ''
+    ORDER BY direction_id
+  `).all(routeId) as Array<{ direction_id: number; trip_headsign: string }>;
+  
+  const result: Record<number, string> = {};
+  for (const r of rows) {
+    // Use the first headsign per direction (most common)
+    if (!(r.direction_id in result)) {
+      result[r.direction_id] = r.trip_headsign;
+    }
+  }
+  return result;
 }
 
 export function getStopWithRoutes(stopId: string) {
