@@ -1,5 +1,8 @@
 // Server-side Web Push — subscription management + cord monitoring
+// Polls MARTA only when active cords exist — zero API calls when idle
 import webpush from 'web-push';
+import { getVehicles, getPredictions } from './realtime.js';
+import { getTripLookup, getPairedStops } from './db.js';
 
 // Configure VAPID
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || '';
@@ -68,6 +71,7 @@ export function registerCord(
   });
 
   console.log(`🔔 Cord registered: ${id} for route ${routeId} at stop ${stopId}${vehicleId ? ` (vehicle ${vehicleId})` : ''}`);
+  startCordPolling(); // Ensure poll loop is running
   return id;
 }
 
@@ -142,6 +146,80 @@ export async function checkCords(
 
       // Auto-remove after notification
       setTimeout(() => activeCords.delete(id), 5 * 60 * 1000); // clean up after 5 min
+    }
+  }
+}
+
+// ─────────────────────────────────────
+// SELF-MANAGING POLL LOOP
+// Only polls MARTA when active cords exist.
+// Starts when first cord is registered, stops when last cord expires/cancels.
+// ─────────────────────────────────────
+
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+const CORD_POLL_INTERVAL = 30_000; // 30s — match client poll rate
+
+function startCordPolling() {
+  if (pollTimer) return; // Already running
+  if (activeCords.size === 0) return; // Nothing to watch
+
+  console.log('🔔 Cord poll loop started');
+  pollTimer = setInterval(pollForCords, CORD_POLL_INTERVAL);
+  // Also run immediately
+  pollForCords();
+}
+
+function stopCordPolling() {
+  if (!pollTimer) return;
+  clearInterval(pollTimer);
+  pollTimer = null;
+  console.log('🔔 Cord poll loop stopped — no active cords');
+}
+
+async function pollForCords() {
+  // Clean expired first
+  const now = Date.now();
+  for (const [id, cord] of activeCords) {
+    if (now > cord.expiresAt) {
+      activeCords.delete(id);
+    }
+  }
+
+  // If no active cords remain, stop polling
+  if (activeCords.size === 0) {
+    stopCordPolling();
+    return;
+  }
+
+  // Group active cords by route+stop to minimize API calls
+  const groups = new Map<string, { routeId: string; stopId: string }>();
+  for (const cord of activeCords.values()) {
+    if (cord.notified) continue; // Already fired
+    const key = `${cord.routeId}:${cord.stopId}`;
+    if (!groups.has(key)) {
+      groups.set(key, { routeId: cord.routeId, stopId: cord.stopId });
+    }
+  }
+
+  // Fetch predictions for each unique route+stop pair
+  for (const { routeId, stopId } of groups.values()) {
+    try {
+      const tripLookup = getTripLookup(routeId);
+      const pairedStops = getPairedStops(stopId, routeId);
+      const stopIds = pairedStops.length > 0
+        ? pairedStops.map(ps => ps.stop_id)
+        : [stopId];
+
+      const allPreds: Array<{ vehicleId?: string; etaSeconds: number; headsign?: string }> = [];
+      for (const sid of [...new Set(stopIds)]) {
+        const preds = await getPredictions(routeId, sid, tripLookup);
+        allPreds.push(...preds);
+      }
+      allPreds.sort((a, b) => a.etaSeconds - b.etaSeconds);
+
+      await checkCords(routeId, stopId, allPreds);
+    } catch (err) {
+      console.error(`Cord poll error for ${routeId}/${stopId}:`, err);
     }
   }
 }

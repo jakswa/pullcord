@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getRoutes, getRoute, searchStops, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getPairedStops, getRouteHeadsigns } from "../data/db.js";
 import { getVehicles, getPredictions } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
-import { getVapidPublicKey, registerCord, cancelCord, checkCords, getActiveCordCount } from "../data/push.js";
+import { getVapidPublicKey, registerCord, cancelCord, getActiveCordCount } from "../data/push.js";
 
 const app = new Hono();
 
@@ -182,9 +182,6 @@ app.get("/predictions/:routeId/:stopId", async (c) => {
     // Sort by ETA
     allPredictions.sort((a, b) => a.etaSeconds - b.etaSeconds);
 
-    // Check active cords (async, non-blocking — don't delay the response)
-    checkCords(routeId, stopId, allPredictions).catch(e => console.error('Cord check error:', e));
-    
     return c.json({
       stop: {
         stop_id: stop.stop_id,
