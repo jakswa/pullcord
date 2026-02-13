@@ -1219,11 +1219,18 @@
 
   .home-stop-card:active { background: var(--card-hover); }
 
-  .home-stop-name {
+  .home-stop-name,
+  .home-stop-name-link {
     font-weight: 600;
     font-size: 0.95rem;
     color: var(--text-primary);
     margin-bottom: 0.15rem;
+    text-decoration: none;
+    display: block;
+  }
+
+  .home-stop-name-link:active {
+    color: var(--brand);
   }
 
   .home-stop-distance {
@@ -1358,6 +1365,138 @@
     border-top-color: var(--brand);
     border-radius: 50%;
     animation: d-spin 0.8s linear infinite;
+  }
+
+  /* ===== STOP VIEW (multi-route) ===== */
+
+  .stop-shell {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+  }
+
+  .stop-header {
+    padding: 1rem 1rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stop-name {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0.25rem 0 0.5rem;
+    line-height: 1.3;
+  }
+
+  .stop-routes {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  .stop-route-chip {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.3rem;
+    line-height: 1;
+  }
+
+  .stop-arrivals {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.25rem 0;
+  }
+
+  .stop-loading, .stop-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+  }
+
+  .stop-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: none;
+    border-left: 4px solid transparent;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    text-align: left;
+  }
+
+  .stop-row:active {
+    background: var(--bg-secondary);
+  }
+
+  .stop-row-selected {
+    background: var(--bg-secondary);
+    border-left-color: var(--row-color, var(--brand));
+  }
+
+  .stop-row-badge {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 800;
+    padding: 0.25rem 0.45rem;
+    border-radius: 0.3rem;
+    min-width: 2.2rem;
+    text-align: center;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .stop-row-headsign {
+    flex: 1;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stop-eta {
+    font-family: var(--font-mono);
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    flex-shrink: 0;
+    min-width: 3rem;
+    text-align: right;
+  }
+
+  .stop-eta-now {
+    color: var(--live-indicator);
+    animation: d-arriving-pulse 2s ease-in-out infinite;
+  }
+
+  .stop-eta-abs {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    min-width: 4rem;
+    text-align: right;
+  }
+
+  .stop-row-arriving {
+    /* subtle pulse on the left border */
+  }
+
+  .stop-row-arriving .stop-row-badge {
+    animation: d-arriving-pulse 2s ease-in-out infinite;
   }
 
 } /* end @layer components */

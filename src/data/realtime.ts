@@ -88,7 +88,7 @@ class RealtimeDataService {
     return entities;
   }
 
-  private async getTripUpdates(): Promise<any[]> {
+  async getTripUpdates(): Promise<any[]> {
     if (this.isCacheValid(this.tripUpdatesCache)) {
       return this.tripUpdatesCache!.data;
     }
@@ -217,6 +217,60 @@ export async function getVehicles(routeId: string, tripLookup: Map<string, any>)
 
 export async function getPredictions(routeId: string, stopId: string, tripLookup: Map<string, any>): Promise<PredictionUpdate[]> {
   return realtimeService.getPredictions(routeId, stopId, tripLookup);
+}
+
+// Multi-route arrivals for a stop
+export interface StopArrival extends PredictionUpdate {
+  routeId: string;
+  routeShortName: string;
+  routeColor: string;
+}
+
+export async function getStopArrivals(
+  stopId: string,
+  routes: Array<{ route_id: string; route_short_name: string; route_color: string }>,
+  tripLookup: Map<string, any>
+): Promise<StopArrival[]> {
+  const routeMap = new Map(routes.map(r => [r.route_id, r]));
+  const entities = await realtimeService.getTripUpdates();
+  const timestamp = Date.now();
+  const arrivals: StopArrival[] = [];
+
+  for (const entity of entities) {
+    if (!entity.tripUpdate?.trip?.tripId) continue;
+    const tripId = entity.tripUpdate.trip.tripId;
+    const trip = tripLookup.get(tripId);
+    if (!trip || !routeMap.has(trip.route_id)) continue;
+
+    const route = routeMap.get(trip.route_id)!;
+    const stopTimeUpdates = entity.tripUpdate.stopTimeUpdate || [];
+    for (const stu of stopTimeUpdates) {
+      if (stu.stopId !== stopId) continue;
+      const timeUpdate = stu.arrival || stu.departure;
+      if (!timeUpdate?.time) continue;
+
+      const etaTimestamp = parseInt(timeUpdate.time) * 1000;
+      const etaSeconds = Math.max(0, Math.floor((etaTimestamp - timestamp) / 1000));
+      const updateTimestamp = entity.tripUpdate.timestamp
+        ? parseInt(entity.tripUpdate.timestamp) * 1000 : timestamp;
+      const staleSeconds = Math.floor((timestamp - updateTimestamp) / 1000);
+
+      arrivals.push({
+        headsign: trip.trip_headsign || "Unknown",
+        directionId: trip.direction_id,
+        vehicleId: entity.tripUpdate.vehicle?.id || undefined,
+        tripId,
+        etaSeconds,
+        staleSeconds,
+        routeId: trip.route_id,
+        routeShortName: route.route_short_name,
+        routeColor: route.route_color,
+      });
+    }
+  }
+
+  arrivals.sort((a, b) => a.etaSeconds - b.etaSeconds);
+  return arrivals;
 }
 
 export type { VehiclePosition, PredictionUpdate };

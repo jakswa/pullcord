@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { Layout } from "../views/Layout.js";
 import { BusTrackerPage } from "../views/pages/BusTracker.js";
-import { getRoute, getStop, getRouteDetail } from "../data/db.js";
+import { StopViewPage } from "../views/pages/StopView.js";
+import { getRoute, getStop, getRouteDetail, getRoutesForStop } from "../data/db.js";
 
 const app = new Hono();
 
@@ -112,6 +113,35 @@ app.get("/bus", async (c) => {
         </div>
       </Layout>
     );
+  }
+});
+
+// GET /stop?id=104012 — Multi-route stop view
+app.get("/stop", async (c) => {
+  const stopId = c.req.query("id");
+  if (!stopId) return c.redirect("/");
+
+  try {
+    const stop = getStop(stopId);
+    if (!stop) return c.redirect("/");
+
+    const routes = getRoutesForStop(stopId);
+    if (routes.length === 0) return c.redirect("/");
+
+    // If only one bus route serves this stop, go straight to route tracker
+    if (routes.length === 1) {
+      return c.redirect(`/bus?route=${routes[0].route_id}&stop=${stopId}`);
+    }
+
+    return c.html(
+      <StopViewPage
+        stop={{ stop_id: stop.stop_id, stop_name: stop.stop_name, stop_lat: stop.stop_lat, stop_lon: stop.stop_lon }}
+        routes={routes.map(r => ({ route_id: r.route_id, route_short_name: r.route_short_name, route_long_name: r.route_long_name, route_color: r.route_color }))}
+      />
+    );
+  } catch (error) {
+    console.error("Error rendering stop view:", error);
+    return c.redirect("/");
   }
 });
 

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getRoutes, getRoute, searchStops, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getPairedStops, getRouteHeadsigns } from "../data/db.js";
-import { getVehicles, getPredictions } from "../data/realtime.js";
+import { getVehicles, getPredictions, getStopArrivals } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
 import { getVapidPublicKey, registerCord, cancelCord, getActiveCordCount, testFireAll } from "../data/push.js";
 
@@ -195,6 +195,41 @@ app.get("/predictions/:routeId/:stopId", async (c) => {
   } catch (error) {
     console.error("Error fetching predictions:", error);
     return c.json({ error: "Failed to fetch predictions" }, 500);
+  }
+});
+
+// GET /api/stops/:stopId/arrivals — All arriving buses at a stop (multi-route)
+app.get("/stops/:stopId/arrivals", async (c) => {
+  try {
+    const stopId = c.req.param("stopId");
+    const stop = getStop(stopId);
+    if (!stop) return c.json({ error: "Stop not found" }, 404);
+
+    const routes = getRoutesForStop(stopId);
+    if (routes.length === 0) return c.json({ stop, arrivals: [] });
+
+    // Build trip lookup across all routes at this stop
+    const tripLookup = getTripLookup(); // all trips
+    const arrivals = await getStopArrivals(stopId, routes, tripLookup);
+
+    return c.json({
+      stop: {
+        stop_id: stop.stop_id,
+        name: stop.stop_name,
+        lat: stop.stop_lat,
+        lon: stop.stop_lon,
+      },
+      routes: routes.map(r => ({
+        route_id: r.route_id,
+        route_short_name: r.route_short_name,
+        route_long_name: r.route_long_name,
+        route_color: r.route_color,
+      })),
+      arrivals,
+    });
+  } catch (error) {
+    console.error("Error fetching stop arrivals:", error);
+    return c.json({ error: "Failed to fetch arrivals" }, 500);
   }
 });
 

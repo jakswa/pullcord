@@ -205,9 +205,13 @@ class PullcordApp {
       return;
     }
 
-    resultsList.innerHTML = stops.map(stop => `
+    resultsList.innerHTML = stops.map(stop => {
+      const stopLink = stop.routes.length > 1
+        ? `${basePath}/stop?id=${stop.stop_id}`
+        : `${basePath}/bus?route=${stop.routes[0]}&stop=${stop.stop_id}`;
+      return `
       <div class="home-stop-card">
-        <div class="home-stop-name">${this.esc(stop.stop_name)}</div>
+        <a href="${stopLink}" class="home-stop-name-link">${this.esc(stop.stop_name)}</a>
         ${stop.distance ? `<div class="home-stop-distance">${Math.round(stop.distance)}m away</div>` : ''}
         <div class="home-stop-routes">
           ${stop.routes.map(route => `
@@ -215,7 +219,7 @@ class PullcordApp {
           `).join('')}
         </div>
       </div>
-    `).join('');
+    `}).join('');
   }
 
   showLoading(loadingDiv, resultsContainer) {
