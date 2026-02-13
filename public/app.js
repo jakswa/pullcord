@@ -280,11 +280,74 @@ class PullcordApp {
     if (!this.multiRoute) this.prepareStopDirections();
     this.checkCordFired(params);
     this.initPullCord();
-    if (!this.multiRoute) this.initMapToggle();
+    this.initMapToggle();
     this.initRefreshBtn();
     this.initFavoriteBtn();
+
+    // Multi-route: track which route is currently loaded for map/progress
+    if (this.multiRoute) {
+      this.loadedRouteId = null;
+      this.routeDetailCache = {};
+    }
     if (!this.multiRoute) this.discoverOtherRoutes();
     this.startPolling();
+  }
+
+  // Load route-specific data (shapes, stops, vehicles) for multi-route map/progress
+  async loadRouteData(routeId) {
+    if (!this.multiRoute) return;
+    if (this.loadedRouteId === routeId && this.lastVehicles.length > 0) {
+      // Just refresh vehicles for the same route
+      try {
+        const vRes = await fetch(`/api/realtime/${routeId}`);
+        const vData = await vRes.json();
+        this.lastVehicles = vData.vehicles || [];
+      } catch (e) { /* keep stale */ }
+      return;
+    }
+
+    try {
+      // Fetch route detail (shapes + stops) and vehicles in parallel
+      const [rdRes, vRes] = await Promise.all([
+        this.routeDetailCache[routeId]
+          ? Promise.resolve(null)
+          : fetch(`/api/route/${routeId}`),
+        fetch(`/api/realtime/${routeId}`)
+      ]);
+
+      if (rdRes) {
+        const rd = await rdRes.json();
+        this.routeDetailCache[routeId] = rd;
+      }
+      const rd = this.routeDetailCache[routeId];
+
+      const vData = await vRes.json();
+      this.lastVehicles = vData.vehicles || [];
+
+      // Update local data for progress strip + map
+      this.data.stops = (rd.stops || []).map(s => ({
+        id: s.stop_id, name: s.stop_name, lat: s.stop_lat, lon: s.stop_lon,
+        direction: s.direction_id, sequence: s.stop_sequence ?? 0
+      }));
+      this.data.shapes = rd.shapes || [];
+      this.routeColor = rd.route?.route_color ? `#${rd.route.route_color}` : '#E85D3A';
+      this.loadedRouteId = routeId;
+
+      // Re-prepare stop directions for progress strip
+      this.prepareStopDirections();
+
+      // Update map title
+      const titleEl = document.getElementById('map-title-text');
+      if (titleEl) titleEl.textContent = `Route ${rd.route?.route_short_name || routeId}`;
+
+      // Clear and redraw map route lines if map is visible
+      if (this.map) {
+        this.clearMapRoute();
+        this.drawMapRoute();
+      }
+    } catch (e) {
+      console.error('Failed to load route data:', e);
+    }
   }
 
   // Pre-compute direction stop lists for progress strip
@@ -344,11 +407,15 @@ class PullcordApp {
         const data = await res.json();
         this.lastPredictions = (data.arrivals || []).map(a => ({
           ...a,
-          // Normalize fields for shared render methods
           routeBadge: a.routeShortName,
           routeColor: a.routeColor,
         }));
-        this.lastVehicles = [];
+
+        // Fetch vehicles + route detail for hero's route (for map + progress strip)
+        const heroRoute = this.lastPredictions[0]?.routeId;
+        if (heroRoute) {
+          await this.loadRouteData(heroRoute);
+        }
       } else {
         // Single route: fetch vehicles + predictions
         const [vRes, pRes] = await Promise.all([
@@ -362,9 +429,9 @@ class PullcordApp {
       }
 
       this.renderHero(this.lastPredictions);
-      if (!this.multiRoute) this.renderProgressStrip(this.lastPredictions, this.lastVehicles);
+      this.renderProgressStrip(this.lastPredictions, this.lastVehicles);
       this.renderUpcoming(this.lastPredictions);
-      if (!this.multiRoute) this.updateMapMarkers(this.lastVehicles);
+      this.updateMapMarkers(this.lastVehicles);
       this.updateTimestamp();
       this.checkPullCord();
       this.flashRefresh();
@@ -1050,8 +1117,23 @@ class PullcordApp {
     });
   }
 
+  clearMapRoute() {
+    if (!this.map) return;
+    this.routePolylines.forEach(p => this.map.removeLayer(p));
+    this.routePolylines = [];
+    this.stopMarkersList.forEach(m => this.map.removeLayer(m));
+    this.stopMarkersList = [];
+  }
+
+  drawMapRoute() {
+    if (!this.map || !this.data.shapes) return;
+    this.drawRouteShapes();
+    this.addStopMarkers();
+  }
+
   drawRouteShapes() {
-    const { shapes } = this.data;
+    const shapes = this.data.shapes;
+    if (!shapes) return;
     Object.values(shapes).forEach(coords => {
       if (coords.length === 0) return;
       // Outline
@@ -1069,7 +1151,9 @@ class PullcordApp {
   }
 
   addStopMarkers() {
-    const { stops, stop: active } = this.data;
+    const stops = this.data.stops;
+    const active = this.data.stop;
+    if (!stops || !active) return;
     stops.forEach(s => {
       if (s.id === active.id) return;
       const icon = L.divIcon({
