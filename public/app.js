@@ -356,7 +356,7 @@ class PullcordApp {
         html: `
           <div class="bus-marker${isFocused ? ' bus-marker-focused' : ''}${stale ? ' bus-marker-stale' : ''}${lost ? ' bus-marker-lost' : ''}" style="--bus-color: ${this.routeColor}">
             <div class="bus-marker-arrow" style="--bearing: ${v.bearing || 0}deg; --bus-color: ${this.routeColor}"></div>
-            🚌
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="18" height="16" rx="3"/><path d="M8 6v6M16 6v6M2 12h20"/><circle cx="7" cy="16" r="1" fill="#fff"/><circle cx="17" cy="16" r="1" fill="#fff"/></svg>
           </div>`,
         className: '',
         iconSize: [32, 32],

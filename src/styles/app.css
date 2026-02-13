@@ -538,8 +538,8 @@
     margin-bottom: 0.5rem;
   }
 
-  .home-logo {
-    font-size: 2rem;
+  .home-logo-icon {
+    flex-shrink: 0;
   }
 
   .home-wordmark {

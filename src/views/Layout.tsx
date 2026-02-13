@@ -40,7 +40,7 @@ export const Layout = (props: LayoutProps) => (
       <meta name="theme-color" content="#0f172a" />
       
       {/* Favicon */}
-      <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚌</text></svg>" />
+      <link rel="icon" type="image/svg+xml" href="/public/icons/favicon.svg" />
     </head>
     <body class="bg-slate-50 font-sans antialiased">
       {props.children}

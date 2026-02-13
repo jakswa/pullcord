@@ -4,7 +4,14 @@ export const HomePage = () => (
     <div class="home-hero">
       <div class="home-hero-inner">
         <div class="home-brand">
-          <span class="home-logo">🚌</span>
+          <svg class="home-logo-icon" width="40" height="40" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="2" width="24" height="24" rx="5" fill="#2563eb"/>
+            <rect x="8" y="6" width="16" height="8" rx="2" fill="#fff" opacity="0.9"/>
+            <line x1="16" y1="6" x2="16" y2="14" stroke="#2563eb" stroke-width="1.5"/>
+            <rect x="8" y="16" width="16" height="2" rx="1" fill="#fff" opacity="0.4"/>
+            <circle cx="10" cy="22" r="2" fill="#fff"/>
+            <circle cx="22" cy="22" r="2" fill="#fff"/>
+          </svg>
           <span class="home-wordmark">Pullcord</span>
         </div>
         <p class="home-tagline">Where's my bus?</p>
