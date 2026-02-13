@@ -136,6 +136,9 @@ export async function checkCords(
     // Already notified — we're done with this cord
     if (cord.notified) continue;
 
+    // Don't fire on the first poll cycle — prevents instant re-fire on re-subscribe
+    if (now - cord.createdAt < CORD_POLL_INTERVAL) continue;
+
     // Find the relevant prediction
     let pred = cord.vehicleId
       ? predictions.find(p => p.vehicleId === cord.vehicleId)
@@ -161,7 +164,7 @@ export async function checkCords(
             title: `🚌 Bus arriving in ~${mins} min!`,
             body: `Route ${routeName}${headsign} — head to your stop.`,
             tag: `cord-${id}`,
-            url: `/bus?route=${cord.routeId}&stop=${cord.stopId}`,
+            url: `/bus?route=${cord.routeId}&stop=${cord.stopId}&cordFired=${id}`,
           }),
         );
         console.log(`🔔 Push sent for cord ${id}`);
@@ -173,8 +176,8 @@ export async function checkCords(
         }
       }
 
-      // Auto-remove after notification
-      setTimeout(() => activeCords.delete(id), 5 * 60 * 1000); // clean up after 5 min
+      // Cord served its purpose — delete immediately
+      activeCords.delete(id);
     }
   }
 }

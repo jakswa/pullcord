@@ -251,6 +251,7 @@ class PullcordApp {
 
     this.refreshBar = document.getElementById('refresh-bar');
     this.prepareStopDirections();
+    this.checkCordFired(params);
     this.initPullCord();
     this.initMapToggle();
     this.initRefreshBtn();
@@ -757,6 +758,25 @@ class PullcordApp {
   // PULL THE CORD
   // ────────────────────────
 
+  checkCordFired(params) {
+    const firedId = params.get('cordFired');
+    if (!firedId) return;
+
+    // Clean up server-side (best-effort, may already be gone)
+    fetch(`/api/push/cord/${firedId}`, { method: 'DELETE' }).catch(() => {});
+
+    // Reset local cord state
+    this.cordActive = false;
+    this.cordId = null;
+    this.cordFiredId = firedId; // flag so initPullCord shows "delivered" briefly
+
+    // Strip cordFired from URL so refresh doesn't re-trigger
+    params.delete('cordFired');
+    const clean = params.toString();
+    const path = window.location.pathname + (clean ? '?' + clean : '');
+    history.replaceState(null, '', path);
+  }
+
   initPullCord() {
     const section = document.getElementById('cord-section');
     if (!section) return;
@@ -779,6 +799,16 @@ class PullcordApp {
     // Wire up cancel button
     const cancelBtn = document.getElementById('cord-cancel-btn');
     if (cancelBtn) cancelBtn.addEventListener('click', () => this.cancelCord());
+
+    // If we arrived from a fired notification, flash confirmation then reset
+    if (this.cordFiredId) {
+      const label = document.querySelector('.d-cord-label');
+      if (label) label.textContent = '✅ Bus notification delivered!';
+      setTimeout(() => {
+        if (label) label.textContent = '🔔 Notify me';
+      }, 3000);
+      this.cordFiredId = null;
+    }
   }
 
   async activateCord(thresholdMinutes) {
