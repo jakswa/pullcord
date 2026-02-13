@@ -775,26 +775,24 @@ class PullcordApp {
     const list = document.getElementById('upcoming-list');
     if (!section || !list) return;
 
-    // Exclude the hero prediction
-    const heroKey = this.heroPrediction
-      ? `${this.heroPrediction.vehicleId || ''}_${this.heroPrediction.tripId || ''}_${this.heroPrediction.etaSeconds}`
-      : null;
-
-    const upcoming = predictions.filter(p => {
-      const key = `${p.vehicleId || ''}_${p.tripId || ''}_${p.etaSeconds}`;
-      return key !== heroKey;
-    });
-
-    if (upcoming.length === 0) {
+    if (predictions.length === 0) {
       section.style.display = 'none';
       return;
     }
 
     section.style.display = '';
 
-    // Flat list sorted by arrival time — no direction grouping
-    const sorted = [...upcoming].sort((a, b) => a.etaSeconds - b.etaSeconds);
-    list.innerHTML = sorted.map(pred => this.renderUpcomingRow(pred)).join('');
+    // Flat list sorted by arrival time — hero stays in list, highlighted
+    const sorted = [...predictions].sort((a, b) => a.etaSeconds - b.etaSeconds);
+    const heroVid = this.heroPrediction?.vehicleId;
+    const heroTripId = this.heroPrediction?.tripId;
+
+    list.innerHTML = sorted.map(pred => {
+      const isHero = heroVid
+        ? (pred.vehicleId === heroVid && pred.tripId === heroTripId)
+        : (pred === this.heroPrediction);
+      return this.renderUpcomingRow(pred, isHero);
+    }).join('');
 
     // ALL rows are tappable → promote to hero
     list.querySelectorAll('.d-upcoming-row').forEach(row => {
@@ -822,7 +820,7 @@ class PullcordApp {
     });
   }
 
-  renderUpcomingRow(pred) {
+  renderUpcomingRow(pred, isHero = false) {
     const minutes = Math.floor(pred.etaSeconds / 60);
     const tier = pred.tier || 'active';
 
@@ -854,7 +852,7 @@ class PullcordApp {
       : '';
 
     return `
-      <div class="d-upcoming-row clickable tier-${tier}"
+      <div class="d-upcoming-row clickable tier-${tier}${isHero ? ' d-upcoming-hero' : ''}"
            style="--row-color:${rowColor}"
            data-vehicle="${this.esc(pred.vehicleId || '')}"
            data-dir="${pred.directionId != null ? pred.directionId : ''}"

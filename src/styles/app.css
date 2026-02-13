@@ -653,6 +653,11 @@
     cursor: pointer;
   }
 
+  .d-upcoming-row.d-upcoming-hero {
+    background: var(--bg-secondary);
+    border-left-width: 5px;
+  }
+
   .d-upcoming-row.clickable:active {
     background: var(--card-hover);
     transform: scale(0.98);

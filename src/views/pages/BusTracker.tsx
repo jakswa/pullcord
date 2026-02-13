@@ -89,7 +89,7 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
 
         {/* UPCOMING — remaining predictions */}
         <section class="d-upcoming" id="upcoming-section" style="display:none">
-          <div class="d-upcoming-header">Coming up</div>
+          <div class="d-upcoming-header">Arriving</div>
           <div id="upcoming-list" class="d-upcoming-list"></div>
         </section>
 
