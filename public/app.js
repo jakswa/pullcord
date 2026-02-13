@@ -805,7 +805,7 @@ class PullcordApp {
       const label = document.querySelector('.d-cord-label');
       if (label) label.textContent = '✅ Bus notification delivered!';
       setTimeout(() => {
-        if (label) label.textContent = '🔔 Notify me';
+        if (label) label.textContent = 'Notify me when bus is close';
       }, 3000);
       this.cordFiredId = null;
     }
@@ -836,7 +836,7 @@ class PullcordApp {
       const perm = await Notification.requestPermission();
       if (perm !== 'granted') {
         if (label) label.textContent = 'Notifications blocked — check settings';
-        setTimeout(() => { if (label) label.textContent = '🔔 Notify me'; }, 3000);
+        setTimeout(() => { if (label) label.textContent = 'Notify me when bus is close'; }, 3000);
         return;
       }
 
@@ -861,23 +861,34 @@ class PullcordApp {
 
       const { cordId } = await cordRes.json();
 
-      // Success — swap to active display
+      // Success — animate the pull!
       this.cordActive = true;
       this.cordId = cordId;
       this.cordThreshold = thresholdMinutes;
+
+      const cordIcon = document.getElementById('cord-icon');
+
+      // Yank animation
+      if (cordIcon) {
+        cordIcon.classList.add('pulled');
+        cordIcon.addEventListener('animationend', () => {
+          cordIcon.classList.remove('pulled');
+          cordIcon.classList.add('watching');
+        }, { once: true });
+      }
 
       if (options) options.classList.add('hidden');
       if (label) label.classList.add('hidden');
       if (activeDisplay) activeDisplay.classList.remove('hidden');
 
-      if (navigator.vibrate) navigator.vibrate(100);
+      if (navigator.vibrate) navigator.vibrate([50, 30, 100]); // short-pause-long, like a cord snap
 
       this.updateCordStatus();
 
     } catch (err) {
       console.error('Pull cord setup failed:', err);
       if (label) label.textContent = 'Setup failed — try again';
-      setTimeout(() => { if (label) label.textContent = '🔔 Notify me'; }, 3000);
+      setTimeout(() => { if (label) label.textContent = 'Notify me when bus is close'; }, 3000);
     }
   }
 
@@ -891,9 +902,11 @@ class PullcordApp {
     const options = document.getElementById('cord-options');
     const label = document.querySelector('.d-cord-label');
     const activeDisplay = document.getElementById('cord-active-display');
+    const cordIcon = document.getElementById('cord-icon');
 
+    if (cordIcon) { cordIcon.classList.remove('watching', 'pulled'); }
     if (options) options.classList.remove('hidden');
-    if (label) { label.classList.remove('hidden'); label.textContent = '🔔 Notify me'; }
+    if (label) { label.classList.remove('hidden'); label.textContent = 'Notify me when bus is close'; }
     if (activeDisplay) activeDisplay.classList.add('hidden');
   }
 
