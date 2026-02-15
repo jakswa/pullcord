@@ -20,9 +20,8 @@ echo "📥 Downloading MARTA GTFS feed..."
 curl -fSL -o "$GTFS_ZIP" "$GTFS_URL"
 
 echo "📦 Extracting..."
-rm -rf "$GTFS_DIR"
 mkdir -p "$GTFS_DIR"
-unzip -o "$GTFS_ZIP" -d "$GTFS_DIR"
+python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$GTFS_ZIP" "$GTFS_DIR"
 rm "$GTFS_ZIP"
 
 echo "🗄️  Rebuilding SQLite database..."

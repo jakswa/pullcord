@@ -65,7 +65,7 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
               <polyline points="12 6 12 12 16 14"/>
             </svg>
             <div class="d-empty-title">No buses in sight</div>
-            <div class="d-empty-sub">We'll keep watching. Pull the cord below to get notified when one shows up.</div>
+            <div class="d-empty-sub">Buses may not be running on this route right now. Check back during service hours.</div>
           </div>
 
           {/* The countdown display */}

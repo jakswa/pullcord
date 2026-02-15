@@ -24,8 +24,12 @@ class PullcordApp {
 
     // Pull cord state
     this.cordActive = false;
+    this.cordId = null;
+    this.cordThreshold = null;
+    this.cordTripId = null;
     this.cordVehicleId = null;
-    this.cordNotified = false;
+    this.cordDirectionId = null;
+    this.cordRouteId = null;
 
     // Timers
     this.pollTimer = null;
@@ -113,12 +117,15 @@ class PullcordApp {
     if (!container || !list) return;
 
     const favs = this.getFavorites();
+    const shell = document.querySelector('.home-shell');
     if (favs.length === 0) {
       container.classList.add('hidden');
+      if (shell) shell.classList.remove('has-content');
       return;
     }
 
     container.classList.remove('hidden');
+    if (shell) shell.classList.add('has-content');
     list.innerHTML = favs.map(fav => {
       const favLink = fav.routes.length > 1
         ? `${basePath}/bus?stop=${fav.stopId}`
@@ -148,8 +155,11 @@ class PullcordApp {
     try {
       this.showLoading(loadingDiv, resultsContainer);
       const res = await fetch(`/api/stops?q=${encodeURIComponent(query)}`);
-      const stops = await res.json();
-      this.displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath);
+      const data = await res.json();
+      // API returns { routeMatch, stops } for route matches, or plain array for stop matches
+      const stops = data.stops || data;
+      const routeMatch = data.routeMatch || null;
+      this.displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath, routeMatch);
     } catch (e) {
       this.showError('Failed to search stops', resultsList, resultsContainer, loadingDiv);
     }
@@ -160,12 +170,23 @@ class PullcordApp {
       this.showError('Geolocation not supported', resultsList, resultsContainer, loadingDiv);
       return;
     }
-    this.showLoading(loadingDiv, resultsContainer);
+
+    // Inline loading state on button
+    const btn = document.getElementById('location-btn');
+    const btnOriginal = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<div class="d-spinner"></div> Finding you...';
+    }
 
     // Try coarse position first (fast, cell/wifi), fall back to fine
     const getPosition = (opts) => new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(resolve, reject, opts);
     });
+
+    const resetBtn = () => {
+      if (btn) { btn.disabled = false; btn.innerHTML = btnOriginal; }
+    };
 
     let pos;
     try {
@@ -179,6 +200,7 @@ class PullcordApp {
         const msg = e2.code === 1 ? 'Location access denied'
           : e2.code === 3 ? 'Location timed out — try again or search instead'
           : 'Could not determine location';
+        resetBtn();
         this.showError(msg, resultsList, resultsContainer, loadingDiv);
         return;
       }
@@ -188,20 +210,28 @@ class PullcordApp {
       const { latitude, longitude } = pos.coords;
       const res = await fetch(`/api/stops?lat=${latitude}&lon=${longitude}&radius=800`);
       const stops = await res.json();
+      resetBtn();
       this.displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath);
     } catch (e) {
+      resetBtn();
       this.showError('Failed to find nearby stops', resultsList, resultsContainer, loadingDiv);
     }
   }
 
-  displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath) {
+  displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath, routeMatch) {
     this.hideLoadingEl(loadingDiv);
     if (resultsContainer) resultsContainer.classList.remove('hidden');
+    document.querySelector('.home-shell')?.classList.add('has-content');
 
     const header = document.getElementById('results-header');
     if (header) {
-      header.textContent = stops.length > 0 && stops[0].distance
-        ? `${stops.length} stops nearby` : `${stops.length} results`;
+      if (routeMatch) {
+        const color = routeMatch.route_color ? `#${routeMatch.route_color}` : 'var(--color-brand)';
+        header.innerHTML = `<span style="color:${color};font-weight:800">Route ${this.esc(routeMatch.route_short_name)}</span> · ${stops.length} stops`;
+      } else {
+        header.textContent = stops.length > 0 && stops[0].distance
+          ? `${stops.length} stops nearby` : `${stops.length} results`;
+      }
     }
 
     if (stops.length === 0) {
@@ -263,9 +293,10 @@ class PullcordApp {
     // Direction preference from URL (persists on refresh, shareable)
     this.selectedDirection = params.has('dir') ? parseInt(params.get('dir'), 10) : null;
 
-    // Tracked vehicle (in-memory, for "I want THAT specific bus")
+    // Tracked vehicle — persisted in URL via &vid=
     // Falls back to first-in-direction when vehicle disappears
-    this.trackedVehicleId = null;
+    this.trackedVehicleId = params.get('vid') || null;
+    this.trackedPredictionIdx = null;
 
     // Set route color CSS variable on shell
     const shell = document.querySelector('.d-shell');
@@ -466,8 +497,10 @@ class PullcordApp {
       if (this.isFavorite(stopId)) {
         this.removeFavorite(stopId);
       } else {
-        // Gather routes from tabs or current route
-        const routes = [this.config.routeShortName];
+        // Gather routes — multi-route mode has full route list in initial data
+        const routes = this.multiRoute
+          ? (this.data.routes || []).map(r => r.shortName)
+          : [this.config.routeShortName].filter(Boolean);
         this.addFavorite(stopId, this.data.stop.name, routes);
       }
       update();
@@ -492,9 +525,12 @@ class PullcordApp {
 
     loading.style.display = 'none';
 
+    const cordSection = document.getElementById('cord-section');
+
     if (!predictions || predictions.length === 0) {
       empty.style.display = '';
       eta.style.display = 'none';
+      if (cordSection) cordSection.style.display = 'none';
       this.heroPrediction = null;
       this.heroEtaSeconds = null;
       this.stopCountdown();
@@ -503,6 +539,7 @@ class PullcordApp {
 
     empty.style.display = 'none';
     eta.style.display = '';
+    if (cordSection) cordSection.style.display = '';
 
     // Hero selection priority:
     // 1. Tracked vehicle (user tapped a specific bus)
@@ -515,7 +552,14 @@ class PullcordApp {
       if (!hero) {
         // Tracked vehicle disappeared — clear tracking, fall back to direction
         this.trackedVehicleId = null;
+        this.updateVehicleUrl(null);
       }
+    }
+
+    // Fallback: track by index for vehicleless predictions (next-run/scheduled)
+    if (!hero && this.trackedPredictionIdx != null) {
+      hero = predictions[this.trackedPredictionIdx];
+      if (!hero) this.trackedPredictionIdx = null;
     }
 
     if (!hero && this.selectedDirection !== null) {
@@ -592,19 +636,18 @@ class PullcordApp {
       tierEl.className = 'd-hero-tier tier-scheduled';
     }
 
-    // Route badge (multi-route hero)
+    // Hide the old badge element
     const badgeEl = document.getElementById('hero-badge');
-    if (badgeEl && this.multiRoute && this.heroPrediction.routeBadge) {
-      badgeEl.textContent = this.heroPrediction.routeBadge;
-      badgeEl.style.background = `#${this.heroPrediction.routeColor || 'E85D3A'}`;
-      badgeEl.style.display = '';
-    } else if (badgeEl) {
-      badgeEl.style.display = 'none';
-    }
+    if (badgeEl) badgeEl.style.display = 'none';
 
-    // Headsign
+    // Headsign with inline route number for multi-route
     const hsEl = document.getElementById('hero-headsign');
-    hsEl.textContent = `→ ${this.heroPrediction.headsign || 'Unknown'}`;
+    const routePrefix = this.multiRoute && this.heroPrediction.routeBadge
+      ? `${this.heroPrediction.routeBadge} `
+      : '';
+    hsEl.innerHTML = this.multiRoute && this.heroPrediction.routeBadge
+      ? `<span class="d-hero-route" style="color:#${this.heroPrediction.routeColor || 'E85D3A'}">${this.esc(this.heroPrediction.routeBadge)}</span> ${this.esc(this.heroPrediction.headsign || 'Unknown')}`
+      : this.esc(this.heroPrediction.headsign || 'Unknown');
 
     // Meta (arrival time)
     const metaEl = document.getElementById('hero-meta');
@@ -645,17 +688,17 @@ class PullcordApp {
     const label = document.getElementById('progress-label');
     if (!section || !strip) return;
 
-    // Only show for active predictions with a trackable vehicle
-    const hero = predictions[0];
+    // Use the current hero prediction (respects tracked vehicle / direction)
+    const hero = this.heroPrediction;
     if (!hero || hero.tier === 'scheduled' || !hero.vehicleId) {
-      section.style.display = 'none';
+      this.renderEmptyStrip(strip, label);
       return;
     }
 
     // Find the vehicle
     const vehicle = vehicles.find(v => v.id === hero.vehicleId || v.vehicleId === hero.vehicleId);
     if (!vehicle) {
-      section.style.display = 'none';
+      this.renderEmptyStrip(strip, label);
       return;
     }
 
@@ -677,15 +720,13 @@ class PullcordApp {
     }
 
     if (bestDir === null || bestMyIdx < 0 || bestBusIdx < 0) {
-      section.style.display = 'none';
+      this.renderEmptyStrip(strip, label);
       return;
     }
 
     const stops = this.dirStops[bestDir];
     const n = stops.length;
-    if (n < 2) { section.style.display = 'none'; return; }
-
-    section.style.display = '';
+    if (n < 2) { this.renderEmptyStrip(strip, label); return; }
 
     // Calculate bus fractional position between stops
     let busFrac = 0;
@@ -697,12 +738,21 @@ class PullcordApp {
       busFrac = dTotal > 0 ? Math.min(1, dBus / dTotal) : 0;
     }
 
-    // Render SVG
+    // Stops away text
+    const stopsAway = bestMyIdx - bestBusIdx;
+    let stopsText = '';
+    if (stopsAway > 0) {
+      stopsText = `${stopsAway} stop${stopsAway === 1 ? '' : 's'} away`;
+    } else if (stopsAway === 0) {
+      stopsText = 'At your stop';
+    }
+
+    // Render compact SVG strip
     const w = strip.clientWidth || 340;
-    const h = 56;
-    const pad = 28;
+    const h = 40;
+    const pad = 20;
     const uw = w - pad * 2;
-    const lineY = 20;
+    const lineY = 16;
     const x = (i) => pad + (i / (n - 1)) * uw;
 
     const busX = x(bestBusIdx + busFrac);
@@ -714,56 +764,60 @@ class PullcordApp {
     const stripLine = dark ? '#1e293b' : '#EDE5D8';
     const stopDot = dark ? '#334155' : '#D4C4B4';
     const myStopStroke = dark ? '#090e1a' : '#FFFFFF';
-    const labelFill = dark ? '#94a3b8' : '#7C6354';
+    const labelFill = dark ? '#64748b' : '#9C8474';
     const busFill = dark ? '#f8fafc' : '#3B2820';
 
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
 
     // Glow filter
-    svg += `<defs><filter id="pg"><feGaussianBlur stdDeviation="3" result="b"/>` +
+    svg += `<defs><filter id="pg"><feGaussianBlur stdDeviation="2" result="b"/>` +
            `<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
 
     // Background line
-    svg += `<line x1="${pad}" y1="${lineY}" x2="${w-pad}" y2="${lineY}" stroke="${stripLine}" stroke-width="3" stroke-linecap="round"/>`;
+    svg += `<line x1="${pad}" y1="${lineY}" x2="${w-pad}" y2="${lineY}" stroke="${stripLine}" stroke-width="2" stroke-linecap="round"/>`;
 
-    // Active segment: bus → my stop (glowing route color)
+    // Active segment: bus → my stop
     if (busX < myX + 5) {
       svg += `<line x1="${busX}" y1="${lineY}" x2="${myX}" y2="${lineY}" ` +
-             `stroke="${rc}" stroke-width="4" stroke-linecap="round" filter="url(#pg)" opacity="0.7"/>`;
+             `stroke="${rc}" stroke-width="3" stroke-linecap="round" filter="url(#pg)" opacity="0.7"/>`;
     }
 
-    // Stop dots (small)
+    // Stop dots
     for (let i = 0; i < n; i++) {
       if (i === bestMyIdx) continue;
-      svg += `<circle cx="${x(i)}" cy="${lineY}" r="2" fill="${stopDot}"/>`;
+      svg += `<circle cx="${x(i)}" cy="${lineY}" r="1.5" fill="${stopDot}"/>`;
     }
 
-    // My stop — pulsing marker
-    svg += `<circle cx="${myX}" cy="${lineY}" r="10" fill="none" stroke="${rc}" stroke-width="1.5" opacity="0.2">` +
-           `<animate attributeName="r" values="10;14;10" dur="2.5s" repeatCount="indefinite"/>` +
-           `<animate attributeName="opacity" values="0.2;0;0.2" dur="2.5s" repeatCount="indefinite"/></circle>`;
-    svg += `<circle cx="${myX}" cy="${lineY}" r="6" fill="${rc}" stroke="${myStopStroke}" stroke-width="2.5"/>`;
-    svg += `<text x="${myX}" y="${lineY + 22}" text-anchor="middle" fill="${labelFill}" font-size="9" font-weight="600" font-family="Inter,sans-serif">YOU</text>`;
+    // My stop marker
+    svg += `<circle cx="${myX}" cy="${lineY}" r="5" fill="${rc}" stroke="${myStopStroke}" stroke-width="2"/>`;
 
     // Bus marker
-    svg += `<circle cx="${busX}" cy="${lineY}" r="6" fill="${busFill}" stroke="${rc}" stroke-width="2.5" filter="url(#pg)"/>`;
-    // Bus label
-    svg += `<text x="${busX}" y="${lineY - 12}" text-anchor="middle" fill="${busFill}" font-size="9" font-weight="700" font-family="Inter,sans-serif">`;
-    // Show mini bus icon or text
-    svg += `BUS</text>`;
+    svg += `<circle cx="${busX}" cy="${lineY}" r="5" fill="${busFill}" stroke="${rc}" stroke-width="2" filter="url(#pg)"/>`;
+
+    // Stops-away label centered below
+    if (stopsText) {
+      svg += `<text x="${w/2}" y="${h - 2}" text-anchor="middle" fill="${labelFill}" font-size="11" font-weight="600" font-family="'JetBrains Mono',monospace" letter-spacing="0.5">${stopsText.toUpperCase()}</text>`;
+    }
 
     svg += '</svg>';
     strip.innerHTML = svg;
+    label.textContent = '';
+  }
 
-    // Label: X stops away
-    const stopsAway = bestMyIdx - bestBusIdx;
-    if (stopsAway > 0) {
-      label.textContent = `${stopsAway} stop${stopsAway === 1 ? '' : 's'} away`;
-    } else if (stopsAway === 0) {
-      label.textContent = 'At your stop';
-    } else {
-      label.textContent = '';
-    }
+  // Empty progress strip — reserves space, shows just the track line
+  renderEmptyStrip(strip, label) {
+    if (!strip) return;
+    const w = strip.clientWidth || 340;
+    const h = 40;
+    const pad = 20;
+    const lineY = 16;
+    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const stripLine = dark ? '#1e293b' : '#EDE5D8';
+
+    strip.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+      `<line x1="${pad}" y1="${lineY}" x2="${w-pad}" y2="${lineY}" stroke="${stripLine}" stroke-width="2" stroke-linecap="round"/>` +
+      `</svg>`;
+    if (label) label.textContent = '';
   }
 
   // ─────────────────────────────
@@ -776,6 +830,12 @@ class PullcordApp {
     if (!section || !list) return;
 
     if (predictions.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    // Single prediction = hero already shows it, no need for redundant list
+    if (predictions.length <= 1) {
       section.style.display = 'none';
       return;
     }
@@ -795,13 +855,15 @@ class PullcordApp {
     }).join('');
 
     // ALL rows are tappable → promote to hero
-    list.querySelectorAll('.d-upcoming-row').forEach(row => {
+    list.querySelectorAll('.d-upcoming-row').forEach((row, idx) => {
       row.addEventListener('click', () => {
         const vid = row.dataset.vehicle || null;
         const dir = row.dataset.dir != null ? parseInt(row.dataset.dir, 10) : null;
 
-        // Track this specific vehicle
+        // Track this specific vehicle (or index for vehicleless predictions)
         this.trackedVehicleId = vid;
+        this.trackedPredictionIdx = vid ? null : idx;
+        this.updateVehicleUrl(vid);
 
         // Update direction if switching
         if (dir !== null && dir !== this.selectedDirection) {
@@ -809,13 +871,10 @@ class PullcordApp {
           this.updateDirectionUrl(dir);
         }
 
-        // Re-render everything with new hero
+        // Re-render everything with new hero (hero is sticky, no scroll needed)
         this.renderHero(this.lastPredictions);
         this.renderProgressStrip(this.lastPredictions, this.lastVehicles);
         this.renderUpcoming(this.lastPredictions);
-
-        // Scroll to top to see new hero
-        document.getElementById('tracker-content')?.scrollTo({ top: 0, behavior: 'smooth' });
       });
     });
   }
@@ -835,20 +894,22 @@ class PullcordApp {
       statusHtml = '<span class="dot-sched"></span> Scheduled';
     }
 
-    // Arrival time
+    // Arrival time — always present to prevent row height shifts
     let arrivalStr = '';
     if (minutes >= 5) {
       const arr = new Date(Date.now() + pred.etaSeconds * 1000);
       arrivalStr = ` · ~${arr.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
     }
+    // Meta always has content (statusHtml) so height is stable
 
     // Row color — use route color in multi-route, otherwise by tier
     const predColor = pred.routeColor ? `#${pred.routeColor}` : this.routeColor;
     const rowColor = tier === 'next' ? '#60a5fa' : tier === 'scheduled' ? '#334155' : predColor;
 
     // Route badge for multi-route mode
-    const badgeHtml = this.multiRoute && pred.routeBadge
-      ? `<span class="d-upcoming-badge" style="background:#${pred.routeColor || 'E85D3A'}">${this.esc(pred.routeBadge)}</span>`
+    // Route number for multi-route mode — bold colored text, no pill
+    const routeNum = this.multiRoute && pred.routeBadge
+      ? `<span class="d-upcoming-route" style="color:#${pred.routeColor || 'E85D3A'}">${this.esc(pred.routeBadge)}</span>`
       : '';
 
     return `
@@ -857,9 +918,8 @@ class PullcordApp {
            data-vehicle="${this.esc(pred.vehicleId || '')}"
            data-dir="${pred.directionId != null ? pred.directionId : ''}"
            data-route="${this.esc(pred.routeId || '')}">
-        ${badgeHtml}
         <div class="d-upcoming-info">
-          <div class="d-upcoming-headsign">→ ${this.esc(pred.headsign || 'Unknown')}</div>
+          <div class="d-upcoming-headsign">${routeNum}${routeNum ? ' ' : ''}${this.esc(pred.headsign || 'Unknown')}</div>
           <div class="d-upcoming-meta">${statusHtml}${arrivalStr}</div>
         </div>
         <div class="d-upcoming-time">
@@ -874,6 +934,16 @@ class PullcordApp {
   updateDirectionUrl(dir) {
     const url = new URL(window.location);
     url.searchParams.set('dir', dir);
+    window.history.replaceState({}, '', url);
+  }
+
+  updateVehicleUrl(vid) {
+    const url = new URL(window.location);
+    if (vid) {
+      url.searchParams.set('vid', vid);
+    } else {
+      url.searchParams.delete('vid');
+    }
     window.history.replaceState({}, '', url);
   }
 
@@ -892,6 +962,7 @@ class PullcordApp {
     this.cordActive = false;
     this.cordId = null;
     this.cordFiredId = firedId; // flag so initPullCord shows "delivered" briefly
+    try { sessionStorage.removeItem('pullcord_cord'); } catch (e) {}
 
     // Strip cordFired from URL so refresh doesn't re-trigger
     params.delete('cordFired');
@@ -904,8 +975,27 @@ class PullcordApp {
     const section = document.getElementById('cord-section');
     if (!section) return;
 
+    // Detect iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+
     // Check if push is supported
     this.pushSupported = 'serviceWorker' in navigator && 'PushManager' in window;
+
+    // iOS Safari (not installed as PWA) — show install prompt
+    if (isIOS && !isStandalone) {
+      const label = document.getElementById('cord-label');
+      const options = document.getElementById('cord-options');
+      if (options) options.style.display = 'none';
+      if (label) {
+        label.innerHTML = '📲 <button class="d-cord-install-hint" type="button">Add to Home Screen for alerts</button>';
+        label.querySelector('.d-cord-install-hint')?.addEventListener('click', () => {
+          label.innerHTML = 'Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>, then open from there';
+        });
+      }
+      return;
+    }
+
     if (!this.pushSupported) {
       section.style.display = 'none';
       return;
@@ -922,6 +1012,11 @@ class PullcordApp {
     // Wire up cancel button
     const cancelBtn = document.getElementById('cord-cancel-btn');
     if (cancelBtn) cancelBtn.addEventListener('click', () => this.cancelCord());
+
+    // Restore cord state from sessionStorage (survives page refresh)
+    if (!this.cordFiredId) {
+      this.restoreCordState();
+    }
 
     // If we arrived from a fired notification, flash confirmation then reset
     if (this.cordFiredId) {
@@ -977,16 +1072,33 @@ class PullcordApp {
           routeId: this.heroPrediction.routeId || this.config.routeId,
           stopId: this.config.stopId,
           vehicleId: this.heroPrediction.vehicleId || null,
+          tripId: this.heroPrediction.tripId || null,
+          directionId: this.heroPrediction.directionId ?? this.selectedDirection ?? null,
           thresholdMinutes,
         }),
       });
 
+      if (!cordRes.ok) throw new Error(`Server error ${cordRes.status}`);
       const { cordId } = await cordRes.json();
+      if (!cordId) throw new Error('No cordId returned');
 
-      // Success — swap to active display
+      // Success — save cord context (trip-first, matches server fallback priority)
       this.cordActive = true;
       this.cordId = cordId;
       this.cordThreshold = thresholdMinutes;
+      this.cordTripId = this.heroPrediction.tripId || null;
+      this.cordVehicleId = this.heroPrediction.vehicleId || null;
+      this.cordDirectionId = this.heroPrediction.directionId ?? this.selectedDirection ?? null;
+      this.cordRouteId = this.heroPrediction.routeId || this.config.routeId;
+
+      // Persist to sessionStorage (survives page refresh)
+      try {
+        sessionStorage.setItem('pullcord_cord', JSON.stringify({
+          cordId, threshold: thresholdMinutes,
+          tripId: this.cordTripId, vehicleId: this.cordVehicleId,
+          directionId: this.cordDirectionId, routeId: this.cordRouteId,
+        }));
+      } catch (e) { /* private mode / quota */ }
 
       if (cordIdle) cordIdle.classList.add('hidden');
       if (activeDisplay) activeDisplay.classList.remove('hidden');
@@ -1008,6 +1120,11 @@ class PullcordApp {
     }
     this.cordActive = false;
     this.cordId = null;
+    this.cordTripId = null;
+    this.cordVehicleId = null;
+    this.cordDirectionId = null;
+    this.cordRouteId = null;
+    try { sessionStorage.removeItem('pullcord_cord'); } catch (e) {}
 
     const cordIdle = document.getElementById('cord-idle');
     const activeDisplay = document.getElementById('cord-active-display');
@@ -1018,14 +1135,45 @@ class PullcordApp {
     if (activeDisplay) activeDisplay.classList.add('hidden');
   }
 
+  restoreCordState() {
+    try {
+      const raw = sessionStorage.getItem('pullcord_cord');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!saved.cordId) return;
+
+      this.cordActive = true;
+      this.cordId = saved.cordId;
+      this.cordThreshold = saved.threshold;
+      this.cordTripId = saved.tripId || null;
+      this.cordVehicleId = saved.vehicleId || null;
+      this.cordDirectionId = saved.directionId ?? null;
+      this.cordRouteId = saved.routeId || null;
+
+      const cordIdle = document.getElementById('cord-idle');
+      const activeDisplay = document.getElementById('cord-active-display');
+      if (cordIdle) cordIdle.classList.add('hidden');
+      if (activeDisplay) activeDisplay.classList.remove('hidden');
+    } catch (e) { /* corrupt data or private mode */ }
+  }
+
   updateCordStatus() {
     const statusText = document.getElementById('cord-status-text');
     if (!statusText || !this.cordActive) return;
 
-    const hero = this.heroPrediction;
-    if (hero) {
-      const mins = Math.floor(hero.etaSeconds / 60);
+    // Find prediction matching cord context (trip-first, same priority as server)
+    const preds = this.lastPredictions;
+    let pred;
+    if (this.cordTripId) pred = preds.find(p => p.tripId === this.cordTripId);
+    if (!pred && this.cordVehicleId) pred = preds.find(p => p.vehicleId === this.cordVehicleId);
+    if (!pred && this.cordDirectionId != null) pred = preds.find(p => p.directionId === this.cordDirectionId);
+    if (!pred && preds.length > 0) pred = preds[0];
+
+    if (pred) {
+      const mins = Math.floor(pred.etaSeconds / 60);
       statusText.textContent = `${this.cordThreshold}m alert · bus ${mins}m away`;
+    } else {
+      statusText.textContent = `${this.cordThreshold}m alert · waiting for bus`;
     }
   }
 
