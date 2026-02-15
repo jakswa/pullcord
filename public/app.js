@@ -798,6 +798,12 @@ class PullcordApp {
       return;
     }
 
+    // Single prediction = hero already shows it, no need for redundant list
+    if (predictions.length <= 1) {
+      section.style.display = 'none';
+      return;
+    }
+
     section.style.display = '';
 
     // Flat list sorted by arrival time — hero stays in list, highlighted

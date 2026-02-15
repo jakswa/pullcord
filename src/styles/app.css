@@ -18,6 +18,11 @@
 @layer base {
   * { box-sizing: border-box; }
 
+  html, body {
+    overflow: hidden;
+    height: 100%;
+  }
+
   /* ── Light Mode (default) — C's warm palette ── */
   :root {
     /* Brand — consistent across modes */
@@ -175,11 +180,11 @@
     --route-color: var(--brand);
     display: flex;
     flex-direction: column;
-    height: 100dvh;
+    position: fixed;
+    inset: 0;
     background: var(--bg-primary);
     color: var(--text-primary);
     overflow: hidden;
-    position: relative;
   }
 
   /* ── Refresh Bar ── */
@@ -402,13 +407,17 @@
      ───────────────────────────────── */
 
   .d-hero {
-    padding: 1.5rem 1rem 1rem;
+    padding: 1.25rem 1rem 0.75rem;
     text-align: center;
-    min-height: 180px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+  }
+
+  .d-hero-loading,
+  .d-hero-empty {
+    min-height: 160px;
   }
 
   .d-hero-loading {
