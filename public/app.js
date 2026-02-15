@@ -655,10 +655,22 @@ class PullcordApp {
     const routePrefix = this.multiRoute && this.heroPrediction.routeBadge
       ? `${this.heroPrediction.routeBadge} `
       : '';
-    const headsignText = this.truncateMiddle(this.heroPrediction.headsign || 'Unknown');
+    const fullHeadsign = this.heroPrediction.headsign || 'Unknown';
     hsEl.innerHTML = this.multiRoute && this.heroPrediction.routeBadge
-      ? `<span class="d-hero-route" style="color:#${this.heroPrediction.routeColor || 'E85D3A'}">${this.esc(this.heroPrediction.routeBadge)}</span> ${this.esc(headsignText)}`
-      : this.esc(headsignText);
+      ? `<span class="d-hero-route" style="color:#${this.heroPrediction.routeColor || 'E85D3A'}">${this.esc(this.heroPrediction.routeBadge)}</span> <span class="d-hero-headsign-text">${this.esc(fullHeadsign)}</span>`
+      : `<span class="d-hero-headsign-text">${this.esc(fullHeadsign)}</span>`;
+
+    // Measure actual overflow, then middle-truncate if needed
+    const textSpan = hsEl.querySelector('.d-hero-headsign-text');
+    if (textSpan && hsEl.scrollWidth > hsEl.clientWidth) {
+      textSpan.textContent = this.truncateMiddle(fullHeadsign, fullHeadsign.length - 1);
+      // Shrink until it fits
+      let maxLen = fullHeadsign.length - 2;
+      while (hsEl.scrollWidth > hsEl.clientWidth && maxLen > 15) {
+        textSpan.textContent = this.truncateMiddle(fullHeadsign, maxLen);
+        maxLen -= 3;
+      }
+    }
 
     // Meta (arrival time + adherence)
     const metaEl = document.getElementById('hero-meta');
@@ -1435,7 +1447,7 @@ class PullcordApp {
 
   // Middle-truncate long text: "Inman Park/Reynoldstown Station via Woodland Hills" → "Inman Park…Woodland Hills"
   // Cuts at word boundaries (space, /, parens) when possible
-  truncateMiddle(text, maxLen = 45) {
+  truncateMiddle(text, maxLen) {
     if (!text || text.length <= maxLen) return text;
     const budget = maxLen - 1; // 1 char for ellipsis
     const startBudget = Math.ceil(budget * 0.5);
