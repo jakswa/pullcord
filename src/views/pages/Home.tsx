@@ -29,7 +29,7 @@ export const HomePage = () => (
             type="text"
             id="stop-search"
             class="home-search"
-            placeholder="or search by stop name..."
+            placeholder="search stop name or route number"
             autocomplete="off"
           />
         </div>
