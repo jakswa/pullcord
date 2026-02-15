@@ -19,20 +19,20 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Clicking the notification opens/focuses the app
+// Clicking the notification navigates to the cordFired URL + focuses
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = event.notification.data?.url || '/';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Focus existing tab if found
+      // Navigate existing Pullcord tab to cordFired URL, then focus
       for (const client of windowClients) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          return client.focus();
+        if (client.url.includes(self.location.origin) && 'navigate' in client) {
+          return client.navigate(url).then(() => client.focus());
         }
       }
-      // Otherwise open new tab
+      // No existing tab — open new one
       return clients.openWindow(url);
     })
   );

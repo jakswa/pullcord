@@ -24,8 +24,12 @@ class PullcordApp {
 
     // Pull cord state
     this.cordActive = false;
+    this.cordId = null;
+    this.cordThreshold = null;
+    this.cordTripId = null;
     this.cordVehicleId = null;
-    this.cordNotified = false;
+    this.cordDirectionId = null;
+    this.cordRouteId = null;
 
     // Timers
     this.pollTimer = null;
@@ -499,9 +503,12 @@ class PullcordApp {
 
     loading.style.display = 'none';
 
+    const cordSection = document.getElementById('cord-section');
+
     if (!predictions || predictions.length === 0) {
       empty.style.display = '';
       eta.style.display = 'none';
+      if (cordSection) cordSection.style.display = 'none';
       this.heroPrediction = null;
       this.heroEtaSeconds = null;
       this.stopCountdown();
@@ -510,6 +517,7 @@ class PullcordApp {
 
     empty.style.display = 'none';
     eta.style.display = '';
+    if (cordSection) cordSection.style.display = '';
 
     // Hero selection priority:
     // 1. Tracked vehicle (user tapped a specific bus)
@@ -616,8 +624,8 @@ class PullcordApp {
       ? `${this.heroPrediction.routeBadge} `
       : '';
     hsEl.innerHTML = this.multiRoute && this.heroPrediction.routeBadge
-      ? `<span class="d-hero-route" style="color:#${this.heroPrediction.routeColor || 'E85D3A'}">${this.esc(this.heroPrediction.routeBadge)}</span> → ${this.esc(this.heroPrediction.headsign || 'Unknown')}`
-      : `→ ${this.esc(this.heroPrediction.headsign || 'Unknown')}`;
+      ? `<span class="d-hero-route" style="color:#${this.heroPrediction.routeColor || 'E85D3A'}">${this.esc(this.heroPrediction.routeBadge)}</span> ${this.esc(this.heroPrediction.headsign || 'Unknown')}`
+      : this.esc(this.heroPrediction.headsign || 'Unknown');
 
     // Meta (arrival time)
     const metaEl = document.getElementById('hero-meta');
@@ -871,7 +879,7 @@ class PullcordApp {
            data-dir="${pred.directionId != null ? pred.directionId : ''}"
            data-route="${this.esc(pred.routeId || '')}">
         <div class="d-upcoming-info">
-          <div class="d-upcoming-headsign">${routeNum}→ ${this.esc(pred.headsign || 'Unknown')}</div>
+          <div class="d-upcoming-headsign">${routeNum}${routeNum ? ' ' : ''}${this.esc(pred.headsign || 'Unknown')}</div>
           <div class="d-upcoming-meta">${statusHtml}${arrivalStr}</div>
         </div>
         <div class="d-upcoming-time">
@@ -914,6 +922,7 @@ class PullcordApp {
     this.cordActive = false;
     this.cordId = null;
     this.cordFiredId = firedId; // flag so initPullCord shows "delivered" briefly
+    try { sessionStorage.removeItem('pullcord_cord'); } catch (e) {}
 
     // Strip cordFired from URL so refresh doesn't re-trigger
     params.delete('cordFired');
@@ -963,6 +972,11 @@ class PullcordApp {
     // Wire up cancel button
     const cancelBtn = document.getElementById('cord-cancel-btn');
     if (cancelBtn) cancelBtn.addEventListener('click', () => this.cancelCord());
+
+    // Restore cord state from sessionStorage (survives page refresh)
+    if (!this.cordFiredId) {
+      this.restoreCordState();
+    }
 
     // If we arrived from a fired notification, flash confirmation then reset
     if (this.cordFiredId) {
@@ -1019,16 +1033,32 @@ class PullcordApp {
           stopId: this.config.stopId,
           vehicleId: this.heroPrediction.vehicleId || null,
           tripId: this.heroPrediction.tripId || null,
+          directionId: this.heroPrediction.directionId ?? this.selectedDirection ?? null,
           thresholdMinutes,
         }),
       });
 
+      if (!cordRes.ok) throw new Error(`Server error ${cordRes.status}`);
       const { cordId } = await cordRes.json();
+      if (!cordId) throw new Error('No cordId returned');
 
-      // Success — swap to active display
+      // Success — save cord context (trip-first, matches server fallback priority)
       this.cordActive = true;
       this.cordId = cordId;
       this.cordThreshold = thresholdMinutes;
+      this.cordTripId = this.heroPrediction.tripId || null;
+      this.cordVehicleId = this.heroPrediction.vehicleId || null;
+      this.cordDirectionId = this.heroPrediction.directionId ?? this.selectedDirection ?? null;
+      this.cordRouteId = this.heroPrediction.routeId || this.config.routeId;
+
+      // Persist to sessionStorage (survives page refresh)
+      try {
+        sessionStorage.setItem('pullcord_cord', JSON.stringify({
+          cordId, threshold: thresholdMinutes,
+          tripId: this.cordTripId, vehicleId: this.cordVehicleId,
+          directionId: this.cordDirectionId, routeId: this.cordRouteId,
+        }));
+      } catch (e) { /* private mode / quota */ }
 
       if (cordIdle) cordIdle.classList.add('hidden');
       if (activeDisplay) activeDisplay.classList.remove('hidden');
@@ -1050,6 +1080,11 @@ class PullcordApp {
     }
     this.cordActive = false;
     this.cordId = null;
+    this.cordTripId = null;
+    this.cordVehicleId = null;
+    this.cordDirectionId = null;
+    this.cordRouteId = null;
+    try { sessionStorage.removeItem('pullcord_cord'); } catch (e) {}
 
     const cordIdle = document.getElementById('cord-idle');
     const activeDisplay = document.getElementById('cord-active-display');
@@ -1060,14 +1095,45 @@ class PullcordApp {
     if (activeDisplay) activeDisplay.classList.add('hidden');
   }
 
+  restoreCordState() {
+    try {
+      const raw = sessionStorage.getItem('pullcord_cord');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!saved.cordId) return;
+
+      this.cordActive = true;
+      this.cordId = saved.cordId;
+      this.cordThreshold = saved.threshold;
+      this.cordTripId = saved.tripId || null;
+      this.cordVehicleId = saved.vehicleId || null;
+      this.cordDirectionId = saved.directionId ?? null;
+      this.cordRouteId = saved.routeId || null;
+
+      const cordIdle = document.getElementById('cord-idle');
+      const activeDisplay = document.getElementById('cord-active-display');
+      if (cordIdle) cordIdle.classList.add('hidden');
+      if (activeDisplay) activeDisplay.classList.remove('hidden');
+    } catch (e) { /* corrupt data or private mode */ }
+  }
+
   updateCordStatus() {
     const statusText = document.getElementById('cord-status-text');
     if (!statusText || !this.cordActive) return;
 
-    const hero = this.heroPrediction;
-    if (hero) {
-      const mins = Math.floor(hero.etaSeconds / 60);
+    // Find prediction matching cord context (trip-first, same priority as server)
+    const preds = this.lastPredictions;
+    let pred;
+    if (this.cordTripId) pred = preds.find(p => p.tripId === this.cordTripId);
+    if (!pred && this.cordVehicleId) pred = preds.find(p => p.vehicleId === this.cordVehicleId);
+    if (!pred && this.cordDirectionId != null) pred = preds.find(p => p.directionId === this.cordDirectionId);
+    if (!pred && preds.length > 0) pred = preds[0];
+
+    if (pred) {
+      const mins = Math.floor(pred.etaSeconds / 60);
       statusText.textContent = `${this.cordThreshold}m alert · bus ${mins}m away`;
+    } else {
+      statusText.textContent = `${this.cordThreshold}m alert · waiting for bus`;
     }
   }
 
