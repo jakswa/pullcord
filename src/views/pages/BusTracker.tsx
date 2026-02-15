@@ -82,7 +82,7 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
         </section>
 
         {/* PROGRESS STRIP */}
-        <section class="d-progress" id="progress-section" style="display:none">
+        <section class="d-progress" id="progress-section">
           <div class="d-progress-strip" id="progress-strip"></div>
           <div class="d-progress-label" id="progress-label"></div>
         </section>
