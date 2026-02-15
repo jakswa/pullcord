@@ -1449,7 +1449,7 @@ class PullcordApp {
 
   staleTier(s) {
     if (s == null || s < 45) return { level: 'live', html: '<span class="dot-live"></span> Live' };
-    if (s < 90) return { level: 'delayed', html: '<span class="dot-delayed"></span> Delayed' };
+    if (s < 90) return { level: 'delayed', html: '<span class="dot-delayed"></span> ~1m ago' };
     if (s < 180) {
       const m = Math.floor(s / 60);
       return { level: 'stale', html: `<span class="dot-stale"></span> ~${m}m ago` };
