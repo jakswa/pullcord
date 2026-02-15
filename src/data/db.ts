@@ -342,6 +342,26 @@ class MARTADatabase {
       }));
   }
 
+  // Batch lookup scheduled arrival times for (stop_id, trip_id[]) pairs
+  // Returns Map<tripId, arrival_time string> e.g. "14:52:00"
+  getScheduledArrivals(stopId: string, tripIds: string[]): Map<string, string> {
+    if (tripIds.length === 0) return new Map();
+    const placeholders = tripIds.map(() => '?').join(',');
+    const rows = this.db.prepare(`
+      SELECT trip_id, arrival_time 
+      FROM stop_times 
+      WHERE stop_id = ? AND trip_id IN (${placeholders})
+    `).all(stopId, ...tripIds) as Array<{ trip_id: string; arrival_time: string }>;
+    const result = new Map<string, string>();
+    for (const row of rows) {
+      // For loop routes with duplicate (trip_id, stop_id), first row wins
+      if (!result.has(row.trip_id)) {
+        result.set(row.trip_id, row.arrival_time);
+      }
+    }
+    return result;
+  }
+
   close() {
     this.db.close();
   }
@@ -410,6 +430,10 @@ export function getStopWithRoutes(stopId: string) {
 
 export function getPairedStops(stopId: string, routeId: string) {
   return db.getPairedStops(stopId, routeId);
+}
+
+export function getScheduledArrivals(stopId: string, tripIds: string[]): Map<string, string> {
+  return db.getScheduledArrivals(stopId, tripIds);
 }
 
 export type { Route, Stop, Trip, RouteStop, RouteDetail };

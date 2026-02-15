@@ -659,14 +659,15 @@ class PullcordApp {
       ? `<span class="d-hero-route" style="color:#${this.heroPrediction.routeColor || 'E85D3A'}">${this.esc(this.heroPrediction.routeBadge)}</span> ${this.esc(this.heroPrediction.headsign || 'Unknown')}`
       : this.esc(this.heroPrediction.headsign || 'Unknown');
 
-    // Meta (arrival time)
+    // Meta (arrival time + adherence)
     const metaEl = document.getElementById('hero-meta');
     if (minutes >= 2) {
       const arrival = new Date(Date.now() + seconds * 1000);
       const timeStr = arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-      metaEl.textContent = `arrives ~${timeStr}`;
+      const adherenceHtml = this.formatAdherence(this.heroPrediction.adherenceSec);
+      metaEl.innerHTML = `arrives ${adherenceHtml}~${this.esc(timeStr)}`;
     } else {
-      metaEl.textContent = '';
+      metaEl.innerHTML = '';
     }
   }
 
@@ -906,11 +907,12 @@ class PullcordApp {
       statusHtml = '<span class="dot-sched"></span> Scheduled';
     }
 
-    // Arrival time — always present to prevent row height shifts
+    // Arrival time + adherence — always present to prevent row height shifts
     let arrivalStr = '';
     if (minutes >= 5) {
       const arr = new Date(Date.now() + pred.etaSeconds * 1000);
-      arrivalStr = ` · ~${arr.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+      const adherenceHtml = tier === 'active' ? this.formatAdherence(pred.adherenceSec) : '';
+      arrivalStr = ` · ${adherenceHtml}~${this.esc(arr.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))}`;
     }
     // Meta always has content (statusHtml) so height is stable
 
@@ -1429,6 +1431,21 @@ class PullcordApp {
   // ──────────────
   // UTILITIES
   // ──────────────
+
+  // Format adherence delta for display
+  // adherenceSec: positive = late, negative = early, null/undefined = unknown
+  formatAdherence(adherenceSec) {
+    if (adherenceSec == null) return '';
+    const absSec = Math.abs(adherenceSec);
+    // Suppress noise: |delta| <= 60s is basically on time
+    if (absSec <= 60) return '<span class="d-adherence d-adherence-ontime">on time </span>';
+    const mins = Math.round(absSec / 60);
+    if (adherenceSec > 0) {
+      return `<span class="d-adherence d-adherence-late">${mins}m late </span>`;
+    } else {
+      return `<span class="d-adherence d-adherence-early">${mins}m early </span>`;
+    }
+  }
 
   staleTier(s) {
     if (s == null || s < 45) return { level: 'live', html: '<span class="dot-live"></span> Live' };

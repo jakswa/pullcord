@@ -1,5 +1,6 @@
 import { load } from "protobufjs";
 import path from "path";
+import { getScheduledArrivals } from "./db";
 
 const VEHICLE_POSITIONS_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb";
 const TRIP_UPDATES_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb";
@@ -27,6 +28,7 @@ interface PredictionUpdate {
   etaSeconds: number;
   staleSeconds: number;
   tier?: string;
+  adherenceSec?: number; // positive = late, negative = early, null = unknown
 }
 
 interface CachedData<T> {
@@ -186,7 +188,8 @@ class RealtimeDataService {
     const entities = await this.getTripUpdates();
     const timestamp = Date.now();
 
-    const predictions: PredictionUpdate[] = [];
+    // Collect predictions with raw RT arrival timestamps for adherence computation
+    const predictions: (PredictionUpdate & { _rtArrivalSec?: number })[] = [];
 
     for (const entity of entities) {
       if (!entity.tripUpdate?.trip?.tripId) continue;
@@ -204,7 +207,8 @@ class RealtimeDataService {
         const timeUpdate = stu.arrival || stu.departure;
         if (!timeUpdate?.time) continue;
 
-        const etaTimestamp = parseInt(timeUpdate.time) * 1000;
+        const rtArrivalSec = parseInt(timeUpdate.time);
+        const etaTimestamp = rtArrivalSec * 1000;
         const etaSeconds = Math.max(0, Math.floor((etaTimestamp - timestamp) / 1000));
         
         // Calculate staleness from trip update timestamp
@@ -218,8 +222,24 @@ class RealtimeDataService {
           vehicleId: entity.tripUpdate.vehicle?.id || undefined,
           tripId,
           etaSeconds,
-          staleSeconds
+          staleSeconds,
+          _rtArrivalSec: rtArrivalSec
         });
+      }
+    }
+
+    // Batch lookup scheduled arrivals and compute adherence
+    const tripIds = predictions.map(p => p.tripId).filter(Boolean) as string[];
+    if (tripIds.length > 0) {
+      const scheduled = getScheduledArrivals(stopId, tripIds);
+      for (const pred of predictions) {
+        if (pred.tripId && pred._rtArrivalSec) {
+          const schedTime = scheduled.get(pred.tripId);
+          if (schedTime) {
+            pred.adherenceSec = computeAdherenceSec(pred._rtArrivalSec, schedTime);
+          }
+        }
+        delete (pred as any)._rtArrivalSec;
       }
     }
 
@@ -227,6 +247,28 @@ class RealtimeDataService {
     predictions.sort((a, b) => a.etaSeconds - b.etaSeconds);
     return predictions;
   }
+}
+
+// Compute schedule adherence: positive = late, negative = early
+// Returns null if delta is unreasonable (>30 min, likely midnight edge case)
+function computeAdherenceSec(rtArrivalSec: number, scheduledTimeStr: string): number | null {
+  const parts = scheduledTimeStr.split(':').map(Number);
+  if (parts.length < 2) return null;
+  const [h, m, s] = [parts[0], parts[1], parts[2] || 0];
+  const schedTotalSec = h * 3600 + m * 60 + s;
+
+  // Determine service midnight from the RT arrival date
+  const rtDate = new Date(rtArrivalSec * 1000);
+  const todayMidnightSec = new Date(rtDate.getFullYear(), rtDate.getMonth(), rtDate.getDate()).getTime() / 1000;
+
+  // GTFS times >= 24:00:00 mean the service day started yesterday
+  const serviceMidnightSec = h >= 24 ? todayMidnightSec - 86400 : todayMidnightSec;
+  const scheduledSec = serviceMidnightSec + schedTotalSec;
+  const delta = Math.round(rtArrivalSec - scheduledSec);
+
+  // Cap at ±30 min — anything beyond is likely a data edge case
+  if (Math.abs(delta) > 1800) return null;
+  return delta;
 }
 
 // Singleton instance
@@ -246,6 +288,7 @@ export interface StopArrival extends PredictionUpdate {
   routeId: string;
   routeShortName: string;
   routeColor: string;
+  adherenceSec?: number;
 }
 
 export async function getStopArrivals(
@@ -256,7 +299,7 @@ export async function getStopArrivals(
   const routeMap = new Map(routes.map(r => [r.route_id, r]));
   const entities = await realtimeService.getTripUpdates();
   const timestamp = Date.now();
-  const arrivals: StopArrival[] = [];
+  const arrivals: (StopArrival & { _rtArrivalSec?: number })[] = [];
 
   for (const entity of entities) {
     if (!entity.tripUpdate?.trip?.tripId) continue;
@@ -271,7 +314,8 @@ export async function getStopArrivals(
       const timeUpdate = stu.arrival || stu.departure;
       if (!timeUpdate?.time) continue;
 
-      const etaTimestamp = parseInt(timeUpdate.time) * 1000;
+      const rtArrivalSec = parseInt(timeUpdate.time);
+      const etaTimestamp = rtArrivalSec * 1000;
       const etaSeconds = Math.max(0, Math.floor((etaTimestamp - timestamp) / 1000));
       const updateTimestamp = entity.tripUpdate.timestamp
         ? parseInt(entity.tripUpdate.timestamp) * 1000 : timestamp;
@@ -287,7 +331,23 @@ export async function getStopArrivals(
         routeId: trip.route_id,
         routeShortName: route.route_short_name,
         routeColor: route.route_color,
+        _rtArrivalSec: rtArrivalSec
       });
+    }
+  }
+
+  // Batch lookup scheduled arrivals and compute adherence
+  const tripIds = arrivals.map(a => a.tripId).filter(Boolean) as string[];
+  if (tripIds.length > 0) {
+    const scheduled = getScheduledArrivals(stopId, tripIds);
+    for (const arr of arrivals) {
+      if (arr.tripId && arr._rtArrivalSec) {
+        const schedTime = scheduled.get(arr.tripId);
+        if (schedTime) {
+          arr.adherenceSec = computeAdherenceSec(arr._rtArrivalSec, schedTime);
+        }
+      }
+      delete (arr as any)._rtArrivalSec;
     }
   }
 

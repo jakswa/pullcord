@@ -531,8 +531,6 @@
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    align-self: flex-end;
-    margin-bottom: 0.5rem;
   }
 
   .d-hero-unit.arriving {
@@ -835,6 +833,15 @@
   .dot-delayed { background: var(--live-delayed); animation: d-blink 2s ease-in-out infinite; }
   .dot-stale { background: var(--dot-stale); }
   .dot-lost { background: var(--dot-lost); }
+
+  /* Schedule adherence indicators */
+  .d-adherence {
+    font-weight: 600;
+    font-size: 0.85em;
+  }
+  .d-adherence-ontime { color: var(--live-green); }
+  .d-adherence-early { color: var(--live-green); }
+  .d-adherence-late { color: var(--live-delayed); }
 
   .dot-next {
     display: inline-block;
