@@ -553,12 +553,13 @@
   .d-hero-meta {
     font-family: var(--font-mono);
     font-size: 0.85rem;
+    line-height: 1.4;
     color: var(--text-secondary);
     margin-top: 0.35rem;
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    min-height: 1.25em;
+    min-height: 1.4em;
   }
 
   .d-hero-map-link {
