@@ -293,8 +293,9 @@ class PullcordApp {
     // Direction preference from URL (persists on refresh, shareable)
     this.selectedDirection = params.has('dir') ? parseInt(params.get('dir'), 10) : null;
 
-    // Tracked vehicle — persisted in URL via &vid=
-    // Falls back to first-in-direction when vehicle disappears
+    // Tracked vehicle/trip — persisted in URL via &vid=
+    // Falls back: tripId → vehicleId → direction → first prediction
+    this.trackedTripId = null;
     this.trackedVehicleId = params.get('vid') || null;
     this.trackedPredictionIdx = null;
 
@@ -547,10 +548,19 @@ class PullcordApp {
     // 3. First prediction overall (auto-select direction)
     let hero;
 
-    if (this.trackedVehicleId) {
+    // 1a. Match by exact trip (most specific — handles same vehicle, different trips)
+    if (this.trackedTripId) {
+      hero = predictions.find(p => p.tripId === this.trackedTripId);
+      if (!hero) {
+        this.trackedTripId = null;
+        // Fall through to vehicleId match
+      }
+    }
+
+    // 1b. Match by vehicle (if trip disappeared but vehicle still active)
+    if (!hero && this.trackedVehicleId) {
       hero = predictions.find(p => p.vehicleId === this.trackedVehicleId);
       if (!hero) {
-        // Tracked vehicle disappeared — clear tracking, fall back to direction
         this.trackedVehicleId = null;
         this.updateVehicleUrl(null);
       }
@@ -858,9 +868,11 @@ class PullcordApp {
     list.querySelectorAll('.d-upcoming-row').forEach((row, idx) => {
       row.addEventListener('click', () => {
         const vid = row.dataset.vehicle || null;
+        const tid = row.dataset.trip || null;
         const dir = row.dataset.dir != null ? parseInt(row.dataset.dir, 10) : null;
 
-        // Track this specific vehicle (or index for vehicleless predictions)
+        // Track this specific trip (or vehicle, or index for vehicleless predictions)
+        this.trackedTripId = tid;
         this.trackedVehicleId = vid;
         this.trackedPredictionIdx = vid ? null : idx;
         this.updateVehicleUrl(vid);
@@ -916,6 +928,7 @@ class PullcordApp {
       <div class="d-upcoming-row clickable tier-${tier}${isHero ? ' d-upcoming-hero' : ''}"
            style="--row-color:${rowColor}"
            data-vehicle="${this.esc(pred.vehicleId || '')}"
+           data-trip="${this.esc(pred.tripId || '')}"
            data-dir="${pred.directionId != null ? pred.directionId : ''}"
            data-route="${this.esc(pred.routeId || '')}">
         <div class="d-upcoming-info">
