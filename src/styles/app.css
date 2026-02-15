@@ -386,9 +386,10 @@
   /* ── Scrollable Content ── */
   .d-content {
     flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
+    overflow: hidden;
   }
 
   /* ── Spinner ── */
@@ -413,6 +414,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
   }
 
   .d-hero-loading,
@@ -516,12 +518,10 @@
 
   .d-hero-number.tier-next {
     color: var(--tier-next);
-    font-size: clamp(4rem, 18vw, 7rem);
   }
 
   .d-hero-number.tier-scheduled {
     color: var(--tier-sched);
-    font-size: clamp(3.5rem, 16vw, 6rem);
   }
 
   .d-hero-unit {
@@ -558,6 +558,7 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
+    min-height: 1.25em;
   }
 
   .d-hero-map-link {
@@ -588,6 +589,8 @@
 
   .d-progress {
     padding: 0.75rem 0.5rem 0.25rem;
+    flex-shrink: 0;
+    min-height: 48px;
   }
 
   .d-progress-strip {
@@ -613,6 +616,10 @@
 
   .d-upcoming {
     padding: 0 0.75rem 1rem;
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    min-height: 0;
   }
 
   .d-upcoming-header {
@@ -688,6 +695,7 @@
     align-items: center;
     gap: 0.25rem;
     margin-top: 0.2rem;
+    min-height: 1.25em;
   }
 
   .d-upcoming-time {
@@ -1212,6 +1220,17 @@
     transform: scale(0.98);
     background: var(--brand-active);
     box-shadow: 0 2px 8px rgba(232, 93, 58, 0.2);
+  }
+  .home-locate-btn:disabled {
+    opacity: 0.85;
+    cursor: wait;
+    transform: none;
+  }
+  .home-locate-btn .d-spinner {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-color: rgba(255,255,255,0.3);
+    border-top-color: #fff;
   }
 
   .home-locate-icon { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }

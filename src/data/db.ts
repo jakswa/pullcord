@@ -80,11 +80,16 @@ class MARTADatabase {
   }
 
   // Search stops by name
+  // Search stops by name, deduplicated.
+  // MARTA GTFS has separate stop IDs per direction at the same physical location.
+  // The tracker's paired-stop logic merges both directions regardless of which ID
+  // you use, so we GROUP BY stop_name to avoid duplicate cards in results.
   searchStops(query: string, limit: number = 20): Stop[] {
     const stmt = this.db.prepare(`
-      SELECT stop_id, stop_name, stop_lat, stop_lon 
+      SELECT MIN(stop_id) as stop_id, stop_name, stop_lat, stop_lon 
       FROM stops 
       WHERE stop_name LIKE ?
+      GROUP BY stop_name
       ORDER BY 
         CASE 
           WHEN stop_name LIKE ? THEN 1
@@ -98,6 +103,23 @@ class MARTADatabase {
     const exactPattern = `${query}%`;
     
     return stmt.all(searchPattern, exactPattern, limit) as Stop[];
+  }
+
+  // Get stops on a route (for route-first search), deduplicated by name
+  // MARTA GTFS has separate stop IDs for each direction at the same physical location
+  // (opposite sides of the street, ~25m apart). Since the tracker's paired-stop logic
+  // automatically merges predictions from both directions regardless of which stop ID
+  // you land on, we deduplicate by stop_name to avoid showing identical-looking cards.
+  getStopsForRoute(routeId: string, limit: number = 40): Stop[] {
+    return this.db.prepare(`
+      SELECT MIN(s.stop_id) as stop_id, s.stop_name, s.stop_lat, s.stop_lon
+      FROM route_stops rs
+      JOIN stops s ON rs.stop_id = s.stop_id
+      WHERE rs.route_id = ?
+      GROUP BY s.stop_name
+      ORDER BY s.stop_name
+      LIMIT ?
+    `).all(routeId, limit) as Stop[];
   }
 
   // Get stops near a location
@@ -129,10 +151,19 @@ class MARTADatabase {
       return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
-    return candidates
+    // Dedup by stop_name — MARTA has separate IDs per direction at same location
+    const withDist = candidates
       .map(s => ({ ...s, distance: haversine(lat, lon, s.stop_lat, s.stop_lon) }))
       .filter(s => s.distance <= radiusMeters)
-      .sort((a, b) => a.distance - b.distance)
+      .sort((a, b) => a.distance - b.distance);
+    
+    const seen = new Set<string>();
+    return withDist
+      .filter(s => {
+        if (seen.has(s.stop_name)) return false;
+        seen.add(s.stop_name);
+        return true;
+      })
       .slice(0, limit);
   }
 
@@ -330,6 +361,10 @@ export function getRoute(routeIdentifier: string): Route | null {
 
 export function searchStops(query: string, limit?: number): Stop[] {
   return db.searchStops(query, limit);
+}
+
+export function getStopsForRoute(routeId: string, limit?: number): Stop[] {
+  return db.getStopsForRoute(routeId, limit);
 }
 
 export function getNearbyStops(lat: number, lon: number, radiusMeters?: number, limit?: number): Stop[] {

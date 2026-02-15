@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getRoutes, getRoute, searchStops, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getPairedStops, getRouteHeadsigns } from "../data/db.js";
+import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getPairedStops, getRouteHeadsigns } from "../data/db.js";
 import { getVehicles, getPredictions, getStopArrivals } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
 import { getVapidPublicKey, registerCord, cancelCord, getActiveCordCount, testFireAll } from "../data/push.js";
@@ -28,7 +28,23 @@ app.get("/stops", (c) => {
     const limit = parseInt(c.req.query("limit") || "20");
 
     if (query) {
-      // Text search
+      let routeMatch: { route_short_name: string; route_color: string } | null = null;
+      let routeStops: any[] = [];
+
+      // If query looks like a route number, try matching a route
+      if (/^\d+$/.test(query.trim())) {
+        const route = getRoute(query.trim());
+        if (route) {
+          routeMatch = route;
+          const stops = getStopsForRoute(route.route_id, 60);
+          routeStops = stops.map(stop => {
+            const routes = getRoutesForStop(stop.stop_id);
+            return { ...stop, routes: routes.map(r => r.route_short_name) };
+          }).filter(stop => stop.routes.length > 0);
+        }
+      }
+
+      // Also do normal stop name search
       const stops = searchStops(query, limit);
       
       // Enrich with bus routes, filter out rail-only stops
@@ -36,6 +52,13 @@ app.get("/stops", (c) => {
         const routes = getRoutesForStop(stop.stop_id);
         return { ...stop, routes: routes.map(r => r.route_short_name) };
       }).filter(stop => stop.routes.length > 0);
+
+      // Combine: route stops first (deduplicated), then name matches
+      if (routeStops.length > 0) {
+        const routeStopIds = new Set(routeStops.map(s => s.stop_id));
+        const extra = enrichedStops.filter(s => !routeStopIds.has(s.stop_id));
+        return c.json({ routeMatch, stops: [...routeStops, ...extra] });
+      }
       
       return c.json(enrichedStops);
       

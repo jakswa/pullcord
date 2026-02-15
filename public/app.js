@@ -155,8 +155,11 @@ class PullcordApp {
     try {
       this.showLoading(loadingDiv, resultsContainer);
       const res = await fetch(`/api/stops?q=${encodeURIComponent(query)}`);
-      const stops = await res.json();
-      this.displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath);
+      const data = await res.json();
+      // API returns { routeMatch, stops } for route matches, or plain array for stop matches
+      const stops = data.stops || data;
+      const routeMatch = data.routeMatch || null;
+      this.displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath, routeMatch);
     } catch (e) {
       this.showError('Failed to search stops', resultsList, resultsContainer, loadingDiv);
     }
@@ -167,12 +170,23 @@ class PullcordApp {
       this.showError('Geolocation not supported', resultsList, resultsContainer, loadingDiv);
       return;
     }
-    this.showLoading(loadingDiv, resultsContainer);
+
+    // Inline loading state on button
+    const btn = document.getElementById('location-btn');
+    const btnOriginal = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<div class="d-spinner"></div> Finding you...';
+    }
 
     // Try coarse position first (fast, cell/wifi), fall back to fine
     const getPosition = (opts) => new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(resolve, reject, opts);
     });
+
+    const resetBtn = () => {
+      if (btn) { btn.disabled = false; btn.innerHTML = btnOriginal; }
+    };
 
     let pos;
     try {
@@ -186,6 +200,7 @@ class PullcordApp {
         const msg = e2.code === 1 ? 'Location access denied'
           : e2.code === 3 ? 'Location timed out — try again or search instead'
           : 'Could not determine location';
+        resetBtn();
         this.showError(msg, resultsList, resultsContainer, loadingDiv);
         return;
       }
@@ -195,21 +210,28 @@ class PullcordApp {
       const { latitude, longitude } = pos.coords;
       const res = await fetch(`/api/stops?lat=${latitude}&lon=${longitude}&radius=800`);
       const stops = await res.json();
+      resetBtn();
       this.displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath);
     } catch (e) {
+      resetBtn();
       this.showError('Failed to find nearby stops', resultsList, resultsContainer, loadingDiv);
     }
   }
 
-  displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath) {
+  displayStops(stops, resultsList, resultsContainer, loadingDiv, basePath, routeMatch) {
     this.hideLoadingEl(loadingDiv);
     if (resultsContainer) resultsContainer.classList.remove('hidden');
     document.querySelector('.home-shell')?.classList.add('has-content');
 
     const header = document.getElementById('results-header');
     if (header) {
-      header.textContent = stops.length > 0 && stops[0].distance
-        ? `${stops.length} stops nearby` : `${stops.length} results`;
+      if (routeMatch) {
+        const color = routeMatch.route_color ? `#${routeMatch.route_color}` : 'var(--color-brand)';
+        header.innerHTML = `<span style="color:${color};font-weight:800">Route ${this.esc(routeMatch.route_short_name)}</span> · ${stops.length} stops`;
+      } else {
+        header.textContent = stops.length > 0 && stops[0].distance
+          ? `${stops.length} stops nearby` : `${stops.length} results`;
+      }
     }
 
     if (stops.length === 0) {
@@ -669,14 +691,14 @@ class PullcordApp {
     // Use the current hero prediction (respects tracked vehicle / direction)
     const hero = this.heroPrediction;
     if (!hero || hero.tier === 'scheduled' || !hero.vehicleId) {
-      section.style.display = 'none';
+      this.renderEmptyStrip(strip, label);
       return;
     }
 
     // Find the vehicle
     const vehicle = vehicles.find(v => v.id === hero.vehicleId || v.vehicleId === hero.vehicleId);
     if (!vehicle) {
-      section.style.display = 'none';
+      this.renderEmptyStrip(strip, label);
       return;
     }
 
@@ -698,15 +720,13 @@ class PullcordApp {
     }
 
     if (bestDir === null || bestMyIdx < 0 || bestBusIdx < 0) {
-      section.style.display = 'none';
+      this.renderEmptyStrip(strip, label);
       return;
     }
 
     const stops = this.dirStops[bestDir];
     const n = stops.length;
-    if (n < 2) { section.style.display = 'none'; return; }
-
-    section.style.display = '';
+    if (n < 2) { this.renderEmptyStrip(strip, label); return; }
 
     // Calculate bus fractional position between stops
     let busFrac = 0;
@@ -784,6 +804,22 @@ class PullcordApp {
     label.textContent = '';
   }
 
+  // Empty progress strip — reserves space, shows just the track line
+  renderEmptyStrip(strip, label) {
+    if (!strip) return;
+    const w = strip.clientWidth || 340;
+    const h = 40;
+    const pad = 20;
+    const lineY = 16;
+    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const stripLine = dark ? '#1e293b' : '#EDE5D8';
+
+    strip.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+      `<line x1="${pad}" y1="${lineY}" x2="${w-pad}" y2="${lineY}" stroke="${stripLine}" stroke-width="2" stroke-linecap="round"/>` +
+      `</svg>`;
+    if (label) label.textContent = '';
+  }
+
   // ─────────────────────────────
   // UPCOMING — other predictions
   // ─────────────────────────────
@@ -835,13 +871,10 @@ class PullcordApp {
           this.updateDirectionUrl(dir);
         }
 
-        // Re-render everything with new hero
+        // Re-render everything with new hero (hero is sticky, no scroll needed)
         this.renderHero(this.lastPredictions);
         this.renderProgressStrip(this.lastPredictions, this.lastVehicles);
         this.renderUpcoming(this.lastPredictions);
-
-        // Scroll to top to see new hero
-        document.getElementById('tracker-content')?.scrollTo({ top: 0, behavior: 'smooth' });
       });
     });
   }
@@ -861,12 +894,13 @@ class PullcordApp {
       statusHtml = '<span class="dot-sched"></span> Scheduled';
     }
 
-    // Arrival time
+    // Arrival time — always present to prevent row height shifts
     let arrivalStr = '';
     if (minutes >= 5) {
       const arr = new Date(Date.now() + pred.etaSeconds * 1000);
       arrivalStr = ` · ~${arr.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
     }
+    // Meta always has content (statusHtml) so height is stable
 
     // Row color — use route color in multi-route, otherwise by tier
     const predColor = pred.routeColor ? `#${pred.routeColor}` : this.routeColor;
