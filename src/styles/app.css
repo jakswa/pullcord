@@ -750,9 +750,19 @@
     background: var(--tier-next-bg);
   }
 
+  .d-upcoming-row.tier-next.d-upcoming-hero {
+    background: rgba(232, 93, 58, 0.1);
+    border-left-color: var(--color-brand);
+  }
+
   .d-upcoming-row.tier-scheduled {
     border-left-color: var(--tier-sched-border);
     background: var(--tier-sched-bg);
+  }
+
+  .d-upcoming-row.tier-scheduled.d-upcoming-hero {
+    background: rgba(232, 93, 58, 0.1);
+    border-left-color: var(--color-brand);
   }
 
   /* Update flash on upcoming rows */
