@@ -546,6 +546,9 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
+    white-space: nowrap;
+    overflow: hidden;
+    justify-content: center;
   }
 
   .d-hero-meta {

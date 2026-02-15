@@ -655,9 +655,10 @@ class PullcordApp {
     const routePrefix = this.multiRoute && this.heroPrediction.routeBadge
       ? `${this.heroPrediction.routeBadge} `
       : '';
+    const headsignText = this.truncateMiddle(this.heroPrediction.headsign || 'Unknown');
     hsEl.innerHTML = this.multiRoute && this.heroPrediction.routeBadge
-      ? `<span class="d-hero-route" style="color:#${this.heroPrediction.routeColor || 'E85D3A'}">${this.esc(this.heroPrediction.routeBadge)}</span> ${this.esc(this.heroPrediction.headsign || 'Unknown')}`
-      : this.esc(this.heroPrediction.headsign || 'Unknown');
+      ? `<span class="d-hero-route" style="color:#${this.heroPrediction.routeColor || 'E85D3A'}">${this.esc(this.heroPrediction.routeBadge)}</span> ${this.esc(headsignText)}`
+      : this.esc(headsignText);
 
     // Meta (arrival time + adherence)
     const metaEl = document.getElementById('hero-meta');
@@ -1431,6 +1432,35 @@ class PullcordApp {
   // ──────────────
   // UTILITIES
   // ──────────────
+
+  // Middle-truncate long text: "Inman Park/Reynoldstown Station via Woodland Hills" → "Inman Park…Woodland Hills"
+  // Cuts at word boundaries (space, /, parens) when possible
+  truncateMiddle(text, maxLen = 45) {
+    if (!text || text.length <= maxLen) return text;
+    const budget = maxLen - 1; // 1 char for ellipsis
+    const startBudget = Math.ceil(budget * 0.5);
+    const endBudget = Math.floor(budget * 0.5);
+
+    // Find break point for start (search backward from cut point)
+    // Break on space, /, or opening paren
+    let startEnd = -1;
+    for (let i = startBudget; i >= startBudget * 0.3; i--) {
+      if (' /('.includes(text[i])) { startEnd = i; break; }
+    }
+    if (startEnd < 0) startEnd = startBudget; // no good break, hard cut
+    const startPart = text.substring(0, startEnd).trim();
+
+    // Find break point for end (search forward from cut point)
+    const endCutFrom = text.length - endBudget;
+    let endStart = -1;
+    for (let i = endCutFrom; i < text.length - endBudget * 0.3; i++) {
+      if (' /('.includes(text[i])) { endStart = i; break; }
+    }
+    if (endStart < 0) endStart = endCutFrom;
+    const endPart = text.substring(endStart).trim();
+
+    return startPart + '…' + endPart;
+  }
 
   // Format adherence delta for display
   // adherenceSec: positive = late, negative = early, null/undefined = unknown
