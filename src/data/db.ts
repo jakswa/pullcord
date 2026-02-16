@@ -85,10 +85,19 @@ class MARTADatabase {
   // The tracker's paired-stop logic merges both directions regardless of which ID
   // you use, so we GROUP BY stop_name to avoid duplicate cards in results.
   searchStops(query: string, limit: number = 20): Stop[] {
+    // Split query into words — each word must match somewhere in the stop name
+    // "five points" matches "FIVE POINTS STATION"
+    // "mem gib" matches "MEMORIAL DR SE @ GIBSON ST SE"
+    const words = query.trim().split(/\s+/).filter(w => w.length > 0);
+    if (words.length === 0) return [];
+    
+    const whereClauses = words.map(() => `stop_name LIKE ?`);
+    const whereSQL = whereClauses.join(' AND ');
+    
     const stmt = this.db.prepare(`
       SELECT MIN(stop_id) as stop_id, stop_name, stop_lat, stop_lon 
       FROM stops 
-      WHERE stop_name LIKE ?
+      WHERE ${whereSQL}
       GROUP BY stop_name
       ORDER BY 
         CASE 
@@ -99,10 +108,10 @@ class MARTADatabase {
       LIMIT ?
     `);
     
-    const searchPattern = `%${query}%`;
-    const exactPattern = `${query}%`;
+    const searchParams = words.map(w => `%${w}%`);
+    const exactPattern = `${words[0]}%`;
     
-    return stmt.all(searchPattern, exactPattern, limit) as Stop[];
+    return stmt.all(...searchParams, exactPattern, limit) as Stop[];
   }
 
   // Get stops on a route (for route-first search), deduplicated by name
@@ -176,15 +185,27 @@ class MARTADatabase {
     `).get(stopId) as Stop | null;
   }
 
+  // Get all stop IDs sharing the same name (paired directional stops)
+  getStopIdsByName(stopId: string): string[] {
+    const ids = this.db.prepare(`
+      SELECT stop_id FROM stops
+      WHERE stop_name = (SELECT stop_name FROM stops WHERE stop_id = ?)
+    `).all(stopId) as Array<{ stop_id: string }>;
+    return ids.map(r => r.stop_id);
+  }
+
   // Get routes serving a stop (bus only, excludes rail)
+  // Merges routes from all paired stops (same name, opposite directions)
   getRoutesForStop(stopId: string): Route[] {
+    const allIds = this.getStopIdsByName(stopId);
+    const placeholders = allIds.map(() => '?').join(',');
     const routes = this.db.prepare(`
       SELECT DISTINCT r.route_id, r.route_short_name, r.route_long_name, r.route_color, r.route_text_color
       FROM routes r
       JOIN route_stops rs ON r.route_id = rs.route_id
-      WHERE rs.stop_id = ?
+      WHERE rs.stop_id IN (${placeholders})
       ORDER BY CAST(r.route_short_name AS INTEGER), r.route_short_name
-    `).all(stopId) as Route[];
+    `).all(...allIds) as Route[];
     return routes.filter(r => !RAIL_ROUTES.has(r.route_short_name));
   }
 
@@ -346,12 +367,14 @@ class MARTADatabase {
   // Returns Map<tripId, arrival_time string> e.g. "14:52:00"
   getScheduledArrivals(stopId: string, tripIds: string[]): Map<string, string> {
     if (tripIds.length === 0) return new Map();
-    const placeholders = tripIds.map(() => '?').join(',');
+    const allStopIds = this.getStopIdsByName(stopId);
+    const stopPlaceholders = allStopIds.map(() => '?').join(',');
+    const tripPlaceholders = tripIds.map(() => '?').join(',');
     const rows = this.db.prepare(`
       SELECT trip_id, arrival_time 
       FROM stop_times 
-      WHERE stop_id = ? AND trip_id IN (${placeholders})
-    `).all(stopId, ...tripIds) as Array<{ trip_id: string; arrival_time: string }>;
+      WHERE stop_id IN (${stopPlaceholders}) AND trip_id IN (${tripPlaceholders})
+    `).all(...allStopIds, ...tripIds) as Array<{ trip_id: string; arrival_time: string }>;
     const result = new Map<string, string>();
     for (const row of rows) {
       // For loop routes with duplicate (trip_id, stop_id), first row wins
@@ -397,6 +420,10 @@ export function getStop(stopId: string): Stop | null {
 
 export function getRoutesForStop(stopId: string): Route[] {
   return db.getRoutesForStop(stopId);
+}
+
+export function getStopIdsByName(stopId: string): string[] {
+  return db.getStopIdsByName(stopId);
 }
 
 export function getRouteDetail(routeId: string): RouteDetail | null {

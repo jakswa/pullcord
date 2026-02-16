@@ -1,6 +1,6 @@
 import { load } from "protobufjs";
 import path from "path";
-import { getScheduledArrivals } from "./db";
+import { getScheduledArrivals, getStopIdsByName } from "./db";
 
 const VEHICLE_POSITIONS_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb";
 const TRIP_UPDATES_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb";
@@ -187,6 +187,8 @@ class RealtimeDataService {
   async getPredictions(routeId: string, stopId: string, tripLookup: Map<string, any>): Promise<PredictionUpdate[]> {
     const entities = await this.getTripUpdates();
     const timestamp = Date.now();
+    // Check all paired stop IDs (same physical location, different directions)
+    const allStopIds = new Set(getStopIdsByName(stopId));
 
     // Collect predictions with raw RT arrival timestamps for adherence computation
     const predictions: (PredictionUpdate & { _rtArrivalSec?: number })[] = [];
@@ -201,7 +203,7 @@ class RealtimeDataService {
 
       const stopTimeUpdates = entity.tripUpdate.stopTimeUpdate || [];
       for (const stu of stopTimeUpdates) {
-        if (stu.stopId !== stopId) continue;
+        if (!allStopIds.has(stu.stopId)) continue;
 
         // Use arrival or departure time
         const timeUpdate = stu.arrival || stu.departure;
@@ -209,7 +211,12 @@ class RealtimeDataService {
 
         const rtArrivalSec = parseInt(timeUpdate.time);
         const etaTimestamp = rtArrivalSec * 1000;
-        const etaSeconds = Math.max(0, Math.floor((etaTimestamp - timestamp) / 1000));
+        const rawEtaSeconds = Math.floor((etaTimestamp - timestamp) / 1000);
+        
+        // Skip predictions more than 2 minutes past due — the bus likely already passed
+        if (rawEtaSeconds < -120) continue;
+        
+        const etaSeconds = Math.max(0, rawEtaSeconds);
         
         // Calculate staleness from trip update timestamp
         const updateTimestamp = entity.tripUpdate.timestamp ? 
@@ -297,6 +304,8 @@ export async function getStopArrivals(
   tripLookup: Map<string, any>
 ): Promise<StopArrival[]> {
   const routeMap = new Map(routes.map(r => [r.route_id, r]));
+  // Check all paired stop IDs (same physical location, different directions)
+  const allStopIds = new Set(getStopIdsByName(stopId));
   const entities = await realtimeService.getTripUpdates();
   const timestamp = Date.now();
   const arrivals: (StopArrival & { _rtArrivalSec?: number })[] = [];
@@ -310,13 +319,18 @@ export async function getStopArrivals(
     const route = routeMap.get(trip.route_id)!;
     const stopTimeUpdates = entity.tripUpdate.stopTimeUpdate || [];
     for (const stu of stopTimeUpdates) {
-      if (stu.stopId !== stopId) continue;
+      if (!allStopIds.has(stu.stopId)) continue;
       const timeUpdate = stu.arrival || stu.departure;
       if (!timeUpdate?.time) continue;
 
       const rtArrivalSec = parseInt(timeUpdate.time);
       const etaTimestamp = rtArrivalSec * 1000;
-      const etaSeconds = Math.max(0, Math.floor((etaTimestamp - timestamp) / 1000));
+      const rawEtaSeconds = Math.floor((etaTimestamp - timestamp) / 1000);
+      
+      // Skip predictions more than 2 minutes past due
+      if (rawEtaSeconds < -120) continue;
+      
+      const etaSeconds = Math.max(0, rawEtaSeconds);
       const updateTimestamp = entity.tripUpdate.timestamp
         ? parseInt(entity.tripUpdate.timestamp) * 1000 : timestamp;
       const staleSeconds = Math.floor((timestamp - updateTimestamp) / 1000);
