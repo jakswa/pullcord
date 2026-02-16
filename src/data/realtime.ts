@@ -250,9 +250,19 @@ class RealtimeDataService {
       }
     }
 
+    // Deduplicate by tripId (paired stops can match same trip twice)
+    const seen = new Set<string>();
+    const deduped = predictions.filter(p => {
+      if (!p.tripId || !seen.has(p.tripId)) {
+        if (p.tripId) seen.add(p.tripId);
+        return true;
+      }
+      return false;
+    });
+
     // Sort by ETA
-    predictions.sort((a, b) => a.etaSeconds - b.etaSeconds);
-    return predictions;
+    deduped.sort((a, b) => a.etaSeconds - b.etaSeconds);
+    return deduped;
   }
 }
 
@@ -365,8 +375,18 @@ export async function getStopArrivals(
     }
   }
 
-  arrivals.sort((a, b) => a.etaSeconds - b.etaSeconds);
-  return arrivals;
+    // Deduplicate by tripId (paired stops can match same trip twice)
+  const seen = new Set<string>();
+  const deduped = arrivals.filter(a => {
+    if (!a.tripId || !seen.has(a.tripId)) {
+      if (a.tripId) seen.add(a.tripId);
+      return true;
+    }
+    return false;
+  });
+
+  deduped.sort((a, b) => a.etaSeconds - b.etaSeconds);
+  return deduped;
 }
 
 export type { VehiclePosition, PredictionUpdate };

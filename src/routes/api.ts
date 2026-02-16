@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getPairedStops, getRouteHeadsigns } from "../data/db.js";
+import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRouteHeadsigns } from "../data/db.js";
 import { getVehicles, getPredictions, getStopArrivals } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
 import { getVapidPublicKey, registerCord, cancelCord, getActiveCordCount, testFireAll } from "../data/push.js";
@@ -177,19 +177,8 @@ app.get("/predictions/:routeId/:stopId", async (c) => {
     const activeVehicleIds = new Set(vehicles.map(v => v.vehicleId));
     const activeTripIds = new Set(vehicles.map(v => v.tripId));
     
-    // Find paired stops (same physical location, both directions)
-    const pairedStops = getPairedStops(stopId, route.route_id);
-    
-    // Get predictions for ALL paired stops
-    const allPredictions = [];
-    const stopIds = pairedStops.length > 0 
-      ? pairedStops.map(ps => ps.stop_id)
-      : [stopId];
-    
-    for (const sid of [...new Set(stopIds)]) {
-      const preds = await getPredictions(route.route_id, sid, tripLookup);
-      allPredictions.push(...preds);
-    }
+    // getPredictions already merges paired stops (same name, opposite directions)
+    const allPredictions = await getPredictions(route.route_id, stopId, tripLookup);
     
     // Classify each prediction into tiers
     for (const pred of allPredictions) {
