@@ -57,34 +57,29 @@ class MARTADatabase {
   private tripLookupCache: Map<string, Trip> | null = null;
 
   constructor() {
-    // One-time migration: create stop_groups if missing (existing databases pre-Phase 2)
-    this.ensureStopGroups();
+    // One-time migration: add group_id column to stops if missing
+    this.ensureGroupId();
     this.db = new Database(DB_PATH, { readonly: true });
   }
 
-  private ensureStopGroups() {
+  private ensureGroupId() {
     const db = new Database(DB_PATH);
-    // Create table if missing
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS stop_groups (
-        stop_id TEXT PRIMARY KEY,
-        group_id TEXT NOT NULL
-      )
-    `);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_stop_groups_group ON stop_groups(group_id)`);
-    // Populate if empty (handles both fresh DB and failed-import-left-empty-table)
-    const count = db.prepare('SELECT COUNT(*) as c FROM stop_groups').get() as any;
-    if (count.c === 0) {
+    // Check if stops.group_id column exists
+    const cols = db.prepare("PRAGMA table_info(stops)").all() as Array<{ name: string }>;
+    const hasGroupId = cols.some(c => c.name === 'group_id');
+    if (!hasGroupId) {
+      db.exec(`ALTER TABLE stops ADD COLUMN group_id TEXT`);
       db.exec(`
-        INSERT INTO stop_groups (stop_id, group_id)
-        SELECT s.stop_id, g.group_id
-        FROM stops s
-        JOIN (SELECT stop_name, MIN(stop_id) as group_id FROM stops GROUP BY stop_name) g
-          ON s.stop_name = g.stop_name
+        UPDATE stops SET group_id = (
+          SELECT MIN(s2.stop_id) FROM stops s2 WHERE s2.stop_name = stops.stop_name
+        )
       `);
-      const populated = db.prepare('SELECT COUNT(*) as c FROM stop_groups').get() as any;
-      console.log(`📦 Populated stop_groups (${populated.c} mappings)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_stops_group ON stops(group_id)`);
+      const count = db.prepare('SELECT COUNT(*) as c FROM stops WHERE group_id IS NOT NULL').get() as any;
+      console.log(`📦 Added stops.group_id (${count.c} stops)`);
     }
+    // Drop legacy stop_groups table if it exists
+    db.exec(`DROP TABLE IF EXISTS stop_groups`);
     db.close();
   }
 
@@ -214,26 +209,25 @@ class MARTADatabase {
   }
 
   // Get all stop IDs in the same group (paired directional stops at same location).
-  // Uses pre-computed stop_groups table instead of runtime stop_name subquery.
+  // Uses stops.group_id column — no join table needed.
   getStopIdsByName(stopId: string): string[] {
     const ids = this.db.prepare(`
-      SELECT stop_id FROM stop_groups
-      WHERE group_id = (SELECT group_id FROM stop_groups WHERE stop_id = ?)
+      SELECT stop_id FROM stops
+      WHERE group_id = (SELECT group_id FROM stops WHERE stop_id = ?)
     `).all(stopId) as Array<{ stop_id: string }>;
-    // Fallback: if stop not in stop_groups (shouldn't happen), return the input
     return ids.length > 0 ? ids.map(r => r.stop_id) : [stopId];
   }
 
   // Get routes serving a stop (bus only, excludes rail).
-  // Merges routes from all paired stops via stop_groups — single query.
+  // Merges routes from all paired stops via stops.group_id.
   getRoutesForStop(stopId: string): Route[] {
     const routes = this.db.prepare(`
       SELECT DISTINCT r.route_id, r.route_short_name, r.route_long_name, r.route_color, r.route_text_color
       FROM routes r
       JOIN route_stops rs ON r.route_id = rs.route_id
       WHERE rs.stop_id IN (
-        SELECT stop_id FROM stop_groups
-        WHERE group_id = (SELECT group_id FROM stop_groups WHERE stop_id = ?)
+        SELECT stop_id FROM stops
+        WHERE group_id = (SELECT group_id FROM stops WHERE stop_id = ?)
       )
       ORDER BY CAST(r.route_short_name AS INTEGER), r.route_short_name
     `).all(stopId) as Route[];
@@ -329,7 +323,7 @@ class MARTADatabase {
   }
 
   // Batch lookup scheduled arrival times for (stop_id, trip_id[]) pairs.
-  // Uses stop_groups for paired stop resolution — single query.
+  // Uses stops.group_id for paired stop resolution — single query.
   // Returns Map<tripId, arrival_time string> e.g. "14:52:00"
   getScheduledArrivals(stopId: string, tripIds: string[]): Map<string, string> {
     if (tripIds.length === 0) return new Map();
@@ -338,13 +332,12 @@ class MARTADatabase {
       SELECT trip_id, arrival_time 
       FROM stop_times 
       WHERE stop_id IN (
-        SELECT stop_id FROM stop_groups
-        WHERE group_id = (SELECT group_id FROM stop_groups WHERE stop_id = ?)
+        SELECT stop_id FROM stops
+        WHERE group_id = (SELECT group_id FROM stops WHERE stop_id = ?)
       ) AND trip_id IN (${tripPlaceholders})
     `).all(stopId, ...tripIds) as Array<{ trip_id: string; arrival_time: string }>;
     const result = new Map<string, string>();
     for (const row of rows) {
-      // For loop routes with duplicate (trip_id, stop_id), first row wins
       if (!result.has(row.trip_id)) {
         result.set(row.trip_id, row.arrival_time);
       }

@@ -34,9 +34,11 @@ class GTFSImporter {
         stop_id TEXT PRIMARY KEY,
         stop_name TEXT,
         stop_lat REAL,
-        stop_lon REAL
+        stop_lon REAL,
+        group_id TEXT
       )
     `);
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_stops_group ON stops(group_id)`);
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS trips (
@@ -80,16 +82,6 @@ class GTFSImporter {
     `);
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_route_stops_route ON route_stops(route_id)`);
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_route_stops_stop ON route_stops(stop_id)`);
-
-    // Canonical stop groups: maps each stop_id to a group of co-located stops (same name).
-    // Solves the "paired directional stops" problem once at import time instead of 9 places at runtime.
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS stop_groups (
-        stop_id TEXT PRIMARY KEY,
-        group_id TEXT NOT NULL
-      )
-    `);
-    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_stop_groups_group ON stop_groups(group_id)`);
 
     console.log("✓ Tables ready");
   }
@@ -154,6 +146,7 @@ class GTFSImporter {
         stop_name: r.stop_name,
         stop_lat: parseFloat(r.stop_lat),
         stop_lon: parseFloat(r.stop_lon),
+        group_id: null, // populated by buildStopGroups()
       })
     );
     const count = this.upsertTable('stops', records);
@@ -231,33 +224,27 @@ class GTFSImporter {
   }
 
   buildStopGroups() {
-    console.log("Building stop_groups (paired stop resolution)...");
+    console.log("Populating stops.group_id...");
 
-    const tx = this.db.transaction(() => {
-      this.db.run('DELETE FROM stop_groups');
-      // Group stops by name. The canonical group_id is MIN(stop_id) per name.
-      // This means 600031 and 600032 ("FIVE POINTS STATION") share group_id 600031.
-      this.db.run(`
-        INSERT INTO stop_groups (stop_id, group_id)
-        SELECT s.stop_id, g.group_id
-        FROM stops s
-        JOIN (SELECT stop_name, MIN(stop_id) as group_id FROM stops GROUP BY stop_name) g
-          ON s.stop_name = g.stop_name
-      `);
-    });
-    tx();
+    // group_id = MIN(stop_id) per stop_name.
+    // Five Points 600031/600032 both get group_id 600031.
+    this.db.run(`
+      UPDATE stops SET group_id = (
+        SELECT MIN(s2.stop_id) FROM stops s2 WHERE s2.stop_name = stops.stop_name
+      )
+    `);
 
-    const count = this.db.prepare('SELECT COUNT(*) as count FROM stop_groups').get() as any;
-    const groups = this.db.prepare('SELECT COUNT(DISTINCT group_id) as count FROM stop_groups').get() as any;
-    console.log(`✓ Built ${count.count} stop→group mappings (${groups.count} unique groups)`);
-    return count.count;
+    const groups = this.db.prepare('SELECT COUNT(DISTINCT group_id) as count FROM stops').get() as any;
+    const total = this.db.prepare('SELECT COUNT(*) as count FROM stops').get() as any;
+    console.log(`✓ ${total.count} stops → ${groups.count} groups`);
+    return groups.count;
   }
 
   printStats() {
     console.log("\n📊 DATABASE STATISTICS");
     console.log("======================");
 
-    const tables = ['routes', 'stops', 'trips', 'shapes', 'stop_times', 'route_stops', 'stop_groups'];
+    const tables = ['routes', 'stops', 'trips', 'shapes', 'stop_times', 'route_stops'];
     for (const table of tables) {
       const result = this.db.prepare(`SELECT COUNT(*) as count FROM ${table}`).get() as any;
       console.log(`${table.padEnd(12)}: ${result.count.toLocaleString()} rows`);
