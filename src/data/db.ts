@@ -328,19 +328,6 @@ class MARTADatabase {
     return lookup;
   }
 
-  // Get stop details with routes
-  getStopWithRoutes(stopId: string) {
-    const stop = this.getStop(stopId);
-    if (!stop) return null;
-
-    const routes = this.getRoutesForStop(stopId);
-    
-    return {
-      ...stop,
-      routes
-    };
-  }
-
   // Batch lookup scheduled arrival times for (stop_id, trip_id[]) pairs.
   // Uses stop_groups for paired stop resolution — single query.
   // Returns Map<tripId, arrival_time string> e.g. "14:52:00"
@@ -429,10 +416,6 @@ export function getRouteHeadsigns(routeId: string): Record<number, string> {
     }
   }
   return result;
-}
-
-export function getStopWithRoutes(stopId: string) {
-  return db.getStopWithRoutes(stopId);
 }
 
 export function getScheduledArrivals(stopId: string, tripIds: string[]): Map<string, string> {
