@@ -1168,23 +1168,17 @@
      ═══════════════════════ */
 
   .home-shell {
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
+    min-height: 100dvh;
     background: var(--home-bg);
-    overflow: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .home-hero {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2.5rem 1.25rem 1.5rem;
-  }
-
-  /* Center hero vertically only when no favorites/results are showing */
-  .home-shell:not(.has-content) .home-hero {
-    flex: 1;
+    padding: 2.5rem 1.25rem 1rem;
   }
 
   .home-hero-inner {
@@ -1283,9 +1277,6 @@
     max-width: 420px;
     margin: 0 auto;
     width: 100%;
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .home-status {
