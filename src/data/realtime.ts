@@ -374,7 +374,7 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
           arrivalSec: parseTimeToSec(s.arrival_time),
         }));
 
-        const eta = computeETA(veh.lat, veh.lon, tripStops, allStopIds);
+        const eta = computeETA(veh.lat, veh.lon, tripStops, allStopIds, veh.staleSeconds);
         if (eta !== null) {
           arr.etaSeconds = eta;
           arr.etaSource = 'computed';

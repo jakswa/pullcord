@@ -30,7 +30,7 @@ function distSq(lat1, lon1, lat2, lon2) {
  * @param {string} targetStopName - the user's stop name (for paired stop matching)
  * @returns {number|null} seconds until arrival, or null
  */
-function computeClientETA(vehicleLat, vehicleLon, tripStops, targetStopId, targetStopName) {
+function computeClientETA(vehicleLat, vehicleLon, tripStops, targetStopId, targetStopName, staleSeconds) {
   if (tripStops.length < 2) return null;
 
   // Find the target stop index (match by ID or name for paired stops)
@@ -57,6 +57,8 @@ function computeClientETA(vehicleLat, vehicleLon, tripStops, targetStopId, targe
   const deltaSec = tripStops[targetIdx].arrivalSec - tripStops[nearestIdx].arrivalSec;
   if (deltaSec < 0 || deltaSec > 7200) return null;
 
+  var eta = deltaSec;
+
   // Interpolate within current segment
   if (nearestIdx < tripStops.length - 1 && nearestIdx < targetIdx) {
     const segDist = distSq(
@@ -70,9 +72,12 @@ function computeClientETA(vehicleLat, vehicleLon, tripStops, targetStopId, targe
       );
       const fraction = Math.min(1, Math.sqrt(busDist / segDist));
       const segTime = tripStops[nearestIdx + 1].arrivalSec - tripStops[nearestIdx].arrivalSec;
-      return Math.max(0, Math.round(deltaSec - fraction * segTime));
+      eta -= fraction * segTime;
     }
   }
 
-  return Math.max(0, deltaSec);
+  // Subtract position staleness — bus has been moving since GPS reading
+  eta -= (staleSeconds || 0);
+
+  return Math.max(0, Math.round(eta));
 }

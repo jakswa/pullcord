@@ -441,7 +441,8 @@ class PullcordApp {
 
       const eta = computeClientETA(
         veh.lat, veh.lon, stops,
-        this.data.stop.id, this.data.stop.name
+        this.data.stop.id, this.data.stop.name,
+        veh.staleSeconds || 0
       );
       if (eta !== null) {
         pred.etaSeconds = eta;

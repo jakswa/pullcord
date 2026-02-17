@@ -38,6 +38,7 @@ export function computeETA(
   vehicleLon: number,
   tripStops: TripStop[],
   targetStopIds: Set<string>, // grouped stop IDs (paired directions)
+  staleSeconds: number = 0, // vehicle position age — subtracted from result
 ): number | null {
   if (tripStops.length < 2) return null;
 
@@ -65,7 +66,9 @@ export function computeETA(
   // Sanity: negative or huge deltas are data errors
   if (deltaSec < 0 || deltaSec > 7200) return null; // >2h is nonsensical
 
-  // Optional: interpolate within current segment.
+  let eta = deltaSec;
+
+  // Interpolate within current segment.
   // If bus is between stops[nearestIdx] and stops[nearestIdx+1],
   // estimate fraction covered and subtract from delta.
   if (nearestIdx < tripStops.length - 1 && nearestIdx < targetIdx) {
@@ -81,9 +84,12 @@ export function computeETA(
       // Use sqrt for fraction since distSq isn't linear for ratios
       const fraction = Math.min(1, Math.sqrt(busDist / segDist));
       const segTime = tripStops[nearestIdx + 1].arrivalSec - tripStops[nearestIdx].arrivalSec;
-      return Math.max(0, Math.round(deltaSec - fraction * segTime));
+      eta -= fraction * segTime;
     }
   }
 
-  return Math.max(0, deltaSec);
+  // Subtract position staleness — the bus has been moving since the GPS reading
+  eta -= staleSeconds;
+
+  return Math.max(0, Math.round(eta));
 }
