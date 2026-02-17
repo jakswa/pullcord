@@ -158,6 +158,10 @@ export async function testFireAll(): Promise<number> {
           tag: `test-${cord.id}`,
           url: '/',
         }),
+        {
+          TTL: 300,
+          urgency: 'high',
+        },
       );
       console.log(`🔔 Test push sent for cord ${cord.id}`);
       sent++;
@@ -226,6 +230,10 @@ export async function checkCords(
             tag: `cord-${cord.id}`,
             url: `/bus?route=${cord.route_id}&stop=${cord.stop_id}&cordFired=${cord.id}`,
           }),
+          {
+            TTL: 300, // 5 min — stale bus alerts are useless
+            urgency: 'high', // wake device from doze/deep sleep
+          },
         );
         console.log(`🔔 Push sent for cord ${cord.id}`);
       } catch (err: any) {

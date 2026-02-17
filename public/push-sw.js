@@ -8,9 +8,10 @@ self.addEventListener('push', (event) => {
     body: data.body || 'Your bus is arriving soon!',
     icon: '/public/icons/icon-192.png',
     badge: '/public/icons/icon-192.png',
-    vibrate: [200, 100, 200],
+    vibrate: [200, 100, 200, 100, 200],
     tag: data.tag || 'pullcord-alert',
     renotify: true,
+    requireInteraction: true, // keep notification visible until tapped (don't auto-dismiss)
     data: {
       url: data.url || '/',
     },
@@ -19,21 +20,27 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Clicking the notification navigates to the cordFired URL + focuses
+// Clicking the notification opens the cordFired URL
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
+  const path = event.notification.data?.url || '/';
+  // Build full URL — Firefox needs absolute URLs for openWindow
+  const fullUrl = new URL(path, self.location.origin).href;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Navigate existing Pullcord tab to cordFired URL, then focus
+      // Try to reuse an existing Pullcord tab
       for (const client of windowClients) {
-        if (client.url.includes(self.location.origin) && 'navigate' in client) {
-          return client.navigate(url).then(() => client.focus());
+        try {
+          if (client.url.startsWith(self.location.origin) && 'navigate' in client) {
+            return client.navigate(fullUrl).then(() => client.focus());
+          }
+        } catch (e) {
+          // Some browsers throw on navigate — fall through to openWindow
         }
       }
-      // No existing tab — open new one
-      return clients.openWindow(url);
+      // No existing tab or navigate failed — open new one
+      return clients.openWindow(fullUrl);
     })
   );
 });
