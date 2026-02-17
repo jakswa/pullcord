@@ -429,11 +429,20 @@ export async function getStopArrivals(
   const routeInfo = new Map(
     routes.map(r => [r.route_id, { route_short_name: r.route_short_name, route_color: r.route_color }])
   );
+
+  // Fetch vehicles for all routes at this stop so tier classification works
+  const allVehicles: VehiclePosition[] = [];
+  for (const route of routes) {
+    const v = await realtimeService.getVehicles(route.route_id, tripLookup);
+    allVehicles.push(...v);
+  }
+
   const arrivals = await findArrivals({
     stopId,
     tripLookup,
     routeFilter: new Set(routes.map(r => r.route_id)),
     routeInfo,
+    vehicles: allVehicles,
   });
   return arrivals as StopArrival[];
 }
