@@ -37,7 +37,7 @@ app.get("/bus", async (c) => {
       };
 
       return c.html(
-        <Layout title={`${stop.stop_name} — Pullcord`} description={`Live bus arrivals at ${stop.stop_name}. Routes: ${routes.map(r => r.route_short_name).join(', ')}.`}>
+        <Layout title={`${stop.stop_name} — Pullcord`} description={`Live bus arrivals at ${stop.stop_name}. Routes: ${routes.map(r => r.route_short_name).join(', ')}.`} ogImage="/public/icons/og-bus.png" canonicalPath={`/bus?stop=${stop.stop_id}`}>
           <BusTrackerPage
             route={null}
             stop={stop}
@@ -125,7 +125,7 @@ app.get("/bus", async (c) => {
 
     // Render the bus tracker page
     return c.html(
-      <Layout title={`Route ${route.route_short_name} at ${stop.stop_name} — Pullcord`}>
+      <Layout title={`Route ${route.route_short_name} at ${stop.stop_name} — Pullcord`} ogImage="/public/icons/og-bus.png" canonicalPath={`/bus?route=${route.route_id}&stop=${stop.stop_id}`}>
         <BusTrackerPage
           route={route}
           stop={stop}
