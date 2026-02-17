@@ -220,13 +220,19 @@
   /* ── Header ── */
   .d-header {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    flex-direction: column;
+    gap: 0.35rem;
     padding: 0.5rem 0.75rem;
     background: var(--bg-elevated);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     z-index: 10;
+  }
+
+  .d-header-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .d-back {
@@ -269,8 +275,8 @@
   .d-header-routes {
     display: flex;
     gap: 0.25rem;
-    flex-shrink: 0;
     flex-wrap: wrap;
+    padding: 0 0 0.15rem;
   }
 
   .d-hero-route {

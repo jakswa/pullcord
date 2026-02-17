@@ -19,29 +19,32 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
 
       {/* === Compact Header === */}
       <header class="d-header">
-        <a href="/" class="d-back" aria-label="Home">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-        </a>
-        {route ? (
-          <div class="d-badge" style={`background:${routeColor}`}>
-            {route.route_short_name}
+        <div class="d-header-row">
+          <a href="/" class="d-back" aria-label="Home">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+          </a>
+          {route && (
+            <div class="d-badge" style={`background:${routeColor}`}>
+              {route.route_short_name}
+            </div>
+          )}
+          <div class="d-header-info">
+            <div class="d-stop-name">{stop.stop_name}</div>
           </div>
-        ) : (
+          <div class="d-live" id="live-indicator">
+            <span class="d-live-dot"></span>
+            <span class="d-live-time" id="last-updated"></span>
+          </div>
+        </div>
+        {!route && initialData.routes?.length > 0 && (
           <div class="d-header-routes">
-            {initialData.routes?.map((r: any) => (
+            {initialData.routes.map((r: any) => (
               <span class="d-badge-mini" style={`background:#${r.color}`}>{r.shortName}</span>
             ))}
           </div>
         )}
-        <div class="d-header-info">
-          <div class="d-stop-name">{stop.stop_name}</div>
-        </div>
-        <div class="d-live" id="live-indicator">
-          <span class="d-live-dot"></span>
-          <span class="d-live-time" id="last-updated"></span>
-        </div>
       </header>
 
       {/* === Route tabs — other routes at this stop === */}

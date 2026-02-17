@@ -864,8 +864,8 @@ class PullcordApp {
     // My stop marker
     svg += `<circle cx="${myX}" cy="${lineY}" r="5" fill="${rc}" stroke="${myStopStroke}" stroke-width="2"/>`;
 
-    // Bus marker
-    svg += `<circle cx="${busX}" cy="${lineY}" r="5" fill="${busFill}" stroke="${rc}" stroke-width="2" filter="url(#pg)"/>`;
+    // Bus marker — square to distinguish from stop dots
+    svg += `<rect x="${busX - 5}" y="${lineY - 5}" width="10" height="10" rx="2" fill="${busFill}" stroke="${rc}" stroke-width="2" filter="url(#pg)"/>`;
 
     // Stops-away label centered below
     if (stopsText) {
