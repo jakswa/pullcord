@@ -386,6 +386,7 @@ class PullcordApp {
   prepareStopDirections() {
     const stops = this.data.stops || [];
     const myId = this.data.stop.id;
+    const myName = this.data.stop.name;
 
     // Group by direction and sort by stop_sequence
     this.dirStops = {};
@@ -401,9 +402,13 @@ class PullcordApp {
     }
 
     // Find which direction(s) have our stop
+    // Match by ID first, then by name (paired stops have different IDs but same name)
     this.myStopDirections = {};
     for (const [dir, list] of Object.entries(this.dirStops)) {
-      const idx = list.findIndex(s => s.id === myId);
+      let idx = list.findIndex(s => s.id === myId);
+      if (idx === -1 && myName) {
+        idx = list.findIndex(s => s.name === myName);
+      }
       if (idx !== -1) this.myStopDirections[dir] = idx;
     }
   }
