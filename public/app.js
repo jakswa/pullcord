@@ -811,34 +811,33 @@ class PullcordApp {
       busFrac = dTotal > 0 ? Math.min(1, dBus / dTotal) : 0;
     }
 
-    // Stops away text
+    // Only care about the gap between bus and me
     const stopsAway = bestMyIdx - bestBusIdx;
-    let stopsText = '';
-    if (stopsAway > 0) {
-      stopsText = `${stopsAway} stop${stopsAway === 1 ? '' : 's'} away`;
-    } else if (stopsAway === 0) {
-      stopsText = 'At your stop';
-    }
+    const betweenCount = Math.max(0, stopsAway - 1); // stops strictly between
 
-    // Render compact SVG strip
+    // Render: bus pinned left, me pinned right, only between-stops shown
     const w = strip.clientWidth || 340;
     const h = 44;
-    const pad = 20;
+    const pad = 28;
     const uw = w - pad * 2;
     const lineY = 14;
-    const x = (i) => pad + (i / (n - 1)) * uw;
-
-    const busX = x(bestBusIdx + busFrac);
-    const myX = x(bestMyIdx);
     const rc = this.routeColor;
 
-    // Adaptive colors for light/dark mode
+    // Adaptive colors
     const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const stripLine = dark ? '#1e293b' : '#EDE5D8';
-    const stopDot = dark ? '#334155' : '#D4C4B4';
+    const stopDot = dark ? '#475569' : '#C4B4A4';
     const myStopStroke = dark ? '#090e1a' : '#FFFFFF';
     const labelFill = dark ? '#94a3b8' : '#7C6354';
     const busFill = dark ? '#f8fafc' : '#3B2820';
+
+    // Positions: bus at left, me at right, between-stops evenly spaced
+    const totalSlots = betweenCount + 1; // segments between bus and me
+    const busXBase = pad;
+    const myXBase = w - pad;
+    const fracOffset = totalSlots > 0 ? (busFrac / totalSlots) * uw : 0;
+    const busX = busXBase + fracOffset; // bus slides right within first segment
+    const xBetween = (i) => busXBase + ((i + 1) / totalSlots) * uw;
 
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
 
@@ -846,30 +845,33 @@ class PullcordApp {
     svg += `<defs><filter id="pg"><feGaussianBlur stdDeviation="2" result="b"/>` +
            `<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
 
-    // Background line
-    svg += `<line x1="${pad}" y1="${lineY}" x2="${w-pad}" y2="${lineY}" stroke="${stripLine}" stroke-width="2" stroke-linecap="round"/>`;
+    // Background line spans bus to me
+    svg += `<line x1="${busXBase}" y1="${lineY}" x2="${myXBase}" y2="${lineY}" stroke="${stripLine}" stroke-width="2" stroke-linecap="round"/>`;
 
-    // Active segment: bus → my stop
-    if (busX < myX + 5) {
-      svg += `<line x1="${busX}" y1="${lineY}" x2="${myX}" y2="${lineY}" ` +
-             `stroke="${rc}" stroke-width="3" stroke-linecap="round" filter="url(#pg)" opacity="0.7"/>`;
+    // Active segment: bus current position → me
+    svg += `<line x1="${busX}" y1="${lineY}" x2="${myXBase}" y2="${lineY}" ` +
+           `stroke="${rc}" stroke-width="3" stroke-linecap="round" opacity="0.35"/>`;
+
+    // Between-stop dots
+    for (let i = 0; i < betweenCount; i++) {
+      svg += `<circle cx="${xBetween(i)}" cy="${lineY}" r="2" fill="${stopDot}"/>`;
     }
 
-    // Stop dots
-    for (let i = 0; i < n; i++) {
-      if (i === bestMyIdx) continue;
-      svg += `<circle cx="${x(i)}" cy="${lineY}" r="1.5" fill="${stopDot}"/>`;
-    }
+    // Me — destination pin (right side, always fixed)
+    svg += `<circle cx="${myXBase}" cy="${lineY}" r="6" fill="${rc}" stroke="${myStopStroke}" stroke-width="2.5"/>`;
+    svg += `<circle cx="${myXBase}" cy="${lineY}" r="2" fill="${myStopStroke}"/>`;
 
-    // My stop — destination pin: larger, bold, unmistakable
-    svg += `<circle cx="${myX}" cy="${lineY}" r="6" fill="${rc}" stroke="${myStopStroke}" stroke-width="2.5"/>`;
-    svg += `<circle cx="${myX}" cy="${lineY}" r="2" fill="${myStopStroke}"/>`;
-
-    // Bus — pulsing GPS-style dot with outer ring
+    // Bus — GPS dot (left side, slides right within segment)
     svg += `<circle cx="${busX}" cy="${lineY}" r="7" fill="${rc}" opacity="0.2" filter="url(#pg)"/>`;
     svg += `<circle cx="${busX}" cy="${lineY}" r="4" fill="${busFill}" stroke="${rc}" stroke-width="1.5"/>`;
 
-    // Stops-away label centered below
+    // Label
+    let stopsText = '';
+    if (stopsAway > 0) {
+      stopsText = `${stopsAway} stop${stopsAway === 1 ? '' : 's'} away`;
+    } else if (stopsAway === 0) {
+      stopsText = 'At your stop';
+    }
     if (stopsText) {
       svg += `<text x="${w/2}" y="${h - 2}" text-anchor="middle" fill="${labelFill}" font-size="13" font-weight="700" font-family="'JetBrains Mono',monospace" letter-spacing="0.5">${stopsText.toUpperCase()}</text>`;
     }
