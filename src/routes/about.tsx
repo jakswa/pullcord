@@ -8,7 +8,8 @@ app.get("/about", (c) => {
   return c.html(
     <Layout
       title="About — Pullcord"
-      description="What Pullcord is, how it was made, and why an AI wrote a bus tracker."
+      description="Real-time MARTA bus tracker built in Atlanta. GPS-based ETAs, push notifications when your bus is close, and zero tracking. Open source."
+      canonicalPath="/about"
     >
       <AboutPage />
     </Layout>

@@ -1918,6 +1918,15 @@
   line-height: 1.5;
 }
 
+.about-update-img {
+  display: block;
+  max-width: 320px;
+  width: 100%;
+  border-radius: 0.5rem;
+  margin-top: 0.75rem;
+  border: 1px solid var(--border-subtle);
+}
+
 /* Footer */
 .about-footer {
   text-align: center;

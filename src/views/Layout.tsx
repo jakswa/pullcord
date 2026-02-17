@@ -4,6 +4,7 @@ export interface LayoutProps {
   title?: string;
   description?: string;
   ogImage?: string;
+  canonicalPath?: string;
   children: Child;
 }
 
@@ -12,6 +13,7 @@ export const Layout = (props: LayoutProps) => {
   const description = props.description || "Pull the cord. Catch your ride. Real-time MARTA bus tracking with live positions and ETA predictions.";
   const ogImage = props.ogImage || "/public/icons/og-image.png";
   const siteUrl = "https://pullcord.home.jake.town";
+  const canonicalUrl = `${siteUrl}${props.canonicalPath || ""}`;
 
   return (
     <html lang="en">
@@ -22,14 +24,18 @@ export const Layout = (props: LayoutProps) => {
 
         {/* SEO */}
         <meta name="description" content={description} />
+        <link rel="canonical" href={canonicalUrl} />
 
         {/* Open Graph */}
         <meta property="og:type" content="website" />
         <meta property="og:title" content={title} />
         <meta property="og:description" content={description} />
         <meta property="og:image" content={`${siteUrl}${ogImage}`} />
-        <meta property="og:url" content={siteUrl} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:url" content={canonicalUrl} />
         <meta property="og:site_name" content="Pullcord" />
+        <meta property="og:locale" content="en_US" />
 
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />

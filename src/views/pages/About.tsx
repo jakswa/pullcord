@@ -143,6 +143,7 @@ export const AboutPage = () => (
           <div class="about-update-date">Feb 17</div>
           <div class="about-update-text">
             <strong>First real-world Pull the Cord test.</strong> Set an alert on Route 21 westbound, walked to the stop when the notification hit, waited about a minute, bus showed up. The whole point of this app in one sentence.
+            <img src="/public/images/first-cord.jpg" alt="Pullcord push notification: Bus arriving in ~14 min" class="about-update-img" />
           </div>
         </div>
 
