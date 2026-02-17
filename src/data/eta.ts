@@ -60,6 +60,11 @@ export function computeETA(
   // Bus is past our stop — already served
   if (nearestIdx > targetIdx) return null;
 
+  // Bus is at/near the first stop (terminal) — likely waiting to depart.
+  // Schedule deltas don't account for layover time, so fall back to MARTA's ETA
+  // which includes the actual departure time.
+  if (nearestIdx <= 1 && targetIdx > 3) return null;
+
   // Scheduled delta between nearest stop and target stop
   const deltaSec = tripStops[targetIdx].arrivalSec - tripStops[nearestIdx].arrivalSec;
 

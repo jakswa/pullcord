@@ -53,6 +53,9 @@ function computeClientETA(vehicleLat, vehicleLon, tripStops, targetStopId, targe
   // Bus past our stop
   if (nearestIdx > targetIdx) return null;
 
+  // Bus at terminal (first stop) — waiting to depart, fall back to MARTA
+  if (nearestIdx <= 1 && targetIdx > 3) return null;
+
   // Scheduled delta
   const deltaSec = tripStops[targetIdx].arrivalSec - tripStops[nearestIdx].arrivalSec;
   if (deltaSec < 0 || deltaSec > 7200) return null;
