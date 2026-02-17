@@ -142,7 +142,21 @@ export const AboutPage = () => (
         <div class="about-update">
           <div class="about-update-date">Feb 17</div>
           <div class="about-update-text">
-            ETAs for tracked buses are now computed from the bus's actual GPS position and the scheduled travel time between stops. MARTA's feed has a known issue where predicted times just tick forward with the clock instead of reflecting where the bus actually is. Ours use real position data. Also fixed: notifications now wake your phone properly instead of waiting for you to check it.
+            <strong>First real-world Pull the Cord test.</strong> Set an alert on Route 21 westbound, walked to the stop when the notification hit, waited about a minute, bus showed up. The whole point of this app in one sentence.
+          </div>
+        </div>
+
+        <div class="about-update">
+          <div class="about-update-date">Feb 17</div>
+          <div class="about-update-text">
+            ETAs for tracked buses are now computed from the bus's actual GPS position and the scheduled travel time between stops. MARTA's feed has a known issue where predicted times just tick forward with the clock instead of reflecting where the bus actually is. Ours use real position data.
+          </div>
+        </div>
+
+        <div class="about-update">
+          <div class="about-update-date">Feb 17</div>
+          <div class="about-update-text">
+            Notifications now wake your phone properly — no more checking the app to find out you missed the alert. Fixed a bug where tapping the notification on Chrome did nothing. Also fixed ghost predictions where MARTA's feed shows a bus arriving twice because it pre-assigns the bus's next trip before it finishes the current one.
           </div>
         </div>
 
