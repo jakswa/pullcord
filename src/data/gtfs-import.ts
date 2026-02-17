@@ -81,6 +81,16 @@ class GTFSImporter {
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_route_stops_route ON route_stops(route_id)`);
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_route_stops_stop ON route_stops(stop_id)`);
 
+    // Canonical stop groups: maps each stop_id to a group of co-located stops (same name).
+    // Solves the "paired directional stops" problem once at import time instead of 9 places at runtime.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS stop_groups (
+        stop_id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL
+      )
+    `);
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_stop_groups_group ON stop_groups(group_id)`);
+
     console.log("✓ Tables ready");
   }
 
@@ -220,11 +230,34 @@ class GTFSImporter {
     return count.count;
   }
 
+  buildStopGroups() {
+    console.log("Building stop_groups (paired stop resolution)...");
+
+    const tx = this.db.transaction(() => {
+      this.db.run('DELETE FROM stop_groups');
+      // Group stops by name. The canonical group_id is MIN(stop_id) per name.
+      // This means 600031 and 600032 ("FIVE POINTS STATION") share group_id 600031.
+      this.db.run(`
+        INSERT INTO stop_groups (stop_id, group_id)
+        SELECT s.stop_id, g.group_id
+        FROM stops s
+        JOIN (SELECT stop_name, MIN(stop_id) as group_id FROM stops GROUP BY stop_name) g
+          ON s.stop_name = g.stop_name
+      `);
+    });
+    tx();
+
+    const count = this.db.prepare('SELECT COUNT(*) as count FROM stop_groups').get() as any;
+    const groups = this.db.prepare('SELECT COUNT(DISTINCT group_id) as count FROM stop_groups').get() as any;
+    console.log(`✓ Built ${count.count} stop→group mappings (${groups.count} unique groups)`);
+    return count.count;
+  }
+
   printStats() {
     console.log("\n📊 DATABASE STATISTICS");
     console.log("======================");
 
-    const tables = ['routes', 'stops', 'trips', 'shapes', 'stop_times', 'route_stops'];
+    const tables = ['routes', 'stops', 'trips', 'shapes', 'stop_times', 'route_stops', 'stop_groups'];
     for (const table of tables) {
       const result = this.db.prepare(`SELECT COUNT(*) as count FROM ${table}`).get() as any;
       console.log(`${table.padEnd(12)}: ${result.count.toLocaleString()} rows`);
@@ -261,6 +294,7 @@ async function main() {
     await importer.importShapes();
     await importer.importStopTimes();
     importer.buildRouteStops();
+    importer.buildStopGroups();
 
     importer.printStats();
 

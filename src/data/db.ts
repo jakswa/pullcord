@@ -53,11 +53,39 @@ interface RouteDetail {
 const RAIL_ROUTES = new Set(['BLUE', 'GREEN', 'RED', 'GOLD']);
 
 class MARTADatabase {
-  private db: Database;
+  public db: Database;
   private tripLookupCache: Map<string, Trip> | null = null;
 
   constructor() {
+    // One-time migration: create stop_groups if missing (existing databases pre-Phase 2)
+    this.ensureStopGroups();
     this.db = new Database(DB_PATH, { readonly: true });
+  }
+
+  private ensureStopGroups() {
+    const db = new Database(DB_PATH);
+    // Create table if missing
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS stop_groups (
+        stop_id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL
+      )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_stop_groups_group ON stop_groups(group_id)`);
+    // Populate if empty (handles both fresh DB and failed-import-left-empty-table)
+    const count = db.prepare('SELECT COUNT(*) as c FROM stop_groups').get() as any;
+    if (count.c === 0) {
+      db.exec(`
+        INSERT INTO stop_groups (stop_id, group_id)
+        SELECT s.stop_id, g.group_id
+        FROM stops s
+        JOIN (SELECT stop_name, MIN(stop_id) as group_id FROM stops GROUP BY stop_name) g
+          ON s.stop_name = g.stop_name
+      `);
+      const populated = db.prepare('SELECT COUNT(*) as c FROM stop_groups').get() as any;
+      console.log(`📦 Populated stop_groups (${populated.c} mappings)`);
+    }
+    db.close();
   }
 
   // Get all routes
@@ -185,27 +213,30 @@ class MARTADatabase {
     `).get(stopId) as Stop | null;
   }
 
-  // Get all stop IDs sharing the same name (paired directional stops)
+  // Get all stop IDs in the same group (paired directional stops at same location).
+  // Uses pre-computed stop_groups table instead of runtime stop_name subquery.
   getStopIdsByName(stopId: string): string[] {
     const ids = this.db.prepare(`
-      SELECT stop_id FROM stops
-      WHERE stop_name = (SELECT stop_name FROM stops WHERE stop_id = ?)
+      SELECT stop_id FROM stop_groups
+      WHERE group_id = (SELECT group_id FROM stop_groups WHERE stop_id = ?)
     `).all(stopId) as Array<{ stop_id: string }>;
-    return ids.map(r => r.stop_id);
+    // Fallback: if stop not in stop_groups (shouldn't happen), return the input
+    return ids.length > 0 ? ids.map(r => r.stop_id) : [stopId];
   }
 
-  // Get routes serving a stop (bus only, excludes rail)
-  // Merges routes from all paired stops (same name, opposite directions)
+  // Get routes serving a stop (bus only, excludes rail).
+  // Merges routes from all paired stops via stop_groups — single query.
   getRoutesForStop(stopId: string): Route[] {
-    const allIds = this.getStopIdsByName(stopId);
-    const placeholders = allIds.map(() => '?').join(',');
     const routes = this.db.prepare(`
       SELECT DISTINCT r.route_id, r.route_short_name, r.route_long_name, r.route_color, r.route_text_color
       FROM routes r
       JOIN route_stops rs ON r.route_id = rs.route_id
-      WHERE rs.stop_id IN (${placeholders})
+      WHERE rs.stop_id IN (
+        SELECT stop_id FROM stop_groups
+        WHERE group_id = (SELECT group_id FROM stop_groups WHERE stop_id = ?)
+      )
       ORDER BY CAST(r.route_short_name AS INTEGER), r.route_short_name
-    `).all(...allIds) as Route[];
+    `).all(stopId) as Route[];
     return routes.filter(r => !RAIL_ROUTES.has(r.route_short_name));
   }
 
@@ -310,71 +341,20 @@ class MARTADatabase {
     };
   }
 
-  // Find paired stops: same route, different direction, within ~150m of the given stop
-  getPairedStops(stopId: string, routeId: string): Array<{ stop_id: string; direction_id: number; trip_headsign: string }> {
-    const stop = this.getStop(stopId);
-    if (!stop) return [];
-
-    // Bounding box filter (~150m ≈ 0.0015° at Atlanta latitude)
-    const delta = 0.0015;
-    const latMin = stop.stop_lat - delta;
-    const latMax = stop.stop_lat + delta;
-    const lonMin = stop.stop_lon - delta;
-    const lonMax = stop.stop_lon + delta;
-
-    // Fast: get nearby stops on this route (no trip join — get headsign separately)
-    const nearbyStops = this.db.prepare(`
-      SELECT DISTINCT rs.stop_id, rs.direction_id, s.stop_lat, s.stop_lon
-      FROM route_stops rs
-      JOIN stops s ON rs.stop_id = s.stop_id
-      WHERE rs.route_id = ?
-        AND s.stop_lat BETWEEN ? AND ?
-        AND s.stop_lon BETWEEN ? AND ?
-    `).all(routeId, latMin, latMax, lonMin, lonMax) as Array<{
-      stop_id: string; direction_id: number; stop_lat: number; stop_lon: number;
-    }>;
-
-    // Haversine for precise 150m filter
-    const toRad = (d: number) => d * Math.PI / 180;
-    const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-      const dLat = toRad(lat2 - lat1);
-      const dLon = toRad(lon2 - lon1);
-      const a = Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-      return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    };
-
-    // Get headsign per direction (small separate query, much cheaper than joining in main query)
-    const hsRows = this.db.prepare(`
-      SELECT DISTINCT direction_id, trip_headsign FROM trips
-      WHERE route_id = ? AND trip_headsign != '' ORDER BY direction_id
-    `).all(routeId) as Array<{ direction_id: number; trip_headsign: string }>;
-    const headsigns: Record<number, string> = {};
-    for (const r of hsRows) {
-      if (!(r.direction_id in headsigns)) headsigns[r.direction_id] = r.trip_headsign;
-    }
-
-    return nearbyStops
-      .filter(rs => haversine(stop.stop_lat, stop.stop_lon, rs.stop_lat, rs.stop_lon) < 150)
-      .map(rs => ({
-        stop_id: rs.stop_id,
-        direction_id: rs.direction_id,
-        trip_headsign: headsigns[rs.direction_id] || 'Unknown',
-      }));
-  }
-
-  // Batch lookup scheduled arrival times for (stop_id, trip_id[]) pairs
+  // Batch lookup scheduled arrival times for (stop_id, trip_id[]) pairs.
+  // Uses stop_groups for paired stop resolution — single query.
   // Returns Map<tripId, arrival_time string> e.g. "14:52:00"
   getScheduledArrivals(stopId: string, tripIds: string[]): Map<string, string> {
     if (tripIds.length === 0) return new Map();
-    const allStopIds = this.getStopIdsByName(stopId);
-    const stopPlaceholders = allStopIds.map(() => '?').join(',');
     const tripPlaceholders = tripIds.map(() => '?').join(',');
     const rows = this.db.prepare(`
       SELECT trip_id, arrival_time 
       FROM stop_times 
-      WHERE stop_id IN (${stopPlaceholders}) AND trip_id IN (${tripPlaceholders})
-    `).all(...allStopIds, ...tripIds) as Array<{ trip_id: string; arrival_time: string }>;
+      WHERE stop_id IN (
+        SELECT stop_id FROM stop_groups
+        WHERE group_id = (SELECT group_id FROM stop_groups WHERE stop_id = ?)
+      ) AND trip_id IN (${tripPlaceholders})
+    `).all(stopId, ...tripIds) as Array<{ trip_id: string; arrival_time: string }>;
     const result = new Map<string, string>();
     for (const row of rows) {
       // For loop routes with duplicate (trip_id, stop_id), first row wins
@@ -453,10 +433,6 @@ export function getRouteHeadsigns(routeId: string): Record<number, string> {
 
 export function getStopWithRoutes(stopId: string) {
   return db.getStopWithRoutes(stopId);
-}
-
-export function getPairedStops(stopId: string, routeId: string) {
-  return db.getPairedStops(stopId, routeId);
 }
 
 export function getScheduledArrivals(stopId: string, tripIds: string[]): Map<string, string> {
