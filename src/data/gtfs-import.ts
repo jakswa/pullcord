@@ -5,7 +5,7 @@ import { createReadStream } from "fs";
 import path from "path";
 
 const GTFS_DIR = path.join(process.cwd(), "data", "gtfs");
-const DB_PATH = path.join(process.cwd(), "data", "marta.db");
+const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "data", "marta.db");
 
 class GTFSImporter {
   private db: Database;

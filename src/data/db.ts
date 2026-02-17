@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import path from "path";
 
-const DB_PATH = path.join(process.cwd(), "data", "marta.db");
+const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "data", "marta.db");
 
 interface Route {
   route_id: string;

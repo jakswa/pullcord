@@ -24,7 +24,7 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
 // Separate DB from GTFS (which is readonly)
 // ─────────────────────────────────────
 
-const CORD_DB_PATH = path.join(process.cwd(), 'data', 'cords.db');
+const CORD_DB_PATH = process.env.CORDS_DATABASE_URL || path.join(process.cwd(), 'data', 'cords.db');
 const db = new Database(CORD_DB_PATH);
 
 // WAL mode for concurrent reads during polls

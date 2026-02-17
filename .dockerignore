@@ -1,0 +1,9 @@
+node_modules
+.git
+data/*.db
+data/*.db-journal
+data/*.db-wal
+*.md
+docs/
+cron_scripts/
+.env
