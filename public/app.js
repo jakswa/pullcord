@@ -822,10 +822,10 @@ class PullcordApp {
 
     // Render compact SVG strip
     const w = strip.clientWidth || 340;
-    const h = 40;
+    const h = 44;
     const pad = 20;
     const uw = w - pad * 2;
-    const lineY = 16;
+    const lineY = 14;
     const x = (i) => pad + (i / (n - 1)) * uw;
 
     const busX = x(bestBusIdx + busFrac);
@@ -869,7 +869,7 @@ class PullcordApp {
 
     // Stops-away label centered below
     if (stopsText) {
-      svg += `<text x="${w/2}" y="${h - 2}" text-anchor="middle" fill="${labelFill}" font-size="11" font-weight="600" font-family="'JetBrains Mono',monospace" letter-spacing="0.5">${stopsText.toUpperCase()}</text>`;
+      svg += `<text x="${w/2}" y="${h - 2}" text-anchor="middle" fill="${labelFill}" font-size="13" font-weight="700" font-family="'JetBrains Mono',monospace" letter-spacing="0.5">${stopsText.toUpperCase()}</text>`;
     }
 
     svg += '</svg>';
