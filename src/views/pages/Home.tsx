@@ -12,7 +12,7 @@ export const HomePage = () => (
           </svg>
           <span class="home-wordmark">Pullcord</span>
         </div>
-        <p class="home-tagline">Pull the cord. Catch your ride.</p>
+        <p class="home-tagline">Pull the cord. Catch your ride. · <a href="/about" class="home-about-link">About</a></p>
 
         {/* Big location button — primary action */}
         <button id="location-btn" class="home-locate-btn">
@@ -59,7 +59,6 @@ export const HomePage = () => (
     {/* Footer */}
     <div class="home-footer">
       <p>Real-time MARTA bus tracking · data updates every 30s</p>
-      <p class="home-footer-sub"><a href="/about" class="home-footer-link">About Pullcord</a></p>
     </div>
   </div>
 );
