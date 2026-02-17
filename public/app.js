@@ -861,11 +861,13 @@ class PullcordApp {
       svg += `<circle cx="${x(i)}" cy="${lineY}" r="1.5" fill="${stopDot}"/>`;
     }
 
-    // My stop marker
-    svg += `<circle cx="${myX}" cy="${lineY}" r="5" fill="${rc}" stroke="${myStopStroke}" stroke-width="2"/>`;
+    // My stop — destination pin: larger, bold, unmistakable
+    svg += `<circle cx="${myX}" cy="${lineY}" r="6" fill="${rc}" stroke="${myStopStroke}" stroke-width="2.5"/>`;
+    svg += `<circle cx="${myX}" cy="${lineY}" r="2" fill="${myStopStroke}"/>`;
 
-    // Bus marker — square to distinguish from stop dots
-    svg += `<rect x="${busX - 5}" y="${lineY - 5}" width="10" height="10" rx="2" fill="${busFill}" stroke="${rc}" stroke-width="2" filter="url(#pg)"/>`;
+    // Bus — pulsing GPS-style dot with outer ring
+    svg += `<circle cx="${busX}" cy="${lineY}" r="7" fill="${rc}" opacity="0.2" filter="url(#pg)"/>`;
+    svg += `<circle cx="${busX}" cy="${lineY}" r="4" fill="${busFill}" stroke="${rc}" stroke-width="1.5"/>`;
 
     // Stops-away label centered below
     if (stopsText) {

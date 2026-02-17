@@ -38,13 +38,6 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
             <span class="d-live-time" id="last-updated"></span>
           </div>
         </div>
-        {!route && initialData.routes?.length > 0 && (
-          <div class="d-header-routes">
-            {initialData.routes.map((r: any) => (
-              <span class="d-badge-mini" style={`background:#${r.color}`}>{r.shortName}</span>
-            ))}
-          </div>
-        )}
       </header>
 
       {/* === Route tabs — other routes at this stop === */}
