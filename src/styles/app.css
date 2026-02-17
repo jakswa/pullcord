@@ -1894,6 +1894,30 @@
   margin-top: 0.1rem;
 }
 
+/* Updates */
+.about-update {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.about-update:last-child {
+  border-bottom: none;
+}
+
+.about-update-date {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.about-update-text {
+  color: var(--text-body);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 /* Footer */
 .about-footer {
   text-align: center;

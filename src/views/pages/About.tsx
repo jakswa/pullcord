@@ -135,6 +135,53 @@ export const AboutPage = () => (
         </div>
       </section>
 
+      {/* Updates */}
+      <section class="about-section">
+        <h2 class="about-h2">Updates</h2>
+
+        <div class="about-update">
+          <div class="about-update-date">Feb 17</div>
+          <div class="about-update-text">
+            ETAs for tracked buses are now computed from the bus's actual GPS position and the scheduled travel time between stops. MARTA's feed has a known issue where predicted times just tick forward with the clock instead of reflecting where the bus actually is. Ours use real position data. Also fixed: notifications now wake your phone properly instead of waiting for you to check it.
+          </div>
+        </div>
+
+        <div class="about-update">
+          <div class="about-update-date">Feb 16</div>
+          <div class="about-update-text">
+            Backend cleanup. Consolidated how we look up predictions so single-stop and multi-stop views use the same code path. Paired stops (same location, two IDs for each direction) now resolve correctly everywhere. Fewer bugs, same features.
+          </div>
+        </div>
+
+        <div class="about-update">
+          <div class="about-update-date">Feb 15</div>
+          <div class="about-update-text">
+            Search now finds routes by number — type "21" and it shows Route 21 stops. Fixed a bunch of edge cases with stops that serve multiple routes. Stability and accessibility work.
+          </div>
+        </div>
+
+        <div class="about-update">
+          <div class="about-update-date">Feb 14</div>
+          <div class="about-update-text">
+            "Pull the Cord" notifications are now reliable. They survive app restarts, fire even with your phone locked, and clean up after themselves. Replaced the janky browser notification API with real Web Push — your phone buzzes like a text message when your bus is close.
+          </div>
+        </div>
+
+        <div class="about-update">
+          <div class="about-update-date">Feb 13</div>
+          <div class="about-update-text">
+            Redesigned the tracker from scratch. The big countdown number, the progress strip showing your bus approaching, the direction-aware stop list — all new. Went through four design experiments and picked the best pieces from each. Added favorites so you can save your regular stops.
+          </div>
+        </div>
+
+        <div class="about-update">
+          <div class="about-update-date">Feb 12</div>
+          <div class="about-update-text">
+            Pullcord launched. Live bus positions on a map with ETA predictions for all 118 MARTA bus routes, built on GTFS real-time feeds. Find your stop by location or search, see what's coming.
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <div class="about-footer">
         <p>Made in Atlanta 🍑</p>
