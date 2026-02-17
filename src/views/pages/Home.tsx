@@ -59,7 +59,7 @@ export const HomePage = () => (
     {/* Footer */}
     <div class="home-footer">
       <p>Real-time MARTA bus tracking · data updates every 30s</p>
-      <p class="home-footer-sub"><a href="/about" style="color: inherit; text-decoration: underline; text-underline-offset: 2px; opacity: 0.7;">About Pullcord</a></p>
+      <p class="home-footer-sub"><a href="/about" class="home-footer-link">About Pullcord</a></p>
     </div>
   </div>
 );

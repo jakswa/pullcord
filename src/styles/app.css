@@ -1378,13 +1378,25 @@
   .home-footer {
     padding: 1rem;
     text-align: center;
-    color: var(--text-faint);
+    color: var(--text-muted);
     font-size: 0.7rem;
   }
 
   .home-footer-sub {
-    color: var(--text-dim);
+    color: var(--text-secondary);
     margin-top: 0.15rem;
+  }
+
+  .home-footer-link {
+    color: var(--text-secondary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-color: var(--border);
+    transition: color 0.15s;
+  }
+
+  .home-footer-link:active {
+    color: var(--brand);
   }
 
   /* ── Favorites ── */

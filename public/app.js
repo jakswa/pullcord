@@ -837,7 +837,7 @@ class PullcordApp {
     const stripLine = dark ? '#1e293b' : '#EDE5D8';
     const stopDot = dark ? '#334155' : '#D4C4B4';
     const myStopStroke = dark ? '#090e1a' : '#FFFFFF';
-    const labelFill = dark ? '#64748b' : '#9C8474';
+    const labelFill = dark ? '#94a3b8' : '#7C6354';
     const busFill = dark ? '#f8fafc' : '#3B2820';
 
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
