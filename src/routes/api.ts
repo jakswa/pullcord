@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRouteHeadsigns } from "../data/db.js";
 import { getVehicles, findArrivals, getStopArrivals } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
-import { getVapidPublicKey, registerCord, cancelCord, getActiveCordCount, testFireAll } from "../data/push.js";
+import { getVapidPublicKey, registerCord, cancelCord, cordExists, getActiveCordCount, testFireAll } from "../data/push.js";
 
 const app = new Hono();
 
@@ -261,6 +261,12 @@ app.post("/push/cord", async (c) => {
     console.error("Error registering cord:", error);
     return c.json({ error: "Failed to register cord" }, 500);
   }
+});
+
+// GET /api/push/cord/:id — check if cord exists (for client-side state sync)
+app.get("/push/cord/:id", (c) => {
+  const id = c.req.param("id");
+  return cordExists(id) ? c.json({ exists: true }) : c.json({ exists: false }, 404);
 });
 
 // DELETE /api/push/cord/:id — cancel a cord

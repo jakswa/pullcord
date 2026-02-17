@@ -134,6 +134,11 @@ export function cancelCord(id: string): boolean {
   return deleted;
 }
 
+export function cordExists(id: string): boolean {
+  const row = db.prepare('SELECT 1 FROM cords WHERE id = ?').get(id);
+  return !!row;
+}
+
 export function getActiveCordCount(): number {
   return (stmtCount.get() as { count: number }).count;
 }

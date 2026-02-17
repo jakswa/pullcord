@@ -1265,6 +1265,24 @@ class PullcordApp {
 
   checkPullCord() {
     if (!this.cordActive) return;
+
+    // Periodically verify cord still exists server-side (every 30s)
+    // Catches fired/expired cords that the client missed (e.g., notification clicked
+    // outside the app, or app was backgrounded when the push arrived)
+    const now = Date.now();
+    if (this.cordId && (!this._lastCordCheck || now - this._lastCordCheck > 30000)) {
+      this._lastCordCheck = now;
+      fetch(`/api/push/cord/${this.cordId}`, { method: 'HEAD' })
+        .then(res => {
+          if (res.status === 404) {
+            // Cord is gone — fired or expired
+            console.log('Cord no longer exists server-side, clearing local state');
+            this.cancelCord();
+          }
+        })
+        .catch(() => {}); // network error — leave state alone
+    }
+
     this.updateCordStatus();
   }
 
