@@ -826,7 +826,7 @@ class PullcordApp {
 
     // Render: bus pinned left, me pinned right, only between-stops shown
     const w = strip.clientWidth || 340;
-    const h = 44;
+    const h = 48;
     const pad = 28;
     const uw = w - pad * 2;
     const lineY = 14;

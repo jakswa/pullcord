@@ -595,9 +595,9 @@
      ────────────────────────────────── */
 
   .d-progress {
-    padding: 0.75rem 0.5rem 0.25rem;
+    padding: 0.75rem 0.5rem 0.5rem;
     flex-shrink: 0;
-    min-height: 48px;
+    min-height: 52px;
   }
 
   .d-progress-strip {
