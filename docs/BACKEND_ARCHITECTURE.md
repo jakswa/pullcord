@@ -112,6 +112,77 @@ Everything in one class: home page, tracker page, hero, progress strip, upcoming
 - Removed `getStopWithRoutes()` — defined but never imported
 - `mock.ts` kept — still used for `?mock` screenshot param
 
+### Phase 2b: stops.group_id replaces stop_groups table ✅ (b781c54)
+- Jake's call: column on stops is simpler than a join table
+- Dropped stop_groups table, added `stops.group_id` column
+- Auto-migration on startup (adds column + populates, drops old table)
+- -20 lines, one fewer table, same 6,611 groups
+
+---
+
+## Computed ETA Prototype (computed-eta branch)
+
+*2026-02-16 — prototype, not merged to main yet*
+
+### Problem
+MARTA's GTFS-RT trip update arrival times are "treadmill" predictions — they advance with wall clock rather than reflecting real vehicle progress. Our Feb 16 analysis of 12,828 samples confirmed this pattern.
+
+### Approach
+Replace MARTA's treadmill ETA with our own for active-tier vehicles:
+
+```
+ETA = scheduled_time[your_stop] - scheduled_time[bus_nearest_stop] - interpolation - staleness
+```
+
+One subtraction + two small corrections. No ML, no history, no complexity.
+
+### How it works
+1. **Vehicle position** — lat/lon from GTFS-RT vehicle positions feed (94% are ≤30s stale, median 20s)
+2. **Trip stop sequence** — ordered stops with scheduled arrival times from static GTFS
+3. **Snap to nearest stop** — linear scan of ~50 stops, pick closest by distance
+4. **Schedule delta** — subtract scheduled times (encodes all inter-stop travel time)
+5. **Segment interpolation** — if bus is between stops, estimate fraction covered, subtract proportional time
+6. **Staleness correction** — subtract `vehicle.timestamp` age from ETA (bus has been moving since GPS reading)
+
+### Architecture
+- `src/data/eta.ts` — pure computation function, no I/O, no dependencies
+- `public/eta.js` — same algorithm for client-side use (shared logic, not shared module)
+- Server: `findArrivals()` computes for push notifications
+- Client: `computeClientETAs()` computes for display after each poll
+- `etaSource` field: `'computed'` vs `'marta'` (API consumers can distinguish)
+- Falls back to MARTA predictions for next/scheduled tier (no vehicle position)
+
+### Data additions
+- `arrival_time` added to route detail stops payload (from representative trip per direction)
+- `getTripStopSequences(tripIds)` — batch query for trip stop sequences (one SQL call per poll)
+- `stops.group_id` used for paired stop resolution in ETA computation
+
+### What it doesn't do
+- No historical averaging or ML — pure schedule + position math
+- No bearing/speed extrapolation — MARTA's feed has unreliable values
+- No prediction for next/scheduled tier — needs trip updates or calendar-based discovery (see issue #11)
+
+### Commits
+- `4d36f30` — core implementation (eta.ts, client eta.js, findArrivals integration)
+- `17bd7ff` — cord UI desync fix (checkPullCord verifies cord existence server-side)
+- `8b0a942` — staleness correction (subtract vehicle position age from ETA)
+
+---
+
+## Known Quirks
+
+### Duplicate arrivals for same route at multi-route stops
+At busy stops (e.g., Five Points 600031), you can see two entries for the same route with nearly identical ETAs but different vehicles/trips. Example:
+
+```
+Route 21 | 7m | Kensington Station | vid=3650 | trip=10923849
+Route 21 | 7m | Kensington Station | vid=4684 | trip=10923834
+```
+
+This is **correct data, not a dedup bug** — two buses genuinely approaching at the same time. MARTA pre-assigns buses to their next trip before finishing their current one, so both show as "7 minutes to Kensington" even though both are still westbound.
+
+The UI doesn't distinguish them visually (no vehicle ID shown in arrival cards). Not a priority to fix but could add a bus identifier or collapse into "2 buses in ~7 min" in the future.
+
 ---
 
 ## What stays
