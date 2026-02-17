@@ -5,7 +5,7 @@ import { Database } from 'bun:sqlite';
 import webpush from 'web-push';
 import path from 'path';
 import { getPredictions } from './realtime.js';
-import { getTripLookup } from './db.js';
+import { getTripLookup, getRoute } from './db.js';
 
 // Configure VAPID
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || '';
@@ -226,7 +226,7 @@ export async function checkCords(
           sub,
           JSON.stringify({
             title: `🚌 Bus arriving in ~${mins} min!`,
-            body: `Route ${cord.route_id}${headsign} — head to your stop.`,
+            body: `Route ${getRoute(cord.route_id)?.route_short_name || cord.route_id}${headsign} — head to your stop.`,
             tag: `cord-${cord.id}`,
             url: `/bus?route=${cord.route_id}&stop=${cord.stop_id}&cordFired=${cord.id}`,
           }),
