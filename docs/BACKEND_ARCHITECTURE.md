@@ -91,24 +91,26 @@ Everything in one class: home page, tracker page, hero, progress strip, upcoming
 
 ---
 
-## Proposed Simplifications (pre-custom-ETA)
+## Completed Simplifications (2026-02-16)
 
-### Phase 1: Consolidate prediction paths
-1. Extract `findArrivalsAtStop(allStopIds, tripLookup, routeFilter?)` from realtime.ts
-2. Both `getPredictions` and `getStopArrivals` call it
-3. Include tier classification in the core function (pass vehicle positions)
-4. Adherence + dedup happen once, not twice
+### Phase 1: Consolidate prediction paths ✅ (41cffb5)
+- New `findArrivals(opts)` in realtime.ts — single function for all prediction paths
+- `getPredictions()` and `getStopArrivals()` are thin wrappers
+- Tier classification (active/next/scheduled) moved from api.ts into findArrivals
+- Adherence, dedup, paired stops handled once — ~80 lines of duplication eliminated
+- Fixed latent bug in push.ts (redundant paired-stop expansion loop)
 
-### Phase 2: Canonical stop groups
-1. During GTFS import, build `stop_groups` table: `(group_id, stop_id)`
-2. Group stops by name (or proximity + name match)
-3. All queries use `WHERE stop_id IN (SELECT stop_id FROM stop_groups WHERE group_id = ?)`
-4. Or simply: resolve to canonical group_id at API entry point, pass it through
+### Phase 2: Canonical stop groups ✅ (873a2dc)
+- `stop_groups` table: `(stop_id PK, group_id)` — built at import, auto-migrated on startup
+- 8724 stops → 6611 unique groups (2113 paired stops)
+- `getStopIdsByName()` → indexed stop_groups lookup (was: runtime stop_name subquery)
+- `getRoutesForStop()` → single query with stop_groups subquery (was: 2 queries)
+- `getScheduledArrivals()` → single query (was: 2 queries)
+- Removed dead `getPairedStops()` (60+ lines)
 
-### Phase 3: Clean dead code
-1. Remove `getPairedStops()` if unused
-2. Remove mock.ts if screenshots use real data now
-3. Audit `getStopWithRoutes()` — may be unused
+### Phase 3: Clean dead code ✅ (2df9b9f)
+- Removed `getStopWithRoutes()` — defined but never imported
+- `mock.ts` kept — still used for `?mock` screenshot param
 
 ---
 
