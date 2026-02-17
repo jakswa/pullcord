@@ -763,7 +763,7 @@ class PullcordApp {
 
     // Use the current hero prediction (respects tracked vehicle / direction)
     const hero = this.heroPrediction;
-    if (!hero || hero.tier === 'scheduled' || !hero.vehicleId) {
+    if (!hero || hero.tier === 'scheduled' || hero.tier === 'next' || !hero.vehicleId) {
       this.renderEmptyStrip(strip, label);
       return;
     }
