@@ -902,10 +902,20 @@ class PullcordApp {
           this.updateDirectionUrl(dir);
         }
 
-        // Re-render everything with new hero (hero is sticky, no scroll needed)
-        this.renderHero(this.lastPredictions);
-        this.renderProgressStrip(this.lastPredictions, this.lastVehicles);
-        this.renderUpcoming(this.lastPredictions);
+        // Load route data if hero switched to a different route (multi-route)
+        const newRouteId = row.dataset.route || null;
+        if (this.multiRoute && newRouteId && newRouteId !== this.loadedRouteId) {
+          this.loadRouteData(newRouteId).then(() => {
+            this.renderHero(this.lastPredictions);
+            this.renderProgressStrip(this.lastPredictions, this.lastVehicles);
+            this.renderUpcoming(this.lastPredictions);
+          });
+        } else {
+          // Re-render everything with new hero (hero is sticky, no scroll needed)
+          this.renderHero(this.lastPredictions);
+          this.renderProgressStrip(this.lastPredictions, this.lastVehicles);
+          this.renderUpcoming(this.lastPredictions);
+        }
       });
     });
   }
