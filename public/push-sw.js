@@ -24,22 +24,24 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const path = event.notification.data?.url || '/';
-  // Build full URL — Firefox needs absolute URLs for openWindow
   const fullUrl = new URL(path, self.location.origin).href;
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Try to reuse an existing Pullcord tab
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windowClients) => {
+      // Try to focus an existing Pullcord tab and navigate it
       for (const client of windowClients) {
-        try {
-          if (client.url.startsWith(self.location.origin) && 'navigate' in client) {
-            return client.navigate(fullUrl).then(() => client.focus());
+        if (client.url.startsWith(self.location.origin)) {
+          try {
+            await client.focus();
+            // Post message to navigate — more reliable than client.navigate() on Chrome Android
+            client.postMessage({ type: 'navigate', url: fullUrl });
+            return;
+          } catch (e) {
+            // focus() can throw if not allowed — fall through
           }
-        } catch (e) {
-          // Some browsers throw on navigate — fall through to openWindow
         }
       }
-      // No existing tab or navigate failed — open new one
+      // No existing tab — open new one
       return clients.openWindow(fullUrl);
     })
   );

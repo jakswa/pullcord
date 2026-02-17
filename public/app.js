@@ -46,6 +46,15 @@ class PullcordApp {
     const page = this.detectPage();
     if (page === 'home') this.initHomePage();
     else if (page === 'tracker') this.initTrackerPage();
+
+    // Listen for SW navigation messages (notification click → navigate)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'navigate' && event.data.url) {
+          window.location.href = event.data.url;
+        }
+      });
+    }
   }
 
   detectPage() {
