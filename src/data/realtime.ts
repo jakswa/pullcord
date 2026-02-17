@@ -1,6 +1,7 @@
 import { load } from "protobufjs";
 import path from "path";
-import { getScheduledArrivals, getStopIdsByName } from "./db";
+import { getScheduledArrivals, getStopIdsByName, getTripStopSequences } from "./db";
+import { computeETA, parseTimeToSec, type TripStop } from "./eta";
 
 const VEHICLE_POSITIONS_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb";
 const TRIP_UPDATES_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb";
@@ -42,6 +43,7 @@ interface ArrivalPrediction {
   staleSeconds: number;
   tier?: string;
   adherenceSec?: number | null;
+  etaSource?: 'marta' | 'computed'; // 'computed' = vehicle position + schedule deltas
   // Route enrichment — present when routeInfo provided
   routeId?: string;
   routeShortName?: string;
@@ -339,6 +341,45 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
         }
       }
       delete (arr as any)._rtArrivalSec;
+    }
+  }
+
+  // Computed ETA: for active-tier vehicles with known positions, replace MARTA's
+  // treadmill ETA with our own based on vehicle position + scheduled inter-stop deltas.
+  if (vehicles && vehicles.length > 0) {
+    // Build vehicle position lookup
+    const vehiclePos = new Map(vehicles.map(v => [v.vehicleId, v]));
+
+    // Collect tripIds that have active vehicles
+    const activeTripIdsForETA = arrivals
+      .filter(a => a.tier === 'active' && a.tripId && a.vehicleId && vehiclePos.has(a.vehicleId))
+      .map(a => a.tripId!);
+
+    if (activeTripIdsForETA.length > 0) {
+      // One batch query for all trip stop sequences
+      const tripStopSeqs = getTripStopSequences(activeTripIdsForETA);
+
+      for (const arr of arrivals) {
+        if (arr.tier !== 'active' || !arr.tripId || !arr.vehicleId) continue;
+        const veh = vehiclePos.get(arr.vehicleId);
+        const rawStops = tripStopSeqs.get(arr.tripId);
+        if (!veh || !rawStops) continue;
+
+        // Convert to TripStop format
+        const tripStops: TripStop[] = rawStops.map(s => ({
+          stop_id: s.stop_id,
+          lat: s.lat,
+          lon: s.lon,
+          sequence: s.sequence,
+          arrivalSec: parseTimeToSec(s.arrival_time),
+        }));
+
+        const eta = computeETA(veh.lat, veh.lon, tripStops, allStopIds);
+        if (eta !== null) {
+          arr.etaSeconds = eta;
+          arr.etaSource = 'computed';
+        }
+      }
     }
   }
 

@@ -79,6 +79,7 @@ export const Layout = (props: LayoutProps) => {
         ></script>
 
         {/* App JS */}
+        <script src="/public/eta.js"></script>
         <script src="/public/app.js"></script>
 
         {/* Push SW is registered on-demand by Pull the Cord — no page-load SW */}

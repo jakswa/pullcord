@@ -41,6 +41,7 @@ interface RouteStop {
   stop_lat: number;
   stop_lon: number;
   stop_sequence?: number;
+  arrival_time?: string; // HH:MM:SS from representative trip (for inter-stop deltas)
 }
 
 interface RouteDetail {
@@ -277,7 +278,8 @@ class MARTADatabase {
           s.stop_name,
           s.stop_lat,
           s.stop_lon,
-          st.stop_sequence
+          st.stop_sequence,
+          st.arrival_time
         FROM stop_times st
         JOIN stops s ON st.stop_id = s.stop_id
         WHERE st.trip_id = ?
@@ -341,6 +343,29 @@ class MARTADatabase {
       if (!result.has(row.trip_id)) {
         result.set(row.trip_id, row.arrival_time);
       }
+    }
+    return result;
+  }
+
+  // Get stop sequences with times and positions for a set of trips (for ETA computation).
+  // Returns Map<tripId, [{stop_id, lat, lon, sequence, arrival_time}]>
+  getTripStopSequences(tripIds: string[]): Map<string, Array<{ stop_id: string; lat: number; lon: number; sequence: number; arrival_time: string }>> {
+    if (tripIds.length === 0) return new Map();
+    const placeholders = tripIds.map(() => '?').join(',');
+    const rows = this.db.prepare(`
+      SELECT st.trip_id, st.stop_id, s.stop_lat as lat, s.stop_lon as lon,
+             st.stop_sequence as sequence, st.arrival_time
+      FROM stop_times st
+      JOIN stops s ON st.stop_id = s.stop_id
+      WHERE st.trip_id IN (${placeholders})
+      ORDER BY st.trip_id, st.stop_sequence
+    `).all(...tripIds) as Array<{ trip_id: string; stop_id: string; lat: number; lon: number; sequence: number; arrival_time: string }>;
+
+    const result = new Map<string, Array<{ stop_id: string; lat: number; lon: number; sequence: number; arrival_time: string }>>();
+    for (const row of rows) {
+      let list = result.get(row.trip_id);
+      if (!list) { list = []; result.set(row.trip_id, list); }
+      list.push({ stop_id: row.stop_id, lat: row.lat, lon: row.lon, sequence: row.sequence, arrival_time: row.arrival_time });
     }
     return result;
   }
@@ -413,6 +438,10 @@ export function getRouteHeadsigns(routeId: string): Record<number, string> {
 
 export function getScheduledArrivals(stopId: string, tripIds: string[]): Map<string, string> {
   return db.getScheduledArrivals(stopId, tripIds);
+}
+
+export function getTripStopSequences(tripIds: string[]) {
+  return db.getTripStopSequences(tripIds);
 }
 
 export type { Route, Stop, Trip, RouteStop, RouteDetail };

@@ -117,7 +117,8 @@ app.get("/bus", async (c) => {
         lat: s.stop_lat,
         lon: s.stop_lon,
         direction: s.direction_id,
-        sequence: s.stop_sequence ?? 0
+        sequence: s.stop_sequence ?? 0,
+        arrivalTime: s.arrival_time ?? null
       })),
       timestamp: Date.now()
     };

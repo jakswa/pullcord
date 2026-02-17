@@ -382,7 +382,7 @@ class PullcordApp {
     }
   }
 
-  // Pre-compute direction stop lists for progress strip
+  // Pre-compute direction stop lists for progress strip + ETA computation
   prepareStopDirections() {
     const stops = this.data.stops || [];
     const myId = this.data.stop.id;
@@ -393,7 +393,12 @@ class PullcordApp {
     stops.forEach(s => {
       const d = String(s.direction);
       if (!this.dirStops[d]) this.dirStops[d] = [];
-      this.dirStops[d].push(s);
+      // Parse arrivalTime once for ETA computation
+      const entry = { ...s };
+      if (s.arrivalTime && typeof parseTimeToSec === 'function') {
+        entry.arrivalSec = parseTimeToSec(s.arrivalTime);
+      }
+      this.dirStops[d].push(entry);
     });
 
     // Sort each direction by sequence (from GTFS stop_times)
@@ -411,6 +416,41 @@ class PullcordApp {
       }
       if (idx !== -1) this.myStopDirections[dir] = idx;
     }
+  }
+
+  // ── Client-side computed ETA ──
+  // For active-tier vehicles with known positions, compute ETA from
+  // vehicle position + scheduled inter-stop deltas. Falls back to
+  // server-provided ETA if computation fails.
+  computeClientETAs() {
+    if (typeof computeClientETA !== 'function') return;
+    if (!this.lastVehicles || !this.lastPredictions || !this.dirStops) return;
+
+    const vehicleMap = new Map(this.lastVehicles.map(v => [v.vehicleId, v]));
+
+    for (const pred of this.lastPredictions) {
+      // Only compute for active vehicles (on the road, current trip)
+      if (pred.tier !== 'active' || !pred.vehicleId) continue;
+      const veh = vehicleMap.get(pred.vehicleId);
+      if (!veh) continue;
+
+      // Find the direction stops for this vehicle's direction
+      const dir = String(pred.directionId);
+      const stops = this.dirStops[dir];
+      if (!stops || stops.length < 2 || !stops[0].arrivalSec) continue;
+
+      const eta = computeClientETA(
+        veh.lat, veh.lon, stops,
+        this.data.stop.id, this.data.stop.name
+      );
+      if (eta !== null) {
+        pred.etaSeconds = eta;
+        pred.etaSource = 'computed';
+      }
+    }
+
+    // Re-sort by ETA after recomputation
+    this.lastPredictions.sort((a, b) => a.etaSeconds - b.etaSeconds);
   }
 
   // ── Refresh Bar ──
@@ -463,6 +503,9 @@ class PullcordApp {
         const predictionsData = await pRes.json();
         this.lastVehicles = vehiclesData.vehicles || [];
         this.lastPredictions = predictionsData.predictions || [];
+
+        // Client-side computed ETA for active vehicles with known positions
+        this.computeClientETAs();
       }
 
       this.renderHero(this.lastPredictions);
