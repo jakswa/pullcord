@@ -4,8 +4,8 @@
 import { Database } from 'bun:sqlite';
 import webpush from 'web-push';
 import path from 'path';
-import { getVehicles, getPredictions } from './realtime.js';
-import { getTripLookup, getPairedStops } from './db.js';
+import { getPredictions } from './realtime.js';
+import { getTripLookup } from './db.js';
 
 // Configure VAPID
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || '';
@@ -275,19 +275,9 @@ async function pollForCords() {
   for (const { route_id, stop_id } of groups) {
     try {
       const tripLookup = getTripLookup(route_id);
-      const pairedStops = getPairedStops(stop_id, route_id);
-      const stopIds = pairedStops.length > 0
-        ? pairedStops.map(ps => ps.stop_id)
-        : [stop_id];
-
-      const allPreds: Array<{ vehicleId?: string; tripId?: string; directionId?: number; etaSeconds: number; headsign?: string }> = [];
-      for (const sid of [...new Set(stopIds)]) {
-        const preds = await getPredictions(route_id, sid, tripLookup);
-        allPreds.push(...preds);
-      }
-      allPreds.sort((a, b) => a.etaSeconds - b.etaSeconds);
-
-      await checkCords(route_id, stop_id, allPreds);
+      // getPredictions handles paired stops internally via getStopIdsByName()
+      const preds = await getPredictions(route_id, stop_id, tripLookup);
+      await checkCords(route_id, stop_id, preds);
     } catch (err) {
       console.error(`Cord poll error for ${route_id}/${stop_id}:`, err);
     }

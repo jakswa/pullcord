@@ -20,6 +20,7 @@ interface VehiclePosition {
   staleSeconds: number;
 }
 
+// Legacy type — kept for backward compatibility. Identical to ArrivalPrediction.
 interface PredictionUpdate {
   vehicleId?: string;
   tripId?: string;
@@ -28,7 +29,31 @@ interface PredictionUpdate {
   etaSeconds: number;
   staleSeconds: number;
   tier?: string;
-  adherenceSec?: number; // positive = late, negative = early, null = unknown
+  adherenceSec?: number | null; // positive = late, negative = early, null = unknown
+}
+
+// Unified prediction type returned by findArrivals()
+interface ArrivalPrediction {
+  vehicleId?: string;
+  tripId?: string;
+  headsign?: string;
+  directionId?: number;
+  etaSeconds: number;
+  staleSeconds: number;
+  tier?: string;
+  adherenceSec?: number | null;
+  // Route enrichment — present when routeInfo provided
+  routeId?: string;
+  routeShortName?: string;
+  routeColor?: string;
+}
+
+interface FindArrivalsOptions {
+  stopId: string;
+  tripLookup: Map<string, any>;
+  routeFilter?: Set<string>;  // only include these route IDs (undefined = all in tripLookup)
+  routeInfo?: Map<string, { route_short_name: string; route_color: string }>;
+  vehicles?: VehiclePosition[];  // provide for tier classification
 }
 
 interface CachedData<T> {
@@ -184,87 +209,13 @@ class RealtimeDataService {
       });
   }
 
-  async getPredictions(routeId: string, stopId: string, tripLookup: Map<string, any>): Promise<PredictionUpdate[]> {
-    const entities = await this.getTripUpdates();
-    const timestamp = Date.now();
-    // Check all paired stop IDs (same physical location, different directions)
-    const allStopIds = new Set(getStopIdsByName(stopId));
-
-    // Collect predictions with raw RT arrival timestamps for adherence computation
-    const predictions: (PredictionUpdate & { _rtArrivalSec?: number })[] = [];
-
-    for (const entity of entities) {
-      if (!entity.tripUpdate?.trip?.tripId) continue;
-      
-      const tripId = entity.tripUpdate.trip.tripId;
-      const trip = tripLookup.get(tripId);
-      
-      if (trip?.route_id !== routeId) continue;
-
-      const stopTimeUpdates = entity.tripUpdate.stopTimeUpdate || [];
-      for (const stu of stopTimeUpdates) {
-        if (!allStopIds.has(stu.stopId)) continue;
-
-        // Use arrival or departure time
-        const timeUpdate = stu.arrival || stu.departure;
-        if (!timeUpdate?.time) continue;
-
-        const rtArrivalSec = parseInt(timeUpdate.time);
-        const etaTimestamp = rtArrivalSec * 1000;
-        const rawEtaSeconds = Math.floor((etaTimestamp - timestamp) / 1000);
-        
-        // Skip predictions more than 2 minutes past due — the bus likely already passed
-        if (rawEtaSeconds < -120) continue;
-        
-        const etaSeconds = Math.max(0, rawEtaSeconds);
-        
-        // Calculate staleness from trip update timestamp
-        const updateTimestamp = entity.tripUpdate.timestamp ? 
-          parseInt(entity.tripUpdate.timestamp) * 1000 : timestamp;
-        const staleSeconds = Math.floor((timestamp - updateTimestamp) / 1000);
-
-        predictions.push({
-          headsign: trip.trip_headsign || "Unknown Destination",
-          directionId: trip.direction_id,
-          vehicleId: entity.tripUpdate.vehicle?.id || undefined,
-          tripId,
-          etaSeconds,
-          staleSeconds,
-          _rtArrivalSec: rtArrivalSec
-        });
-      }
-    }
-
-    // Batch lookup scheduled arrivals and compute adherence
-    const tripIds = predictions.map(p => p.tripId).filter(Boolean) as string[];
-    if (tripIds.length > 0) {
-      const scheduled = getScheduledArrivals(stopId, tripIds);
-      for (const pred of predictions) {
-        if (pred.tripId && pred._rtArrivalSec) {
-          const schedTime = scheduled.get(pred.tripId);
-          if (schedTime) {
-            pred.adherenceSec = computeAdherenceSec(pred._rtArrivalSec, schedTime);
-          }
-        }
-        delete (pred as any)._rtArrivalSec;
-      }
-    }
-
-    // Deduplicate by tripId (paired stops can match same trip twice)
-    const seen = new Set<string>();
-    const deduped = predictions.filter(p => {
-      if (!p.tripId || !seen.has(p.tripId)) {
-        if (p.tripId) seen.add(p.tripId);
-        return true;
-      }
-      return false;
-    });
-
-    // Sort by ETA
-    deduped.sort((a, b) => a.etaSeconds - b.etaSeconds);
-    return deduped;
-  }
 }
+
+// ─────────────────────────────────────
+// SHARED CORE: findArrivals()
+// Single function for all prediction paths — single-route, multi-route, with or without tiers.
+// Handles: paired stops, ETA, staleness, adherence, dedup, tier classification.
+// ─────────────────────────────────────
 
 // Compute schedule adherence: positive = late, negative = early
 // Returns null if delta is unreasonable (>30 min, likely midnight edge case)
@@ -291,76 +242,92 @@ function computeAdherenceSec(rtArrivalSec: number, scheduledTimeStr: string): nu
 // Singleton instance
 const realtimeService = new RealtimeDataService();
 
-// Export async functions that use the singleton
-export async function getVehicles(routeId: string, tripLookup: Map<string, any>): Promise<VehiclePosition[]> {
-  return realtimeService.getVehicles(routeId, tripLookup);
-}
+async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPrediction[]> {
+  const { stopId, tripLookup, routeFilter, routeInfo, vehicles } = opts;
 
-export async function getPredictions(routeId: string, stopId: string, tripLookup: Map<string, any>): Promise<PredictionUpdate[]> {
-  return realtimeService.getPredictions(routeId, stopId, tripLookup);
-}
-
-// Multi-route arrivals for a stop
-export interface StopArrival extends PredictionUpdate {
-  routeId: string;
-  routeShortName: string;
-  routeColor: string;
-  adherenceSec?: number;
-}
-
-export async function getStopArrivals(
-  stopId: string,
-  routes: Array<{ route_id: string; route_short_name: string; route_color: string }>,
-  tripLookup: Map<string, any>
-): Promise<StopArrival[]> {
-  const routeMap = new Map(routes.map(r => [r.route_id, r]));
-  // Check all paired stop IDs (same physical location, different directions)
+  // Paired stop resolution — one place, every path
   const allStopIds = new Set(getStopIdsByName(stopId));
+
   const entities = await realtimeService.getTripUpdates();
   const timestamp = Date.now();
-  const arrivals: (StopArrival & { _rtArrivalSec?: number })[] = [];
+
+  // Vehicle lookup for tier classification (when vehicles provided)
+  let activeVehicleIds: Set<string> | undefined;
+  let activeTripIds: Set<string> | undefined;
+  if (vehicles) {
+    activeVehicleIds = new Set(vehicles.map(v => v.vehicleId));
+    activeTripIds = new Set(vehicles.map(v => v.tripId));
+  }
+
+  const arrivals: (ArrivalPrediction & { _rtArrivalSec?: number })[] = [];
 
   for (const entity of entities) {
     if (!entity.tripUpdate?.trip?.tripId) continue;
+
     const tripId = entity.tripUpdate.trip.tripId;
     const trip = tripLookup.get(tripId);
-    if (!trip || !routeMap.has(trip.route_id)) continue;
+    if (!trip) continue;
 
-    const route = routeMap.get(trip.route_id)!;
+    // Route filter
+    if (routeFilter && !routeFilter.has(trip.route_id)) continue;
+
     const stopTimeUpdates = entity.tripUpdate.stopTimeUpdate || [];
     for (const stu of stopTimeUpdates) {
       if (!allStopIds.has(stu.stopId)) continue;
+
       const timeUpdate = stu.arrival || stu.departure;
       if (!timeUpdate?.time) continue;
 
       const rtArrivalSec = parseInt(timeUpdate.time);
       const etaTimestamp = rtArrivalSec * 1000;
       const rawEtaSeconds = Math.floor((etaTimestamp - timestamp) / 1000);
-      
-      // Skip predictions more than 2 minutes past due
+
+      // Skip predictions more than 2 minutes past due — bus likely already passed
       if (rawEtaSeconds < -120) continue;
-      
+
       const etaSeconds = Math.max(0, rawEtaSeconds);
       const updateTimestamp = entity.tripUpdate.timestamp
         ? parseInt(entity.tripUpdate.timestamp) * 1000 : timestamp;
       const staleSeconds = Math.floor((timestamp - updateTimestamp) / 1000);
 
-      arrivals.push({
-        headsign: trip.trip_headsign || "Unknown",
+      const vehicleId = entity.tripUpdate.vehicle?.id || undefined;
+
+      // Tier classification (when vehicle positions available)
+      let tier: string | undefined;
+      if (activeVehicleIds && activeTripIds) {
+        if (vehicleId && activeVehicleIds.has(vehicleId) && activeTripIds.has(tripId)) {
+          tier = 'active';
+        } else if (vehicleId && activeVehicleIds.has(vehicleId)) {
+          tier = 'next';
+        } else {
+          tier = 'scheduled';
+        }
+      }
+
+      const arrival: ArrivalPrediction & { _rtArrivalSec?: number } = {
+        headsign: trip.trip_headsign || 'Unknown Destination',
         directionId: trip.direction_id,
-        vehicleId: entity.tripUpdate.vehicle?.id || undefined,
+        vehicleId,
         tripId,
         etaSeconds,
         staleSeconds,
-        routeId: trip.route_id,
-        routeShortName: route.route_short_name,
-        routeColor: route.route_color,
-        _rtArrivalSec: rtArrivalSec
-      });
+        tier,
+        _rtArrivalSec: rtArrivalSec,
+      };
+
+      // Route enrichment (multi-route mode)
+      if (routeInfo) {
+        const ri = routeInfo.get(trip.route_id);
+        arrival.routeId = trip.route_id;
+        arrival.routeShortName = ri?.route_short_name;
+        arrival.routeColor = ri?.route_color;
+      }
+
+      arrivals.push(arrival);
     }
   }
 
-  // Batch lookup scheduled arrivals and compute adherence
+  // Batch adherence lookup
   const tripIds = arrivals.map(a => a.tripId).filter(Boolean) as string[];
   if (tripIds.length > 0) {
     const scheduled = getScheduledArrivals(stopId, tripIds);
@@ -375,7 +342,7 @@ export async function getStopArrivals(
     }
   }
 
-    // Deduplicate by tripId (paired stops can match same trip twice)
+  // Dedup by tripId (paired stops can match same trip from both directions)
   const seen = new Set<string>();
   const deduped = arrivals.filter(a => {
     if (!a.tripId || !seen.has(a.tripId)) {
@@ -389,4 +356,48 @@ export async function getStopArrivals(
   return deduped;
 }
 
-export type { VehiclePosition, PredictionUpdate };
+// ─────────────────────────────────────
+// PUBLIC API — thin wrappers over findArrivals()
+// ─────────────────────────────────────
+
+export async function getVehicles(routeId: string, tripLookup: Map<string, any>): Promise<VehiclePosition[]> {
+  return realtimeService.getVehicles(routeId, tripLookup);
+}
+
+// Single-route predictions (no tier classification — use findArrivals directly for tiers)
+export async function getPredictions(routeId: string, stopId: string, tripLookup: Map<string, any>): Promise<PredictionUpdate[]> {
+  return findArrivals({
+    stopId,
+    tripLookup,
+    routeFilter: new Set([routeId]),
+  });
+}
+
+// Multi-route arrivals for a stop
+export interface StopArrival extends PredictionUpdate {
+  routeId: string;
+  routeShortName: string;
+  routeColor: string;
+}
+
+export async function getStopArrivals(
+  stopId: string,
+  routes: Array<{ route_id: string; route_short_name: string; route_color: string }>,
+  tripLookup: Map<string, any>
+): Promise<StopArrival[]> {
+  const routeInfo = new Map(
+    routes.map(r => [r.route_id, { route_short_name: r.route_short_name, route_color: r.route_color }])
+  );
+  const arrivals = await findArrivals({
+    stopId,
+    tripLookup,
+    routeFilter: new Set(routes.map(r => r.route_id)),
+    routeInfo,
+  });
+  return arrivals as StopArrival[];
+}
+
+// Direct access to the shared core — for callers that need tier classification or custom options
+export { findArrivals };
+
+export type { VehiclePosition, PredictionUpdate, ArrivalPrediction };

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRouteHeadsigns } from "../data/db.js";
-import { getVehicles, getPredictions, getStopArrivals } from "../data/realtime.js";
+import { getVehicles, findArrivals, getStopArrivals } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
 import { getVapidPublicKey, registerCord, cancelCord, getActiveCordCount, testFireAll } from "../data/push.js";
 
@@ -172,27 +172,16 @@ app.get("/predictions/:routeId/:stopId", async (c) => {
 
     const tripLookup = getTripLookup(route.route_id);
     
-    // Get vehicle positions to classify prediction tiers
+    // Get vehicle positions for tier classification
     const vehicles = await getVehicles(route.route_id, tripLookup);
-    const activeVehicleIds = new Set(vehicles.map(v => v.vehicleId));
-    const activeTripIds = new Set(vehicles.map(v => v.tripId));
     
-    // getPredictions already merges paired stops (same name, opposite directions)
-    const allPredictions = await getPredictions(route.route_id, stopId, tripLookup);
-    
-    // Classify each prediction into tiers
-    for (const pred of allPredictions) {
-      if (pred.vehicleId && activeVehicleIds.has(pred.vehicleId) && pred.tripId && activeTripIds.has(pred.tripId)) {
-        pred.tier = 'active';  // Bus on the road, this is its current trip
-      } else if (pred.vehicleId && activeVehicleIds.has(pred.vehicleId)) {
-        pred.tier = 'next';    // Bus exists but this is its future trip
-      } else {
-        pred.tier = 'scheduled'; // No bus assigned yet
-      }
-    }
-    
-    // Sort by ETA
-    allPredictions.sort((a, b) => a.etaSeconds - b.etaSeconds);
+    // findArrivals handles: paired stops, ETA, staleness, adherence, dedup, tier classification
+    const allPredictions = await findArrivals({
+      stopId,
+      tripLookup,
+      routeFilter: new Set([route.route_id]),
+      vehicles,
+    });
 
     return c.json({
       stop: {
