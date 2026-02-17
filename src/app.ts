@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import homeRoutes from "./routes/home.js";
 import busRoutes from "./routes/bus.js";
+import aboutRoutes from "./routes/about.js";
 import apiRoutes from "./routes/api.js";
 type Env = {
   Variables: {
@@ -31,6 +32,7 @@ app.route("/api", apiRoutes);
 // Page routes
 app.route("/", homeRoutes);
 app.route("/", busRoutes);
+app.route("/", aboutRoutes);
 
 // Serve push SW from root scope (SW scope = path of the file)
 app.get("/push-sw.js", async (c) => {
