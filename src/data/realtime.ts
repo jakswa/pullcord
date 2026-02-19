@@ -44,6 +44,7 @@ interface ArrivalPrediction {
   tier?: string;
   adherenceSec?: number | null;
   etaSource?: 'marta' | 'computed'; // 'computed' = vehicle position + schedule deltas
+  martaEtaSeconds?: number; // original MARTA ETA before computed override (for comparison)
   // Route enrichment — present when routeInfo provided
   routeId?: string;
   routeShortName?: string;
@@ -376,6 +377,7 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
 
         const eta = computeETA(veh.lat, veh.lon, tripStops, allStopIds, veh.staleSeconds);
         if (eta !== null) {
+          arr.martaEtaSeconds = arr.etaSeconds; // preserve MARTA's original for comparison
           arr.etaSeconds = eta;
           arr.etaSource = 'computed';
         }

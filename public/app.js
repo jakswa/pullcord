@@ -30,6 +30,8 @@ class PullcordApp {
     this.cordVehicleId = null;
     this.cordDirectionId = null;
     this.cordRouteId = null;
+    this.cordStopId = null;
+    this.cordStopName = null;
 
     // Timers
     this.pollTimer = null;
@@ -1190,6 +1192,8 @@ class PullcordApp {
       this.cordVehicleId = this.heroPrediction.vehicleId || null;
       this.cordDirectionId = this.heroPrediction.directionId ?? this.selectedDirection ?? null;
       this.cordRouteId = this.heroPrediction.routeId || this.config.routeId;
+      this.cordStopId = this.config.stopId;
+      this.cordStopName = this.data?.stop?.name || this.config.stopId;
 
       // Persist to sessionStorage (survives page refresh)
       try {
@@ -1197,6 +1201,7 @@ class PullcordApp {
           cordId, threshold: thresholdMinutes,
           tripId: this.cordTripId, vehicleId: this.cordVehicleId,
           directionId: this.cordDirectionId, routeId: this.cordRouteId,
+          stopId: this.cordStopId, stopName: this.cordStopName,
         }));
       } catch (e) { /* private mode / quota */ }
 
@@ -1224,6 +1229,8 @@ class PullcordApp {
     this.cordVehicleId = null;
     this.cordDirectionId = null;
     this.cordRouteId = null;
+    this.cordStopId = null;
+    this.cordStopName = null;
     try { sessionStorage.removeItem('pullcord_cord'); } catch (e) {}
 
     const cordIdle = document.getElementById('cord-idle');
@@ -1249,6 +1256,8 @@ class PullcordApp {
       this.cordVehicleId = saved.vehicleId || null;
       this.cordDirectionId = saved.directionId ?? null;
       this.cordRouteId = saved.routeId || null;
+      this.cordStopId = saved.stopId || null;
+      this.cordStopName = saved.stopName || saved.stopId || null;
 
       const cordIdle = document.getElementById('cord-idle');
       const activeDisplay = document.getElementById('cord-active-display');
@@ -1261,19 +1270,28 @@ class PullcordApp {
     const statusText = document.getElementById('cord-status-text');
     if (!statusText || !this.cordActive) return;
 
-    // Find prediction matching cord context (trip-first, same priority as server)
-    const preds = this.lastPredictions;
-    let pred;
-    if (this.cordTripId) pred = preds.find(p => p.tripId === this.cordTripId);
-    if (!pred && this.cordVehicleId) pred = preds.find(p => p.vehicleId === this.cordVehicleId);
-    if (!pred && this.cordDirectionId != null) pred = preds.find(p => p.directionId === this.cordDirectionId);
-    if (!pred && preds.length > 0) pred = preds[0];
+    // Only use local predictions if we're viewing the cord's stop
+    const onCordStop = this.cordStopId && this.config.stopId === this.cordStopId;
 
-    if (pred) {
-      const mins = Math.floor(pred.etaSeconds / 60);
-      statusText.textContent = `${this.cordThreshold}m alert · bus ${mins}m away`;
+    if (onCordStop) {
+      // Find prediction matching cord context (trip-first, same priority as server)
+      const preds = this.lastPredictions;
+      let pred;
+      if (this.cordTripId) pred = preds.find(p => p.tripId === this.cordTripId);
+      if (!pred && this.cordVehicleId) pred = preds.find(p => p.vehicleId === this.cordVehicleId);
+      if (!pred && this.cordDirectionId != null) pred = preds.find(p => p.directionId === this.cordDirectionId);
+      if (!pred && preds.length > 0) pred = preds[0];
+
+      if (pred) {
+        const mins = Math.floor(pred.etaSeconds / 60);
+        statusText.textContent = `${this.cordThreshold}m alert · bus ${mins}m away`;
+      } else {
+        statusText.textContent = `${this.cordThreshold}m alert · waiting for bus`;
+      }
     } else {
-      statusText.textContent = `${this.cordThreshold}m alert · waiting for bus`;
+      // Viewing a different stop — show static cord info, don't use wrong predictions
+      const name = this.cordStopName || 'another stop';
+      statusText.textContent = `${this.cordThreshold}m alert active for ${name}`;
     }
   }
 

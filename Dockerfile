@@ -11,9 +11,13 @@ COPY . .
 # Build CSS
 RUN bun run build:css
 
+# Bake marta.db into image for volume seeding
+RUN mkdir -p /app/seed
+COPY data/marta.db /app/seed/marta.db
+
 # Data directory (mount point for Fly volume)
-RUN mkdir -p /app/data
+RUN mkdir -p /data
 
 EXPOSE 4200
 
-CMD ["bun", "run", "src/index.ts"]
+CMD ["/bin/sh", "/app/entrypoint.sh"]

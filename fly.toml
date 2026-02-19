@@ -2,7 +2,7 @@
 # https://pullcord.dev or bus.marta.io
 
 app = "pullcord"
-primary_region = "atl"
+primary_region = "iad"
 
 [build]
 
