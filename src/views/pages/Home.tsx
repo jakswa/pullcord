@@ -12,7 +12,7 @@ export const HomePage = () => (
           </svg>
           <span class="home-wordmark">Pullcord</span>
         </div>
-        <p class="home-tagline">Pull the cord. Catch your ride. · <a href="/about" class="home-about-link">About</a></p>
+        <p class="home-tagline">Pull the cord. Catch your ride. · <a href="/explore" class="home-about-link">Map</a> · <a href="/about" class="home-about-link">About</a></p>
 
         {/* Big location button — primary action */}
         <button id="location-btn" class="home-locate-btn">

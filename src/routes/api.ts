@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRouteHeadsigns } from "../data/db.js";
+import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRouteHeadsigns, getAllStopsWithRoutes } from "../data/db.js";
 import { getVehicles, findArrivals, getStopArrivals } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
 import { getVapidPublicKey, registerCord, cancelCord, cordExists, getActiveCordCount, testFireAll } from "../data/push.js";
@@ -88,6 +88,19 @@ app.get("/stops", (c) => {
   } catch (error) {
     console.error("Error searching stops:", error);
     return c.json({ error: "Failed to search stops" }, 500);
+  }
+});
+
+// GET /api/stops/all - All bus stops with routes (for explore map)
+// Returns compact JSON; ~760KB raw, ~190KB gzipped
+app.get("/stops/all", (c) => {
+  try {
+    const stops = getAllStopsWithRoutes();
+    c.header("Cache-Control", "public, max-age=3600");
+    return c.json(stops);
+  } catch (error) {
+    console.error("Error fetching all stops:", error);
+    return c.json({ error: "Failed to fetch stops" }, 500);
   }
 });
 

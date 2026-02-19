@@ -372,6 +372,28 @@ class MARTADatabase {
 
   close() {
     this.db.close();
+    }
+
+  // Get all bus stops with routes (for explore map)
+  // Returns deduplicated stops with comma-separated route short names
+  // Cached — this query is expensive but data rarely changes
+  private _allStopsCache: { stops: any[]; cachedAt: number } | null = null;
+  
+  getAllStopsWithRoutes(): { stop_id: string; stop_name: string; stop_lat: number; stop_lon: number; routes: string }[] {
+    // Cache for 1 hour
+    if (this._allStopsCache && Date.now() - this._allStopsCache.cachedAt < 3600000) {
+      return this._allStopsCache.stops;
+    }
+    const stops = this.db.prepare(`
+      SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon,
+        GROUP_CONCAT(DISTINCT r.route_short_name) as routes
+      FROM stops s
+      JOIN route_stops rs ON s.stop_id = rs.stop_id
+      JOIN routes r ON rs.route_id = r.route_id
+      GROUP BY s.stop_id
+    `).all() as any[];
+    this._allStopsCache = { stops, cachedAt: Date.now() };
+    return stops;
   }
 }
 
@@ -442,6 +464,10 @@ export function getScheduledArrivals(stopId: string, tripIds: string[]): Map<str
 
 export function getTripStopSequences(tripIds: string[]) {
   return db.getTripStopSequences(tripIds);
+}
+
+export function getAllStopsWithRoutes() {
+  return db.getAllStopsWithRoutes();
 }
 
 export type { Route, Stop, Trip, RouteStop, RouteDetail };
