@@ -1048,8 +1048,8 @@ class PullcordApp {
           <div class="d-upcoming-meta">${statusHtml}${arrivalStr}</div>
         </div>
         <div class="d-upcoming-time">
-          <div class="d-upcoming-minutes${tier !== 'active' ? ` tier-${tier}` : ''}">${minutes < 1 ? 'NOW' : minutes}</div>
-          <div class="d-upcoming-label">${minutes < 1 ? '' : 'min'}</div>
+          <div class="d-upcoming-minutes${tier !== 'active' ? ` tier-${tier}` : ''}">${tier !== 'active' && minutes < 1 ? '—' : minutes < 1 ? 'NOW' : minutes}</div>
+          <div class="d-upcoming-label">${tier !== 'active' && minutes < 1 ? '' : minutes < 1 ? '' : 'min'}</div>
         </div>
       </div>
     `;
