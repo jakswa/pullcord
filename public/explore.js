@@ -6,7 +6,7 @@
 
   // Atlanta center
   const ATL_CENTER = [33.749, -84.388];
-  const DEFAULT_ZOOM = 13;
+  const DEFAULT_ZOOM = 12;
   const CLUSTER_ZOOM = 15; // Below this, show clusters; at/above, show individual stops
   const MIN_ZOOM = 10;
   const MAX_ZOOM = 18;
@@ -17,6 +17,7 @@
   let markers = []; // currently rendered markers
   let userMarker = null;
   let activePopupStopId = null;
+  let pendingFilter = null;
 
   // ─── Init ───
 
@@ -50,13 +51,44 @@
     // Re-render markers on zoom/pan
     map.on('moveend', renderMarkers);
 
-    // Geolocation
+    // Geolocation — header button
     document.getElementById('explore-locate-btn')?.addEventListener('click', locateUser);
 
-    // Route filter
+    // On-map locate button (bottom-right, like Google Maps)
+    const mapLocateBtn = L.control({ position: 'bottomleft' });
+    mapLocateBtn.onAdd = function () {
+      const div = L.DomUtil.create('div', 'explore-map-locate-wrap');
+      div.innerHTML = `<button class="explore-map-locate" aria-label="Center on my location">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3" stroke-width="2" />
+          <path stroke-linecap="round" stroke-width="2" d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+        </svg>
+      </button>`;
+      div.querySelector('button').addEventListener('click', function (e) {
+        L.DomEvent.stopPropagation(e);
+        locateUser();
+      });
+      return div;
+    };
+    mapLocateBtn.addTo(map);
+
+    // Route/name filter — check URL params first
     const searchInput = document.getElementById('explore-search');
     if (searchInput) {
       searchInput.addEventListener('input', debounce(onFilterChange, 200));
+      const params = new URLSearchParams(window.location.search);
+      const urlRoute = params.get('route');
+      const urlQuery = params.get('q');
+      if (urlRoute) {
+        searchInput.value = urlRoute;
+        pendingFilter = { type: 'route', value: urlRoute.trim().toLowerCase() };
+      } else if (urlQuery) {
+        searchInput.value = urlQuery;
+        pendingFilter = { type: 'name', value: urlQuery.trim().toLowerCase() };
+      }
+      if (pendingFilter) {
+        searchInput.placeholder = 'Filter by route or stop name...';
+      }
     }
   }
 
@@ -68,6 +100,13 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       allStops = await res.json();
       document.getElementById('explore-loading')?.classList.add('hidden');
+
+      // Apply pending filter from URL param
+      if (pendingFilter) {
+        applyFilter(pendingFilter.value, pendingFilter.type);
+        pendingFilter = null;
+      }
+
       renderMarkers();
     } catch (err) {
       console.error('Failed to load stops:', err);
@@ -185,10 +224,12 @@
 
   function getGridSize(zoom) {
     // Larger grid = bigger clusters at low zoom
-    if (zoom <= 11) return 0.02;
-    if (zoom <= 12) return 0.01;
-    if (zoom <= 13) return 0.005;
-    return 0.002;
+    // Aggressive clustering keeps the map readable
+    if (zoom <= 10) return 0.06;
+    if (zoom <= 11) return 0.03;
+    if (zoom <= 12) return 0.015;
+    if (zoom <= 13) return 0.008;
+    return 0.004;
   }
 
   // ─── Popup ───
@@ -224,15 +265,38 @@
 
   function onFilterChange(e) {
     const query = e.target.value.trim().toLowerCase();
+    // Auto-detect: all digits = route filter, otherwise name filter
+    const type = /^\d+$/.test(query) ? 'route' : 'name';
+    applyFilter(query, type);
+    renderMarkers();
+  }
+
+  function applyFilter(query, type) {
     if (!query) {
       filteredStops = null;
-    } else {
+      return;
+    }
+    if (type === 'route') {
       filteredStops = allStops.filter(stop => {
         const routes = stop.routes.toLowerCase().split(',');
         return routes.some(r => r.includes(query));
       });
+    } else {
+      filteredStops = allStops.filter(stop =>
+        stop.stop_name.toLowerCase().includes(query)
+      );
     }
-    renderMarkers();
+
+    // Fit map to filtered stops
+    if (filteredStops.length > 0) {
+      const lats = filteredStops.map(s => s.stop_lat);
+      const lons = filteredStops.map(s => s.stop_lon);
+      const bounds = L.latLngBounds(
+        [Math.min(...lats), Math.min(...lons)],
+        [Math.max(...lats), Math.max(...lons)]
+      );
+      map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+    }
   }
 
   // ─── Geolocation ───

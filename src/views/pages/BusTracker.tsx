@@ -82,7 +82,6 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
           <div class="d-progress-strip" id="progress-strip"></div>
           <div class="d-progress-meta">
             <div class="d-progress-label" id="progress-label"></div>
-            <a id="hero-ride-link" class="d-ride-link hidden" href="#">Ride this bus →</a>
           </div>
         </section>
 
@@ -119,13 +118,12 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
           </div>
         </div>
         <div class="d-action-row">
-          <button id="map-toggle-btn" class="d-action-btn" type="button">
+          <button id="refresh-btn" class="d-action-btn" type="button">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
-              <line x1="8" y1="2" x2="8" y2="18"/>
-              <line x1="16" y1="6" x2="16" y2="22"/>
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
             </svg>
-            <span id="map-toggle-text">Map</span>
+            Refresh
           </button>
           <span class="d-action-divider"></span>
           <button id="fav-btn" class="d-action-btn" type="button">
@@ -133,12 +131,13 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
             Save Stop
           </button>
           <span class="d-action-divider"></span>
-          <button id="refresh-btn" class="d-action-btn" type="button">
+          <button id="map-toggle-btn" class="d-action-btn" type="button">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="23 4 23 10 17 10"/>
-              <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+              <line x1="8" y1="2" x2="8" y2="18"/>
+              <line x1="16" y1="6" x2="16" y2="22"/>
             </svg>
-            Refresh
+            <span id="map-toggle-text">Map</span>
           </button>
         </div>
       </div>

@@ -77,11 +77,20 @@ class PullcordApp {
     const loadingDiv = document.getElementById('search-loading');
     const basePath = window.__BASE_PATH__ || '';
 
+    const locateRow = document.querySelector('.home-locate-row');
+
     let searchTimeout;
     searchInput.addEventListener('input', (e) => {
       clearTimeout(searchTimeout);
       const q = e.target.value.trim();
-      if (q.length < 2) { this.hideResults(); this.renderFavorites(basePath); return; }
+      if (q.length < 2) {
+        this.hideResults();
+        this.renderFavorites(basePath);
+        if (locateRow) locateRow.classList.remove('home-locate-hidden');
+        return;
+      }
+      // Collapse locate row to make room for results
+      if (locateRow) locateRow.classList.add('home-locate-hidden');
       searchTimeout = setTimeout(() => {
         this.searchStops(q, resultsList, resultsContainer, loadingDiv, basePath);
       }, 300);
@@ -234,14 +243,27 @@ class PullcordApp {
     if (resultsContainer) resultsContainer.classList.remove('hidden');
     document.querySelector('.home-shell')?.classList.add('has-content');
 
+    // Scroll results into view above keyboard on mobile
+    requestAnimationFrame(() => {
+      resultsContainer?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
     const header = document.getElementById('results-header');
     if (header) {
+      const searchVal = document.getElementById('stop-search')?.value?.trim() || '';
       if (routeMatch) {
         const color = routeMatch.route_color ? `#${routeMatch.route_color}` : 'var(--color-brand)';
-        header.innerHTML = `<span style="color:${color};font-weight:800">Route ${this.esc(routeMatch.route_short_name)}</span> · ${stops.length} stops`;
+        const routeNum = this.esc(routeMatch.route_short_name);
+        header.innerHTML = `<span style="color:${color};font-weight:800">Route ${routeNum}</span> · ${stops.length} stops`
+          + ` <a href="/explore?route=${encodeURIComponent(routeMatch.route_short_name)}" class="home-map-toggle">Map ↗</a>`;
+      } else if (stops.length > 0 && stops[0].distance) {
+        header.innerHTML = `${stops.length} stops nearby`
+          + ` <a href="/explore" class="home-map-toggle">Map ↗</a>`;
+      } else if (stops.length > 0 && searchVal) {
+        header.innerHTML = `${stops.length} results`
+          + ` <a href="/explore?q=${encodeURIComponent(searchVal)}" class="home-map-toggle">Map ↗</a>`;
       } else {
-        header.textContent = stops.length > 0 && stops[0].distance
-          ? `${stops.length} stops nearby` : `${stops.length} results`;
+        header.textContent = `${stops.length} results`;
       }
     }
 
@@ -650,9 +672,17 @@ class PullcordApp {
     this.renderHeroDisplay();
     this.startCountdown();
 
-    // Track hero vehicle for map focus (when user opens map via bottom action bar)
-    if (hero.vehicleId && hero.tier !== 'scheduled') {
+    // Track live hero for map focus
+    if (hero.vehicleId && hero.tier === 'active') {
       this.focusedVehicleId = hero.vehicleId;
+    } else {
+      this.focusedVehicleId = null;
+    }
+
+    // Update map button text based on hero state
+    const mapText = document.getElementById('map-toggle-text');
+    if (mapText) {
+      mapText.textContent = (hero.vehicleId && hero.tier === 'active') ? 'Live Map' : 'Map';
     }
   }
 
@@ -743,17 +773,6 @@ class PullcordApp {
       metaEl.innerHTML = '';
     }
 
-    // Ride link — only for active-tier buses with a trip ID
-    const rideLinkEl = document.getElementById('hero-ride-link');
-    if (rideLinkEl) {
-      if (tier === 'active' && this.heroPrediction.tripId) {
-        const rideUrl = `/ride?trip=${encodeURIComponent(this.heroPrediction.tripId)}&stop=${encodeURIComponent(this.config.stopId)}&route=${encodeURIComponent(this.heroPrediction.routeBadge || this.config.routeId)}`;
-        rideLinkEl.href = rideUrl;
-        rideLinkEl.classList.remove('hidden');
-      } else {
-        rideLinkEl.classList.add('hidden');
-      }
-    }
   }
 
   // Countdown timer — ticks every second between polls
@@ -1349,7 +1368,17 @@ class PullcordApp {
     const closeBtn = document.getElementById('map-close-btn');
     const toggleText = document.getElementById('map-toggle-text');
 
-    if (toggleBtn) toggleBtn.addEventListener('click', () => this.showMap());
+    if (toggleBtn) toggleBtn.addEventListener('click', () => {
+      // Live hero → navigate to ride view
+      if (this.focusedVehicleId && this.heroPrediction?.tier === 'active' && this.heroPrediction.tripId) {
+        const tripId = this.heroPrediction.tripId;
+        const stopId = this.config.stopId;
+        const routeId = this.heroPrediction.routeId || this.config.routeId;
+        window.location.href = `/ride?trip=${encodeURIComponent(tripId)}&stop=${encodeURIComponent(stopId)}&route=${encodeURIComponent(routeId)}`;
+        return;
+      }
+      this.showMap();
+    });
     if (closeBtn) closeBtn.addEventListener('click', () => this.hideMap());
   }
 
@@ -1401,7 +1430,13 @@ class PullcordApp {
     this.addStopMarkers();
     this.addActiveStopMarker();
     this.updateMapMarkers(this.lastVehicles);
-    this.map.setView([stop.lat, stop.lon], 15);
+
+    // If tracking a live bus, focus between bus and stop; otherwise center on stop
+    if (this.focusedVehicleId) {
+      this.focusOnBus(this.focusedVehicleId);
+    } else {
+      this.map.setView([stop.lat, stop.lon], 15);
+    }
 
     // Recenter button
     const btn = document.getElementById('recenter-btn');
