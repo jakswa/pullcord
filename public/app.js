@@ -736,15 +736,7 @@ class PullcordApp {
       tierEl.className = 'd-hero-tier tier-scheduled';
     }
 
-    // Hide the old badge element
-    const badgeEl = document.getElementById('hero-badge');
-    if (badgeEl) badgeEl.style.display = 'none';
-
-    // Headsign with inline route number for multi-route
     const hsEl = document.getElementById('hero-headsign');
-    const routePrefix = this.multiRoute && this.heroPrediction.routeBadge
-      ? `${this.heroPrediction.routeBadge} `
-      : '';
     const fullHeadsign = this.heroPrediction.headsign || 'Unknown';
     hsEl.innerHTML = this.multiRoute && this.heroPrediction.routeBadge
       ? `<span class="d-hero-route" style="color:#${this.heroPrediction.routeColor || 'E85D3A'}">${this.esc(this.heroPrediction.routeBadge)}</span> <span class="d-hero-headsign-text">${this.esc(fullHeadsign)}</span>`

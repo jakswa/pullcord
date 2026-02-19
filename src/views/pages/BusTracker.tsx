@@ -68,7 +68,6 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
           <div id="hero-eta" class="d-hero-eta" style="display:none">
             <div class="d-hero-tier" id="hero-tier"></div>
             <div class="d-hero-countdown">
-              {multiRoute && <span class="d-hero-badge" id="hero-badge"></span>}
               <span class="d-hero-number" id="hero-number">--</span>
               <span class="d-hero-unit" id="hero-unit">min</span>
             </div>

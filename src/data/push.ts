@@ -179,7 +179,7 @@ export async function testFireAll(): Promise<number> {
 // CORD CHECK — called per route+stop group during poll
 // ─────────────────────────────────────
 
-export async function checkCords(
+async function checkCords(
   routeId: string,
   stopId: string,
   predictions: Array<{ vehicleId?: string; tripId?: string; directionId?: number; etaSeconds: number; headsign?: string }>,

@@ -14,14 +14,12 @@
   let stops = [];
   let destIndex = -1;
   let busStopIndex = -1;
-  let nearestIndex = -1;
   let userLatLon = null;
   let busLatLon = null;
   let busBearing = 0;
   let watchId = null;
   let userMarker = null;
   let busMarker = null;
-  let routeLine = null;
   let stopMarkers = [];
   let cordZoneActive = false;
   let followBus = true; // map follows bus by default
@@ -123,7 +121,7 @@
       color: prefersDark ? '#1e293b' : '#94a3b8',
       weight: 7, opacity: 0.5, lineCap: 'round', lineJoin: 'round',
     }).addTo(map);
-    routeLine = L.polyline(coords, {
+    L.polyline(coords, {
       color: routeColor, weight: 3.5, opacity: 0.7, lineCap: 'round', lineJoin: 'round',
     }).addTo(map);
 
@@ -282,12 +280,7 @@
           userMarker.setLatLng(userLatLon);
         }
 
-        // Find nearest stop to user
-        let minDist = Infinity;
-        stops.forEach((stop, i) => {
-          const d = haversine(userLatLon[0], userLatLon[1], stop.lat, stop.lon);
-          if (d < minDist) { minDist = d; nearestIndex = i; }
-        });
+        // User GPS dot only — bus position drives stop tracking
       },
       () => { /* silent — GPS is optional */ },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }

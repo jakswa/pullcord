@@ -60,7 +60,7 @@ function computeClientETA(vehicleLat, vehicleLon, tripStops, targetStopId, targe
   const deltaSec = tripStops[targetIdx].arrivalSec - tripStops[nearestIdx].arrivalSec;
   if (deltaSec < 0 || deltaSec > 7200) return null;
 
-  var eta = deltaSec;
+  let eta = deltaSec;
 
   // Interpolate within current segment
   if (nearestIdx < tripStops.length - 1 && nearestIdx < targetIdx) {

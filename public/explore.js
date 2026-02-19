@@ -16,7 +16,6 @@
   let filteredStops = null; // null = show all
   let markers = []; // currently rendered markers
   let userMarker = null;
-  let activePopupStopId = null;
   let pendingFilter = null;
 
   // ─── Init ───
@@ -235,7 +234,6 @@
   // ─── Popup ───
 
   function showStopPopup(stop, marker) {
-    activePopupStopId = stop.stop_id;
     const routes = stop.routes.split(',');
 
     const routeBadges = routes.map(r =>
