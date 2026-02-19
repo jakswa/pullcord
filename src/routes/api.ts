@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRouteHeadsigns, getAllStopsWithRoutes } from "../data/db.js";
+import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRouteHeadsigns, getAllStopsWithRoutes, getTripStopSequences } from "../data/db.js";
 import { getVehicles, findArrivals, getStopArrivals } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
 import { getVapidPublicKey, registerCord, cancelCord, cordExists, getActiveCordCount, testFireAll } from "../data/push.js";
@@ -244,6 +244,35 @@ app.get("/stops/:stopId/arrivals", async (c) => {
   } catch (error) {
     console.error("Error fetching stop arrivals:", error);
     return c.json({ error: "Failed to fetch arrivals" }, 500);
+  }
+});
+
+// GET /api/trip/:tripId/stops — stop sequence for a trip (for ride view)
+app.get("/trip/:tripId/stops", (c) => {
+  try {
+    const tripId = c.req.param("tripId");
+    const sequences = getTripStopSequences([tripId]);
+    const stops = sequences.get(tripId);
+    if (!stops || stops.length === 0) {
+      return c.json({ error: "Trip not found" }, 404);
+    }
+    // Enrich with stop names
+    const enriched = stops.map(s => {
+      const stop = getStop(s.stop_id);
+      return {
+        stop_id: s.stop_id,
+        stop_name: stop?.stop_name || s.stop_id,
+        lat: s.lat,
+        lon: s.lon,
+        sequence: s.sequence,
+        arrival_time: s.arrival_time,
+      };
+    });
+    c.header("Cache-Control", "public, max-age=86400"); // Trip data is static for the day
+    return c.json(enriched);
+  } catch (error) {
+    console.error("Error fetching trip stops:", error);
+    return c.json({ error: "Failed to fetch trip stops" }, 500);
   }
 });
 

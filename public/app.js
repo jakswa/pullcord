@@ -742,6 +742,18 @@ class PullcordApp {
     } else {
       metaEl.innerHTML = '';
     }
+
+    // Ride link — only for active-tier buses with a trip ID
+    const rideLinkEl = document.getElementById('hero-ride-link');
+    if (rideLinkEl) {
+      if (tier === 'active' && this.heroPrediction.tripId) {
+        const rideUrl = `/ride?trip=${encodeURIComponent(this.heroPrediction.tripId)}&stop=${encodeURIComponent(this.config.stopId)}&route=${encodeURIComponent(this.heroPrediction.routeBadge || this.config.routeId)}`;
+        rideLinkEl.href = rideUrl;
+        rideLinkEl.classList.remove('hidden');
+      } else {
+        rideLinkEl.classList.add('hidden');
+      }
+    }
   }
 
   // Countdown timer — ticks every second between polls
