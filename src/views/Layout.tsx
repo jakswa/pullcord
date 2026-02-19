@@ -12,7 +12,7 @@ export const Layout = (props: LayoutProps) => {
   const title = props.title || "Pullcord — Real-time MARTA Bus Tracker";
   const description = props.description || "Pull the cord. Catch your ride. Real-time MARTA bus tracking with live positions and ETA predictions.";
   const ogImage = props.ogImage || "/public/icons/og-image.png";
-  const siteUrl = "https://pullcord.home.jake.town";
+  const siteUrl = process.env.SITE_URL || "https://bus.marta.io";
   const canonicalUrl = `${siteUrl}${props.canonicalPath || ""}`;
 
   return (

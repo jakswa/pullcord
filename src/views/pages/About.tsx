@@ -65,79 +65,16 @@ export const AboutPage = () => (
         </div>
       </section>
 
-      {/* Stack */}
-      <section class="about-section">
-        <h2 class="about-h2">Stack</h2>
-        <div class="about-stack">
-          <span class="about-chip">Hono</span>
-          <span class="about-chip">Bun</span>
-          <span class="about-chip">SQLite</span>
-          <span class="about-chip">Leaflet</span>
-          <span class="about-chip">Tailwind v4</span>
-          <span class="about-chip">GTFS-RT</span>
-          <span class="about-chip">Web Push</span>
-          <span class="about-chip">JSX (no React)</span>
-        </div>
-        <p class="about-muted">No bundler, no framework, no build step beyond Tailwind CSS. The client is vanilla JavaScript. The server renders JSX to HTML strings via Hono.</p>
-      </section>
-
-      {/* Privacy */}
-      <section class="about-section">
-        <h2 class="about-h2">Privacy</h2>
-        <p>Pullcord doesn't track you.</p>
-        <ul class="about-list">
-          <li><strong>Location:</strong> Used client-side only to find nearby stops. Never sent to our server, never stored.</li>
-          <li><strong>Push subscriptions:</strong> Stored in SQLite while your alert is active. Deleted the moment the notification fires.</li>
-          <li><strong>Analytics:</strong> None. No cookies, no tracking pixels, no third-party scripts.</li>
-          <li><strong>Favorites:</strong> Stored in your browser's localStorage. Never leaves your device.</li>
-        </ul>
-      </section>
-
-      {/* Data */}
-      <section class="about-section">
-        <h2 class="about-h2">Data</h2>
-        <p>Real-time bus positions and predictions come from <a href="https://www.itsmarta.com/MARTA-Developer-resources.aspx" class="about-link" target="_blank" rel="noopener">MARTA's GTFS-RT feeds</a>, updated every ~30 seconds. Stop locations, routes, and schedules come from MARTA's static GTFS data.</p>
-        <p>ETAs for tracked buses are computed from vehicle GPS positions and scheduled inter-stop times — not MARTA's prediction feed, which has known accuracy issues.</p>
-      </section>
-
-      {/* Why "Pullcord" */}
-      <section class="about-section">
-        <h2 class="about-h2">Why "Pullcord"?</h2>
-        <p>On a bus, you pull the cord when your stop is coming up. It's the one moment of agency in the whole ride — you're telling the bus <em>this is where I get off</em>.</p>
-        <p>The app's "Pull the Cord" feature works the same way. Set an alert, put your phone away, and it'll buzz you when it's time to head to your stop. One tug, then you're free.</p>
-      </section>
-
-      {/* Links */}
-      <section class="about-section">
-        <h2 class="about-h2">Links</h2>
-        <div class="about-links">
-          <a href="https://codeberg.org/clatis/pullcord" class="about-link-card" target="_blank" rel="noopener">
-            <span class="about-link-icon">📦</span>
-            <div>
-              <div class="about-link-title">Source Code</div>
-              <div class="about-link-desc">codeberg.org/clatis/pullcord</div>
-            </div>
-          </a>
-          <a href="https://codeberg.org/clatis/pullcord/issues" class="about-link-card" target="_blank" rel="noopener">
-            <span class="about-link-icon">💬</span>
-            <div>
-              <div class="about-link-title">Issues &amp; Feedback</div>
-              <div class="about-link-desc">Bug reports and feature requests</div>
-            </div>
-          </a>
-          <a href="https://www.itsmarta.com/MARTA-Developer-resources.aspx" class="about-link-card" target="_blank" rel="noopener">
-            <span class="about-link-icon">🚌</span>
-            <div>
-              <div class="about-link-title">MARTA Developer Resources</div>
-              <div class="about-link-desc">GTFS feeds and API documentation</div>
-            </div>
-          </a>
-        </div>
-      </section>
-
-      {/* Updates */}
+      {/* Updates — moved up: what's new is more interesting than stack details */}
       <section class="about-section">
         <h2 class="about-h2">Updates</h2>
+
+        <div class="about-update">
+          <div class="about-update-date">Feb 19</div>
+          <div class="about-update-text">
+            <strong>Pullcord now lives at <a href="https://bus.marta.io" class="about-link">bus.marta.io</a>.</strong> Deployed to Fly.io in Ashburn, VA — the closest region to Atlanta they offer. This means the app stays up even when the developer's home internet doesn't. The old <code>pullcord.home.jake.town</code> address still works but the new URL is the permanent home. Also fixed a bug where "Pull the Cord" alerts would show the wrong bus's ETA if you navigated to a different stop while an alert was active.
+          </div>
+        </div>
 
         <div class="about-update">
           <div class="about-update-date">Feb 17</div>
@@ -194,6 +131,77 @@ export const AboutPage = () => (
           <div class="about-update-text">
             Pullcord launched. Live bus positions on a map with ETA predictions for all 118 MARTA bus routes, built on GTFS real-time feeds. Find your stop by location or search, see what's coming.
           </div>
+        </div>
+      </section>
+
+      {/* Stack */}
+      <section class="about-section">
+        <h2 class="about-h2">Stack</h2>
+        <div class="about-stack">
+          <span class="about-chip">Hono</span>
+          <span class="about-chip">Bun</span>
+          <span class="about-chip">SQLite</span>
+          <span class="about-chip">Leaflet</span>
+          <span class="about-chip">Tailwind v4</span>
+          <span class="about-chip">GTFS-RT</span>
+          <span class="about-chip">Web Push</span>
+          <span class="about-chip">JSX (no React)</span>
+          <span class="about-chip">Fly.io</span>
+        </div>
+        <p class="about-muted">No bundler, no framework, no build step beyond Tailwind CSS. The client is vanilla JavaScript. The server renders JSX to HTML strings via Hono. Deployed on Fly.io.</p>
+      </section>
+
+      {/* Privacy */}
+      <section class="about-section">
+        <h2 class="about-h2">Privacy</h2>
+        <p>Pullcord doesn't track you.</p>
+        <ul class="about-list">
+          <li><strong>Location:</strong> Used client-side only to find nearby stops. Never sent to our server, never stored.</li>
+          <li><strong>Push subscriptions:</strong> Stored in SQLite while your alert is active. Deleted the moment the notification fires.</li>
+          <li><strong>Analytics:</strong> None. No cookies, no tracking pixels, no third-party scripts.</li>
+          <li><strong>Favorites:</strong> Stored in your browser's localStorage. Never leaves your device.</li>
+        </ul>
+      </section>
+
+      {/* Data */}
+      <section class="about-section">
+        <h2 class="about-h2">Data</h2>
+        <p>Real-time bus positions and predictions come from <a href="https://www.itsmarta.com/MARTA-Developer-resources.aspx" class="about-link" target="_blank" rel="noopener">MARTA's GTFS-RT feeds</a>, updated every ~30 seconds. Stop locations, routes, and schedules come from MARTA's static GTFS data.</p>
+        <p>ETAs for tracked buses are computed from vehicle GPS positions and scheduled inter-stop times — not MARTA's prediction feed, which has known accuracy issues.</p>
+      </section>
+
+      {/* Why "Pullcord" */}
+      <section class="about-section">
+        <h2 class="about-h2">Why "Pullcord"?</h2>
+        <p>On a bus, you pull the cord when your stop is coming up. It's the one moment of agency in the whole ride — you're telling the bus <em>this is where I get off</em>.</p>
+        <p>The app's "Pull the Cord" feature works the same way. Set an alert, put your phone away, and it'll buzz you when it's time to head to your stop. One tug, then you're free.</p>
+      </section>
+
+      {/* Links */}
+      <section class="about-section">
+        <h2 class="about-h2">Links</h2>
+        <div class="about-links">
+          <a href="https://codeberg.org/clatis/pullcord" class="about-link-card" target="_blank" rel="noopener">
+            <span class="about-link-icon">📦</span>
+            <div>
+              <div class="about-link-title">Source Code</div>
+              <div class="about-link-desc">codeberg.org/clatis/pullcord</div>
+            </div>
+          </a>
+          <a href="https://codeberg.org/clatis/pullcord/issues" class="about-link-card" target="_blank" rel="noopener">
+            <span class="about-link-icon">💬</span>
+            <div>
+              <div class="about-link-title">Issues &amp; Feedback</div>
+              <div class="about-link-desc">Bug reports and feature requests</div>
+            </div>
+          </a>
+          <a href="https://www.itsmarta.com/MARTA-Developer-resources.aspx" class="about-link-card" target="_blank" rel="noopener">
+            <span class="about-link-icon">🚌</span>
+            <div>
+              <div class="about-link-title">MARTA Developer Resources</div>
+              <div class="about-link-desc">GTFS feeds and API documentation</div>
+            </div>
+          </a>
         </div>
       </section>
 
