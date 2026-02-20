@@ -443,14 +443,17 @@ export async function refreshGTFS() {
   if (!resp.ok) throw new Error(`GTFS download failed: ${resp.status}`);
   await Bun.write(zipPath, resp);
 
-  // Extract zip using unzip (installed in Docker) or python3 (dev)
+  // Extract zip — try unzip (Docker/Alpine), fall back to python3 (dev)
   const gtfsDir = path.join(process.cwd(), "data", "gtfs");
   await fs.promises.mkdir(gtfsDir, { recursive: true });
-  const unzipProc = Bun.spawn(["unzip", "-o", zipPath, "-d", gtfsDir]);
-  const exitCode = await unzipProc.exited;
-  if (exitCode !== 0) {
-    // Fallback to python3 (dev environment)
-    await Bun.spawn(["python3", "-c", `import zipfile; zipfile.ZipFile("${zipPath}").extractall("${gtfsDir}")`]).exited;
+  try {
+    const proc = Bun.spawn(["unzip", "-o", zipPath, "-d", gtfsDir]);
+    const code = await proc.exited;
+    if (code !== 0) throw new Error(`unzip exited ${code}`);
+  } catch {
+    const proc = Bun.spawn(["python3", "-c", `import zipfile; zipfile.ZipFile("${zipPath}").extractall("${gtfsDir}")`]);
+    const code = await proc.exited;
+    if (code !== 0) throw new Error("Both unzip and python3 extraction failed");
   }
   await fs.promises.unlink(zipPath);
 
