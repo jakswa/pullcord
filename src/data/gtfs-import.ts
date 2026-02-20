@@ -232,12 +232,33 @@ class GTFSImporter {
         stop_name: r.stop_name,
         stop_lat: parseFloat(r.stop_lat),
         stop_lon: parseFloat(r.stop_lon),
-        group_id: null, // populated by buildStopGroups()
+        group_id: null,
       })
     );
-    const count = this.upsertTable('stops', records);
-    console.log(`✓ Imported ${count} stops`);
-    return count;
+
+    // Atomic: insert stops + set group_id in one transaction.
+    // No window where stops exist with null group_id.
+    const columns = Object.keys(records[0]);
+    const placeholders = columns.map(() => '?').join(', ');
+    const stmt = this.db.prepare(
+      `INSERT OR REPLACE INTO stops (${columns.join(', ')}) VALUES (${placeholders})`
+    );
+    const tx = this.db.transaction(() => {
+      for (const record of records) {
+        stmt.run(...Object.values(record));
+      }
+      // group_id = MIN(stop_id) per stop_name — groups directional stops at same location
+      this.db.run(`
+        UPDATE stops SET group_id = (
+          SELECT MIN(s2.stop_id) FROM stops s2 WHERE s2.stop_name = stops.stop_name
+        )
+      `);
+    });
+    tx();
+
+    const groups = this.db.prepare('SELECT COUNT(DISTINCT group_id) as count FROM stops').get() as any;
+    console.log(`✓ Imported ${records.length} stops → ${groups.count} groups`);
+    return records.length;
   }
 
   async importTrips() {
@@ -462,8 +483,7 @@ async function main() {
 
   try {
     await importer.importRoutes();
-    await importer.importStops();
-    importer.buildStopGroups(); // Right after stops — group_id is our custom column, not in GTFS
+    await importer.importStops(); // includes atomic group_id assignment
     await importer.importCalendar();
     await importer.importCalendarDates();
     await importer.importTrips();
@@ -524,8 +544,7 @@ export async function refreshGTFS() {
   const importer = new GTFSImporter();
   try {
     await importer.importRoutes();
-    await importer.importStops();
-    importer.buildStopGroups(); // Right after stops — group_id is our custom column, not in GTFS
+    await importer.importStops(); // includes atomic group_id assignment
     await importer.importCalendar();
     await importer.importCalendarDates();
     await importer.importTrips();
