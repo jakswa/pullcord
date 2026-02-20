@@ -5,8 +5,8 @@ import { createReadStream } from "fs";
 import fs from "fs";
 import path from "path";
 
-const GTFS_DIR = path.join(process.cwd(), "data", "gtfs");
 const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "data", "marta.db");
+const GTFS_DIR = path.join(path.dirname(DB_PATH), "gtfs");
 
 class GTFSImporter {
   private db: Database;
@@ -157,6 +157,55 @@ class GTFSImporter {
     return records.length;
   }
 
+  // Stream-based chunked import for large tables (stop_times, shapes).
+  // Reads CSV in chunks to avoid loading entire file into memory.
+  private async streamImport(
+    tableName: string,
+    csvPath: string,
+    transform: (record: any) => any,
+    chunkSize: number = 10000
+  ): Promise<number> {
+    return new Promise((resolve, reject) => {
+      let totalCount = 0;
+      let chunk: any[] = [];
+      let columns: string[] | null = null;
+      let stmt: any = null;
+
+      const flushChunk = () => {
+        if (chunk.length === 0) return;
+        if (!columns) {
+          columns = Object.keys(chunk[0]);
+          const placeholders = columns.map(() => '?').join(', ');
+          stmt = this.db.prepare(
+            `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`
+          );
+        }
+        const tx = this.db.transaction(() => {
+          for (const record of chunk) {
+            stmt!.run(...Object.values(record));
+          }
+        });
+        tx();
+        totalCount += chunk.length;
+        chunk = [];
+      };
+
+      createReadStream(csvPath)
+        .pipe(parse({ columns: true, skip_empty_lines: true }))
+        .on('data', (record) => {
+          chunk.push(transform(record));
+          if (chunk.length >= chunkSize) {
+            flushChunk();
+          }
+        })
+        .on('end', () => {
+          flushChunk();
+          resolve(totalCount);
+        })
+        .on('error', reject);
+    });
+  }
+
   async importRoutes() {
     console.log("Importing routes...");
     const records = await this.loadCSV(
@@ -248,23 +297,25 @@ class GTFSImporter {
 
   async importShapes() {
     console.log("Importing shapes...");
-    const records = await this.loadCSV(
+    const count = await this.streamImport(
+      'shapes',
       path.join(GTFS_DIR, 'shapes.txt'),
       (r) => ({
         shape_id: r.shape_id,
         shape_pt_lat: parseFloat(r.shape_pt_lat),
         shape_pt_lon: parseFloat(r.shape_pt_lon),
         shape_pt_sequence: parseInt(r.shape_pt_sequence),
-      })
+      }),
+      10000
     );
-    const count = this.upsertTable('shapes', records);
     console.log(`✓ Imported ${count} shape points`);
     return count;
   }
 
   async importStopTimes() {
     console.log("Importing stop times (this may take a moment)...");
-    const records = await this.loadCSV(
+    const count = await this.streamImport(
+      'stop_times',
       path.join(GTFS_DIR, 'stop_times.txt'),
       (r) => ({
         trip_id: r.trip_id,
@@ -272,9 +323,9 @@ class GTFSImporter {
         stop_sequence: parseInt(r.stop_sequence),
         arrival_time: r.arrival_time || '',
         departure_time: r.departure_time || '',
-      })
+      }),
+      10000
     );
-    const count = this.upsertTable('stop_times', records);
     console.log(`✓ Imported ${count} stop times`);
     return count;
   }
@@ -436,15 +487,27 @@ async function main() {
 export async function refreshGTFS() {
   console.log("🔄 GTFS refresh starting...");
 
-  // Download zip
+  // Use DB directory for temp files (persistent volume on Fly.io)
+  const dataDir = path.dirname(DB_PATH);
+
+  // Download zip with timeout
   const GTFS_URL = "https://itsmarta.com/google_transit_feed/google_transit.zip";
-  const zipPath = path.join(process.cwd(), "data", "gtfs.zip");
-  const resp = await fetch(GTFS_URL);
-  if (!resp.ok) throw new Error(`GTFS download failed: ${resp.status}`);
-  await Bun.write(zipPath, resp);
+  const zipPath = path.join(dataDir, "gtfs.zip");
+  console.log(`📥 Downloading GTFS from ${GTFS_URL}...`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60_000);
+  try {
+    const resp = await fetch(GTFS_URL, { signal: controller.signal });
+    if (!resp.ok) throw new Error(`GTFS download failed: ${resp.status}`);
+    const buf = await resp.arrayBuffer();
+    await Bun.write(zipPath, buf);
+    console.log(`✓ Downloaded ${(buf.byteLength / 1024 / 1024).toFixed(1)}MB`);
+  } finally {
+    clearTimeout(timeout);
+  }
 
   // Extract zip — try unzip (Docker/Alpine), fall back to python3 (dev)
-  const gtfsDir = path.join(process.cwd(), "data", "gtfs");
+  const gtfsDir = path.join(dataDir, "gtfs");
   await fs.promises.mkdir(gtfsDir, { recursive: true });
   try {
     const proc = Bun.spawn(["unzip", "-o", zipPath, "-d", gtfsDir]);
