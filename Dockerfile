@@ -1,6 +1,9 @@
 FROM oven/bun:1-alpine AS base
 WORKDIR /app
 
+# unzip needed for weekly GTFS refresh
+RUN apk add --no-cache unzip
+
 # Install dependencies
 COPY package.json bun.lock* ./
 RUN bun install --production --frozen-lockfile

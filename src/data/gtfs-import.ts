@@ -443,9 +443,15 @@ export async function refreshGTFS() {
   if (!resp.ok) throw new Error(`GTFS download failed: ${resp.status}`);
   await Bun.write(zipPath, resp);
 
-  // Extract using python
+  // Extract zip using unzip (installed in Docker) or python3 (dev)
   const gtfsDir = path.join(process.cwd(), "data", "gtfs");
-  await Bun.spawn(["python3", "-c", `import zipfile; zipfile.ZipFile("${zipPath}").extractall("${gtfsDir}")`]).exited;
+  await fs.promises.mkdir(gtfsDir, { recursive: true });
+  const unzipProc = Bun.spawn(["unzip", "-o", zipPath, "-d", gtfsDir]);
+  const exitCode = await unzipProc.exited;
+  if (exitCode !== 0) {
+    // Fallback to python3 (dev environment)
+    await Bun.spawn(["python3", "-c", `import zipfile; zipfile.ZipFile("${zipPath}").extractall("${gtfsDir}")`]).exited;
+  }
   await fs.promises.unlink(zipPath);
 
   // Run import
