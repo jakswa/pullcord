@@ -463,13 +463,13 @@ async function main() {
   try {
     await importer.importRoutes();
     await importer.importStops();
+    importer.buildStopGroups(); // Right after stops — group_id is our custom column, not in GTFS
     await importer.importCalendar();
     await importer.importCalendarDates();
     await importer.importTrips();
     await importer.importShapes();
     await importer.importStopTimes();
     importer.buildRouteStops();
-    importer.buildStopGroups();
     importer.cleanExpiredServices();
 
     importer.printStats();
@@ -525,13 +525,13 @@ export async function refreshGTFS() {
   try {
     await importer.importRoutes();
     await importer.importStops();
+    importer.buildStopGroups(); // Right after stops — group_id is our custom column, not in GTFS
     await importer.importCalendar();
     await importer.importCalendarDates();
     await importer.importTrips();
     await importer.importShapes();
     await importer.importStopTimes();
     importer.buildRouteStops();
-    importer.buildStopGroups();
     importer.cleanExpiredServices();
     importer.printStats();
     console.log("✅ GTFS refresh complete!");
