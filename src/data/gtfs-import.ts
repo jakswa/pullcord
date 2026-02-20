@@ -2,6 +2,7 @@
 import { Database } from "bun:sqlite";
 import { parse } from "csv-parse";
 import { createReadStream } from "fs";
+import fs from "fs";
 import path from "path";
 
 const GTFS_DIR = path.join(process.cwd(), "data", "gtfs");
@@ -44,11 +45,20 @@ class GTFSImporter {
       CREATE TABLE IF NOT EXISTS trips (
         trip_id TEXT PRIMARY KEY,
         route_id TEXT,
+        service_id TEXT,
         trip_headsign TEXT,
         direction_id INTEGER,
         shape_id TEXT
       )
     `);
+
+    // Add service_id column if upgrading from old schema
+    try {
+      this.db.exec(`ALTER TABLE trips ADD COLUMN service_id TEXT`);
+      console.log("  ↳ Added service_id column to trips");
+    } catch (_) {
+      // Column already exists
+    }
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS shapes (
@@ -83,6 +93,34 @@ class GTFSImporter {
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_route_stops_route ON route_stops(route_id)`);
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_route_stops_stop ON route_stops(stop_id)`);
 
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS calendar (
+        service_id TEXT PRIMARY KEY,
+        monday INTEGER,
+        tuesday INTEGER,
+        wednesday INTEGER,
+        thursday INTEGER,
+        friday INTEGER,
+        saturday INTEGER,
+        sunday INTEGER,
+        start_date TEXT,
+        end_date TEXT
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS calendar_dates (
+        service_id TEXT,
+        date TEXT,
+        exception_type INTEGER,
+        UNIQUE(service_id, date)
+      )
+    `);
+
+    // Unique indexes for upsert support on tables without PKs
+    this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_stop_times_unique ON stop_times(trip_id, stop_sequence)`);
+    this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_shapes_unique ON shapes(shape_id, shape_pt_sequence)`);
+
     console.log("✓ Tables ready");
   }
 
@@ -111,7 +149,6 @@ class GTFSImporter {
     );
 
     const tx = this.db.transaction(() => {
-      this.db.run(`DELETE FROM ${tableName}`);
       for (const record of records) {
         stmt.run(...Object.values(record));
       }
@@ -161,6 +198,7 @@ class GTFSImporter {
       (r) => ({
         trip_id: r.trip_id,
         route_id: r.route_id,
+        service_id: r.service_id || '',
         trip_headsign: r.trip_headsign || '',
         direction_id: parseInt(r.direction_id) || 0,
         shape_id: r.shape_id || '',
@@ -168,6 +206,43 @@ class GTFSImporter {
     );
     const count = this.upsertTable('trips', records);
     console.log(`✓ Imported ${count} trips`);
+    return count;
+  }
+
+  async importCalendar() {
+    console.log("Importing calendar...");
+    const records = await this.loadCSV(
+      path.join(GTFS_DIR, 'calendar.txt'),
+      (r) => ({
+        service_id: r.service_id,
+        monday: parseInt(r.monday) || 0,
+        tuesday: parseInt(r.tuesday) || 0,
+        wednesday: parseInt(r.wednesday) || 0,
+        thursday: parseInt(r.thursday) || 0,
+        friday: parseInt(r.friday) || 0,
+        saturday: parseInt(r.saturday) || 0,
+        sunday: parseInt(r.sunday) || 0,
+        start_date: r.start_date,
+        end_date: r.end_date,
+      })
+    );
+    const count = this.upsertTable('calendar', records);
+    console.log(`✓ Imported ${count} calendar entries`);
+    return count;
+  }
+
+  async importCalendarDates() {
+    console.log("Importing calendar_dates...");
+    const records = await this.loadCSV(
+      path.join(GTFS_DIR, 'calendar_dates.txt'),
+      (r) => ({
+        service_id: r.service_id,
+        date: r.date,
+        exception_type: parseInt(r.exception_type) || 0,
+      })
+    );
+    const count = this.upsertTable('calendar_dates', records);
+    console.log(`✓ Imported ${count} calendar_dates entries`);
     return count;
   }
 
@@ -240,11 +315,71 @@ class GTFSImporter {
     return groups.count;
   }
 
+  cleanExpiredServices() {
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    console.log(`Cleaning expired services (before ${today})...`);
+
+    // Get expired service_ids
+    const expired = this.db.prepare('SELECT service_id FROM calendar WHERE end_date < ?').all(today) as { service_id: string }[];
+    if (expired.length === 0) {
+      console.log('No expired services to clean');
+      return;
+    }
+
+    const ids = expired.map(r => r.service_id);
+    const placeholders = ids.map(() => '?').join(',');
+
+    // Get trip_ids for expired services
+    const tripRows = this.db.prepare(`SELECT trip_id, shape_id FROM trips WHERE service_id IN (${placeholders})`).all(...ids) as { trip_id: string; shape_id: string }[];
+    const tripIds = tripRows.map(r => r.trip_id);
+    const shapeIds = [...new Set(tripRows.map(r => r.shape_id).filter(Boolean))];
+
+    if (tripIds.length === 0) {
+      console.log('No expired trips to clean');
+      // Still clean calendar entries even if no trips
+      this.db.run(`DELETE FROM calendar WHERE end_date < ?`, today);
+      this.db.run(`DELETE FROM calendar_dates WHERE service_id IN (${placeholders})`, ...ids);
+      return;
+    }
+
+    // Batch delete in transaction
+    const tx = this.db.transaction(() => {
+      // Delete stop_times in chunks (SQLite variable limit)
+      for (let i = 0; i < tripIds.length; i += 500) {
+        const chunk = tripIds.slice(i, i + 500);
+        const ph = chunk.map(() => '?').join(',');
+        this.db.run(`DELETE FROM stop_times WHERE trip_id IN (${ph})`, ...chunk);
+      }
+
+      // Delete trips
+      this.db.run(`DELETE FROM trips WHERE service_id IN (${placeholders})`, ...ids);
+
+      // Delete expired calendar entries
+      this.db.run(`DELETE FROM calendar WHERE end_date < ?`, today);
+      this.db.run(`DELETE FROM calendar_dates WHERE service_id IN (${placeholders})`, ...ids);
+
+      // Shapes: only delete if no remaining trips reference them
+      for (const shapeId of shapeIds) {
+        const remaining = this.db.prepare('SELECT 1 FROM trips WHERE shape_id = ? LIMIT 1').get(shapeId);
+        if (!remaining) {
+          this.db.run('DELETE FROM shapes WHERE shape_id = ?', shapeId);
+        }
+      }
+    });
+    tx();
+
+    console.log(`🧹 Cleaned ${ids.length} expired services, ${tripIds.length} trips`);
+
+    // Rebuild derived tables
+    this.buildRouteStops();
+    this.buildStopGroups();
+  }
+
   printStats() {
     console.log("\n📊 DATABASE STATISTICS");
     console.log("======================");
 
-    const tables = ['routes', 'stops', 'trips', 'shapes', 'stop_times', 'route_stops'];
+    const tables = ['routes', 'stops', 'trips', 'shapes', 'stop_times', 'route_stops', 'calendar', 'calendar_dates'];
     for (const table of tables) {
       const result = this.db.prepare(`SELECT COUNT(*) as count FROM ${table}`).get() as any;
       console.log(`${table.padEnd(12)}: ${result.count.toLocaleString()} rows`);
@@ -277,11 +412,14 @@ async function main() {
   try {
     await importer.importRoutes();
     await importer.importStops();
+    await importer.importCalendar();
+    await importer.importCalendarDates();
     await importer.importTrips();
     await importer.importShapes();
     await importer.importStopTimes();
     importer.buildRouteStops();
     importer.buildStopGroups();
+    importer.cleanExpiredServices();
 
     importer.printStats();
 
@@ -290,6 +428,43 @@ async function main() {
   } catch (error) {
     console.error("❌ Import failed:", error);
     process.exit(1);
+  } finally {
+    importer.close();
+  }
+}
+
+export async function refreshGTFS() {
+  console.log("🔄 GTFS refresh starting...");
+
+  // Download zip
+  const GTFS_URL = "https://itsmarta.com/google_transit_feed/google_transit.zip";
+  const zipPath = path.join(process.cwd(), "data", "gtfs.zip");
+  const resp = await fetch(GTFS_URL);
+  if (!resp.ok) throw new Error(`GTFS download failed: ${resp.status}`);
+  await Bun.write(zipPath, resp);
+
+  // Extract using python
+  const gtfsDir = path.join(process.cwd(), "data", "gtfs");
+  await Bun.spawn(["python3", "-c", `import zipfile; zipfile.ZipFile("${zipPath}").extractall("${gtfsDir}")`]).exited;
+  await fs.promises.unlink(zipPath);
+
+  // Run import
+  const importer = new GTFSImporter();
+  try {
+    await importer.importRoutes();
+    await importer.importStops();
+    await importer.importCalendar();
+    await importer.importCalendarDates();
+    await importer.importTrips();
+    await importer.importShapes();
+    await importer.importStopTimes();
+    importer.buildRouteStops();
+    importer.buildStopGroups();
+    importer.cleanExpiredServices();
+    importer.printStats();
+    console.log("✅ GTFS refresh complete!");
+  } catch (error) {
+    console.error("❌ GTFS refresh failed:", error);
   } finally {
     importer.close();
   }
