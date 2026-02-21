@@ -5,6 +5,7 @@ import busRoutes from "./routes/bus.js";
 import aboutRoutes from "./routes/about.js";
 import exploreRoutes from "./routes/explore.js";
 import rideRoutes from "./routes/ride.js";
+import railRoutes from "./routes/rail.js";
 import apiRoutes from "./routes/api.js";
 type Env = {
   Variables: {
@@ -37,6 +38,7 @@ app.route("/", busRoutes);
 app.route("/", aboutRoutes);
 app.route("/", exploreRoutes);
 app.route("/", rideRoutes);
+app.route("/", railRoutes);
 
 // Serve push SW from root scope (SW scope = path of the file)
 app.get("/push-sw.js", async (c) => {
