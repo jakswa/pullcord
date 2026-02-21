@@ -157,19 +157,22 @@ class GTFSImporter {
     return records.length;
   }
 
-  // Stream-based chunked import for large tables (stop_times, shapes).
-  // Reads CSV in chunks to avoid loading entire file into memory.
+  // Stream-based import for large tables (stop_times, shapes).
+  // One transaction per table — single fsync at commit instead of per-chunk.
+  // Chunks only control JS memory (flush objects to SQLite, not to disk).
   private async streamImport(
     tableName: string,
     csvPath: string,
     transform: (record: any) => any,
-    chunkSize: number = 10000
+    chunkSize: number = 50000
   ): Promise<number> {
     return new Promise((resolve, reject) => {
       let totalCount = 0;
       let chunk: any[] = [];
       let columns: string[] | null = null;
       let stmt: any = null;
+
+      this.db.exec('BEGIN');
 
       const flushChunk = () => {
         if (chunk.length === 0) return;
@@ -180,12 +183,9 @@ class GTFSImporter {
             `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`
           );
         }
-        const tx = this.db.transaction(() => {
-          for (const record of chunk) {
-            stmt!.run(...Object.values(record));
-          }
-        });
-        tx();
+        for (const record of chunk) {
+          stmt!.run(...Object.values(record));
+        }
         totalCount += chunk.length;
         chunk = [];
       };
@@ -200,9 +200,13 @@ class GTFSImporter {
         })
         .on('end', () => {
           flushChunk();
+          this.db.exec('COMMIT');
           resolve(totalCount);
         })
-        .on('error', reject);
+        .on('error', (err) => {
+          try { this.db.exec('ROLLBACK'); } catch (_) {}
+          reject(err);
+        });
     });
   }
 
