@@ -36,12 +36,24 @@ const API_URL = "https://developerservices.itsmarta.com:18096/itsmarta/railrealt
 const API_KEY = process.env.MARTA_API_KEY || "";
 
 let cache: { data: RailArrival[]; ts: number } | null = null;
-const CACHE_TTL = 8_000; // 8s — API updates ~every 10s
+const CACHE_TTL = 20_000; // 20s — longer than poll interval, taps always hit cache
+let refreshing = false;
 
 export async function fetchArrivals(): Promise<RailArrival[]> {
   const now = Date.now();
+  // Serve cached data if fresh enough
   if (cache && now - cache.ts < CACHE_TTL) return cache.data;
+  // Stale-while-revalidate: serve stale data, refresh in background
+  if (cache && !refreshing) {
+    refreshing = true;
+    _refresh().finally(() => { refreshing = false; });
+    return cache.data;
+  }
+  // No cache at all — must wait
+  return _refresh();
+}
 
+async function _refresh(): Promise<RailArrival[]> {
   const resp = await fetch(`${API_URL}?apiKey=${API_KEY}`, {
     signal: AbortSignal.timeout(5000),
   });
@@ -64,7 +76,7 @@ export async function fetchArrivals(): Promise<RailArrival[]> {
     eventTime: r.EVENT_TIME,
   }));
 
-  cache = { data, ts: now };
+  cache = { data, ts: Date.now() };
   return data;
 }
 
