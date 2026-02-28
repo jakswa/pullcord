@@ -36,7 +36,9 @@ class GTFSImporter {
         stop_name TEXT,
         stop_lat REAL,
         stop_lon REAL,
-        group_id TEXT
+        group_id TEXT,
+        nearest_rail_station TEXT,
+        nearest_rail_distance_m INTEGER
       )
     `);
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_stops_group ON stops(group_id)`);
@@ -451,6 +453,77 @@ class GTFSImporter {
     this.buildStopGroups();
   }
 
+  buildTransferLookup() {
+    console.log("🚇 Building bus↔rail transfer lookup...");
+    const RADIUS_M = 200;
+
+    // Find rail stops (served by routes with rail short names)
+    const railStops = this.db.prepare(`
+      SELECT DISTINCT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
+      FROM stops s
+      JOIN stop_times st ON s.stop_id = st.stop_id
+      JOIN trips t ON st.trip_id = t.trip_id
+      JOIN routes r ON t.route_id = r.route_id
+      WHERE r.route_short_name IN ('BLUE','GOLD','GREEN','RED')
+    `).all() as { stop_id: string; stop_name: string; stop_lat: number; stop_lon: number }[];
+
+    const railStopIds = new Set(railStops.map(s => s.stop_id));
+
+    // Group rail stops by station name → collect all physical points
+    const stations = new Map<string, { name: string; points: { lat: number; lon: number }[] }>();
+    for (const s of railStops) {
+      const name = s.stop_name.replace(/\s+/g, ' ').trim();
+      let station = stations.get(name);
+      if (!station) { station = { name, points: [] }; stations.set(name, station); }
+      station.points.push({ lat: s.stop_lat, lon: s.stop_lon });
+    }
+
+    // Haversine
+    const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    // Get all bus stops
+    const allStops = this.db.prepare('SELECT stop_id, stop_lat, stop_lon FROM stops').all() as { stop_id: string; stop_lat: number; stop_lon: number }[];
+
+    // Clear existing transfer data
+    this.db.run('UPDATE stops SET nearest_rail_station = NULL, nearest_rail_distance_m = NULL');
+
+    // For each bus stop, find closest rail station point within radius
+    const update = this.db.prepare('UPDATE stops SET nearest_rail_station = ?, nearest_rail_distance_m = ? WHERE stop_id = ?');
+    let count = 0;
+
+    const tx = this.db.transaction(() => {
+      for (const stop of allStops) {
+        if (railStopIds.has(stop.stop_id)) continue;
+        let closestDist = Infinity;
+        let closestName: string | null = null;
+
+        for (const station of stations.values()) {
+          for (const point of station.points) {
+            const dist = haversine(stop.stop_lat, stop.stop_lon, point.lat, point.lon);
+            if (dist <= RADIUS_M && dist < closestDist) {
+              closestDist = dist;
+              closestName = station.name;
+            }
+          }
+        }
+
+        if (closestName) {
+          update.run(closestName, Math.round(closestDist), stop.stop_id);
+          count++;
+        }
+      }
+    });
+    tx();
+
+    console.log(`🚇 ${count} bus stops linked to ${stations.size} rail stations (${RADIUS_M}m radius)`);
+  }
+
   printStats() {
     console.log("\n📊 DATABASE STATISTICS");
     console.log("======================");
@@ -495,6 +568,7 @@ async function main() {
     await importer.importStopTimes();
     importer.buildRouteStops();
     importer.cleanExpiredServices();
+    importer.buildTransferLookup();
 
     importer.printStats();
 
@@ -556,6 +630,7 @@ export async function refreshGTFS() {
     await importer.importStopTimes();
     importer.buildRouteStops();
     importer.cleanExpiredServices();
+    importer.buildTransferLookup();
     importer.printStats();
     console.log("✅ GTFS refresh complete!");
   } catch (error) {
