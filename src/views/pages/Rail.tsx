@@ -1204,7 +1204,6 @@ function railStyles(): string {
     .rail-tl-stop.visited .rail-tl-dot {
       width: 8px;
       height: 8px;
-      left: calc(1.65rem + 1.5px - 4px);
     }
 
     .rail-tl-stop {
@@ -1220,27 +1219,26 @@ function railStyles(): string {
 
     .rail-tl-dot {
       position: absolute;
-      left: calc(1.65rem + 1.5px - 7px);
+      left: 0.65rem;
       top: 50%;
-      transform: translateY(-50%);
+      transform: translate(-50%, -50%);
+      margin-left: 1.5px;
       width: 14px;
       height: 14px;
       border-radius: 50%;
       z-index: 1;
-      flex-shrink: 0;
     }
 
     .rail-tl-stop.current .rail-tl-dot {
       width: 18px;
       height: 18px;
-      left: calc(1.65rem + 1.5px - 9px);
       animation: rail-tl-pulse 1.5s ease-in-out infinite;
       box-shadow: 0 0 8px var(--tl-color, #666);
     }
 
     @keyframes rail-tl-pulse {
-      0%, 100% { opacity: 1; transform: translateY(-50%) scale(1); }
-      50% { opacity: 0.7; transform: translateY(-50%) scale(0.85); }
+      0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      50% { opacity: 0.7; transform: translate(-50%, -50%) scale(0.85); }
     }
 
     .rail-tl-name {
