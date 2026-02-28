@@ -1260,7 +1260,7 @@ function railStyles(): string {
     }
 
     .rail-tl-now {
-      color: #4ADE80;
+      color: #fff;
       font-weight: 800;
     }
   `;
