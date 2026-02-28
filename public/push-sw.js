@@ -7,7 +7,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body: data.body || 'Your bus is arriving soon!',
     icon: '/public/icons/icon-192.png',
-    badge: '/public/icons/icon-192.png',
+    badge: '/public/icons/badge-96.png',
     vibrate: [200, 100, 200, 100, 200],
     tag: data.tag || 'pullcord-alert',
     renotify: true,

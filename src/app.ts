@@ -7,6 +7,7 @@ import exploreRoutes from "./routes/explore.js";
 import rideRoutes from "./routes/ride.js";
 import railRoutes from "./routes/rail.js";
 import apiRoutes from "./routes/api.js";
+import railRoutes from "./routes/rail.js";
 type Env = {
   Variables: {
     // Add any context variables here if needed
