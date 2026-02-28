@@ -463,8 +463,12 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
     return false;
   });
 
-  deduped.sort((a, b) => a.etaSeconds - b.etaSeconds);
-  return deduped;
+  // Drop stale "next" tier predictions where the bus already passed
+  // (etaSeconds clamped to 0 means the scheduled arrival is in the past)
+  const filtered = deduped.filter(a => !(a.tier === 'next' && a.etaSeconds < 60));
+
+  filtered.sort((a, b) => a.etaSeconds - b.etaSeconds);
+  return filtered;
 }
 
 // ─────────────────────────────────────
