@@ -457,6 +457,10 @@ class GTFSImporter {
     console.log("🚇 Building bus↔rail transfer lookup...");
     const RADIUS_M = 200;
 
+    // Ensure columns exist (handles existing DBs without them)
+    try { this.db.run('ALTER TABLE stops ADD COLUMN nearest_rail_station TEXT'); } catch {}
+    try { this.db.run('ALTER TABLE stops ADD COLUMN nearest_rail_distance_m INTEGER'); } catch {}
+
     // Find rail stops (served by routes with rail short names)
     const railStops = this.db.prepare(`
       SELECT DISTINCT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
