@@ -86,7 +86,15 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
 
         {/* UPCOMING — remaining predictions */}
         <section class="d-upcoming" id="upcoming-section" style="display:none">
-          <div class="d-upcoming-header">Arriving</div>
+          <div class="d-upcoming-header">
+            Arriving
+            {stop.nearest_rail_station && (
+              <button id="rail-toggle" class="d-rail-toggle" type="button"
+                data-station={stop.nearest_rail_station}>
+                🚇
+              </button>
+            )}
+          </div>
           <div id="upcoming-list" class="d-upcoming-list"></div>
         </section>
 

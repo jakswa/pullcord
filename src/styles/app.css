@@ -602,6 +602,45 @@
     letter-spacing: 0.08em;
     color: var(--text-secondary);
     padding: 0.75rem 0 0.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .d-rail-toggle {
+    font-size: 1.1rem;
+    background: var(--bg-surface, #1e1e1e);
+    border: 1px solid var(--border, #333);
+    border-radius: 0.3rem;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .d-rail-toggle.d-rail-active {
+    opacity: 1;
+    border-color: #4A9FE5;
+  }
+
+  .d-rail-row {
+    text-decoration: none;
+    color: inherit;
+  }
+  .d-rail-dir {
+    font-weight: 800;
+    font-size: 0.85rem;
+    margin-right: 0.25rem;
+  }
+  .d-rail-line {
+    display: inline-block;
+    padding: 0.05rem 0.3rem;
+    border-radius: 0.15rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
+    margin-right: 0.3rem;
+    vertical-align: middle;
   }
 
   .d-upcoming-list {
