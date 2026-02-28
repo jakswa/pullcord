@@ -1014,7 +1014,6 @@
 
 
   /* ── Bus Markers (reused in map panel) ── */
-  .bus-icon { background: transparent !important; border: none !important; }
 
   .bus-marker {
     background: var(--bus-color, var(--bus-marker-default));
