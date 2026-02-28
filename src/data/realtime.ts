@@ -383,6 +383,72 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
         }
       }
     }
+
+    // Ghost vehicle rescue: MARTA's trip update feed sometimes has stale arrival times
+    // (hours in the past) for trips that are actively running. The -120s filter above
+    // correctly drops those, but it means we miss real buses approaching the stop.
+    // Fix: check vehicle positions for active trips that serve our stop but have no
+    // prediction in the arrivals array, and synthesize one from GPS + schedule deltas.
+    const arrivedVehicleTrips = new Set(arrivals.map(a => `${a.vehicleId}:${a.tripId}`));
+    const rescueTripIds: string[] = [];
+    const rescueVehicles: Map<string, VehiclePosition> = new Map(); // tripId → vehicle
+
+    for (const veh of vehicles) {
+      if (!veh.tripId || !veh.vehicleId) continue;
+      // Skip if we already have a prediction for this vehicle on this trip
+      if (arrivedVehicleTrips.has(`${veh.vehicleId}:${veh.tripId}`)) continue;
+      rescueTripIds.push(veh.tripId);
+      rescueVehicles.set(veh.tripId, veh);
+    }
+
+    if (rescueTripIds.length > 0) {
+      const rescueStopSeqs = getTripStopSequences(rescueTripIds);
+
+      for (const [tripId, rawStops] of rescueStopSeqs) {
+        // Does this trip serve any of our target stops?
+        if (!rawStops.some(s => allStopIds.has(s.stop_id))) continue;
+
+        const veh = rescueVehicles.get(tripId);
+        if (!veh) continue;
+
+        const tripStops: TripStop[] = rawStops.map(s => ({
+          stop_id: s.stop_id,
+          lat: s.lat,
+          lon: s.lon,
+          sequence: s.sequence,
+          arrivalSec: parseTimeToSec(s.arrival_time),
+        }));
+
+        const eta = computeETA(veh.lat, veh.lon, tripStops, allStopIds, veh.staleSeconds);
+        if (eta === null) continue;
+
+        // Look up trip metadata
+        const trip = tripLookup.get(tripId);
+        if (!trip) continue;
+        if (routeFilter && !routeFilter.has(trip.route_id)) continue;
+
+        const arrival: ArrivalPrediction = {
+          headsign: trip.trip_headsign || 'Unknown Destination',
+          directionId: trip.direction_id,
+          vehicleId: veh.vehicleId,
+          tripId,
+          etaSeconds: eta,
+          staleSeconds: veh.staleSeconds,
+          tier: 'active',
+          etaSource: 'computed',
+        };
+
+        // Route enrichment (multi-route mode)
+        if (routeInfo) {
+          const ri = routeInfo.get(trip.route_id);
+          arrival.routeId = trip.route_id;
+          arrival.routeShortName = ri?.route_short_name;
+          arrival.routeColor = ri?.route_color;
+        }
+
+        arrivals.push(arrival);
+      }
+    }
   }
 
   // Dedup by tripId (paired stops can match same trip from both directions)
