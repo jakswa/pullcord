@@ -27,6 +27,9 @@ rm "$GTFS_ZIP"
 echo "🗄️  Rebuilding SQLite database..."
 bun run src/data/gtfs-import.ts
 
+echo "🚇 Building transfer stop lookup..."
+bun run tools/build-transfer-lookup.ts
+
 echo "🔄 Restarting Pullcord..."
 systemctl --user restart pullcord
 
