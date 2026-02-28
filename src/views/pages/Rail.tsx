@@ -1204,7 +1204,7 @@ function railStyles(): string {
     .rail-tl-stop.visited .rail-tl-dot {
       width: 8px;
       height: 8px;
-      left: 0.84rem;
+      left: calc(1.65rem + 1.5px - 4px);
     }
 
     .rail-tl-stop {
@@ -1220,7 +1220,7 @@ function railStyles(): string {
 
     .rail-tl-dot {
       position: absolute;
-      left: 0.65rem;
+      left: calc(1.65rem + 1.5px - 7px);
       top: 50%;
       transform: translateY(-50%);
       width: 14px;
@@ -1233,7 +1233,7 @@ function railStyles(): string {
     .rail-tl-stop.current .rail-tl-dot {
       width: 18px;
       height: 18px;
-      left: 0.52rem;
+      left: calc(1.65rem + 1.5px - 9px);
       animation: rail-tl-pulse 1.5s ease-in-out infinite;
       box-shadow: 0 0 8px var(--tl-color, #666);
     }
