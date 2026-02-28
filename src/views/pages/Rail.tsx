@@ -171,22 +171,18 @@ window.reorder=function(){
     h.setAttribute("role","button");
     h.setAttribute("aria-expanded",open?"true":"false");
 
-    var chevron=document.createElement("span");
-    chevron.className="rail-section-chevron";
-    chevron.textContent=open?"\\u25BE":"\\u25B8";
-
     var txt=document.createElement("span");
     txt.textContent=label;
-
-    h.appendChild(chevron);
     h.appendChild(txt);
 
+    var action=document.createElement("span");
+    action.className="rail-section-action";
     if(key==="nearby"&&!userPos){
-      var hint=document.createElement("span");
-      hint.className="rail-section-hint";
-      hint.textContent=isOpen("nearby",false)?"locating…":"tap to enable";
-      h.appendChild(hint);
+      action.textContent=isOpen("nearby",false)?"locating…":"enable";
+    } else {
+      action.textContent=open?"hide":"show";
     }
+    h.appendChild(action);
 
     h.addEventListener("click",function(){toggleSection(key)});
     list.appendChild(h);
@@ -984,17 +980,11 @@ function railStyles(): string {
     .rail-section:active {
       color: var(--text-primary);
     }
-    .rail-section-chevron {
-      font-size: 0.85rem;
-      width: 0.85rem;
-      text-align: center;
-      flex-shrink: 0;
-    }
-    .rail-section-hint {
+    .rail-section-action {
       margin-left: auto;
       font-weight: 400;
       font-size: 0.85rem;
-      opacity: 0.6;
+      opacity: 0.5;
     }
     .rail-section-items {
       display: flex;
