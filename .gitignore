@@ -11,3 +11,4 @@ investigate-*.ts
 screenshot-*.png
 data/cords.db*
 data/marta.db-*
+public/rail.js
