@@ -90,22 +90,37 @@ function buildInlineJS(isLanding: boolean): string {
 
   if (!isLanding) return base;
 
-  // Landing page gets starred + nearby logic
+  // Landing page: starred, nearby (opt-in geo), collapsible sections
   const landing = `
 (function(){
-var SK="rail-starred",coords=window.__COORDS||{};
+var SK="rail-starred",SEC="rail-sections",coords=window.__COORDS||{};
 function getStarred(){try{return JSON.parse(localStorage.getItem(SK))||[]}catch(e){return[]}}
 function setStarred(a){localStorage.setItem(SK,JSON.stringify(a))}
 function toggleStar(slug){var s=getStarred(),i=s.indexOf(slug);if(i>-1)s.splice(i,1);else s.push(slug);setStarred(s);reorder()}
+function getSections(){try{return JSON.parse(localStorage.getItem(SEC))||{}}catch(e){return{}}}
+function setSections(o){localStorage.setItem(SEC,JSON.stringify(o))}
 
 // Haversine in km
 function dist(a,b){var R=6371,dLat=(b[0]-a[0])*Math.PI/180,dLon=(b[1]-a[1])*Math.PI/180;var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 
-var userPos=null;
-function tryGeo(){if(!navigator.geolocation)return;navigator.geolocation.getCurrentPosition(function(p){userPos=[p.coords.latitude,p.coords.longitude];reorder()},function(){},{ maximumAge:120000,timeout:5000 })}
-tryGeo();
+var userPos=null,geoRequested=false;
+
+function requestGeo(){
+  if(geoRequested||!navigator.geolocation)return;
+  geoRequested=true;
+  navigator.geolocation.getCurrentPosition(function(p){
+    userPos=[p.coords.latitude,p.coords.longitude];
+    reorder();
+  },function(){
+    // Permission denied or error — collapse nearby
+    var s=getSections();s.nearby=false;setSections(s);reorder();
+  },{ maximumAge:120000,timeout:8000 });
+}
 
 function getSlug(row){var h=row.getAttribute("href");return h?h.replace("/rail/",""):""}
+
+function isOpen(key,def){var s=getSections();return s.hasOwnProperty(key)?s[key]:def}
+function toggleSection(key){var s=getSections();s[key]=!isOpen(key,key!=="nearby");setSections(s);if(key==="nearby"&&s[key])requestGeo();reorder()}
 
 window.reorder=function(){
   var list=document.querySelector(".rail-station-list");
@@ -113,34 +128,28 @@ window.reorder=function(){
   var rows=Array.from(list.querySelectorAll(".rail-row"));
   var starred=getStarred();
 
-  // Remove existing section headers
-  list.querySelectorAll(".rail-section").forEach(function(el){el.remove()});
-
-  // Remove existing star buttons and re-add
+  // Remove old sections/stars
+  list.querySelectorAll(".rail-section,.rail-section-items").forEach(function(el){el.remove()});
   rows.forEach(function(row){
-    var old=row.querySelector(".rail-star");
-    if(old)old.remove();
+    var old=row.querySelector(".rail-star");if(old)old.remove();
     var slug=getSlug(row);
     var btn=document.createElement("span");
     btn.className="rail-star"+(starred.indexOf(slug)>-1?" starred":"");
-    btn.textContent=starred.indexOf(slug)>-1?"★":"☆";
+    btn.textContent=starred.indexOf(slug)>-1?"\\u2605":"\\u2606";
     btn.setAttribute("role","button");
-    btn.setAttribute("aria-label",starred.indexOf(slug)>-1?"Unstar station":"Star station");
+    btn.setAttribute("aria-label",starred.indexOf(slug)>-1?"Unstar":"Star");
     btn.addEventListener("click",function(e){e.preventDefault();e.stopPropagation();toggleStar(slug)});
     row.insertBefore(btn,row.firstChild);
   });
 
-  // Compute nearby (top 3 within 5km)
+  // Compute nearby
   var nearby=[];
   if(userPos){
-    var dists=rows.map(function(r){var s=getSlug(r);var c=coords[s];return{row:r,slug:s,d:c?dist(userPos,c):999}}).sort(function(a,b){return a.d-b.d});
+    var dists=rows.map(function(r){var s=getSlug(r);var c=coords[s];return{slug:s,d:c?dist(userPos,c):999}}).sort(function(a,b){return a.d-b.d});
     nearby=dists.filter(function(x){return x.d<5}).slice(0,3).map(function(x){return x.slug});
   }
 
-  // Sort: starred first, then nearby, then alphabetical (original order)
-  var starredSet=new Set(starred);
-  var nearbySet=new Set(nearby);
-
+  var starredSet=new Set(starred),nearbySet=new Set(nearby);
   var starredRows=[],nearbyRows=[],restRows=[];
   rows.forEach(function(r){
     var s=getSlug(r);
@@ -149,22 +158,55 @@ window.reorder=function(){
     else restRows.push(r);
   });
 
-  // Clear and rebuild
   while(list.firstChild)list.removeChild(list.firstChild);
 
-  function addSection(label,items){
-    if(items.length===0)return;
+  function addSection(key,label,items,defaultOpen){
+    var open=isOpen(key,defaultOpen);
+    var hasItems=items.length>0;
+    // nearby always shows as a section (it's the geo opt-in)
+    if(!hasItems&&key!=="nearby")return;
+
     var h=document.createElement("div");
-    h.className="rail-section";
-    h.textContent=label;
+    h.className="rail-section"+(open?" open":"");
+    h.setAttribute("role","button");
+    h.setAttribute("aria-expanded",open?"true":"false");
+
+    var chevron=document.createElement("span");
+    chevron.className="rail-section-chevron";
+    chevron.textContent=open?"\\u25BE":"\\u25B8";
+
+    var txt=document.createElement("span");
+    txt.textContent=label;
+
+    h.appendChild(chevron);
+    h.appendChild(txt);
+
+    if(key==="nearby"&&!userPos&&!geoRequested){
+      var hint=document.createElement("span");
+      hint.className="rail-section-hint";
+      hint.textContent="tap to enable";
+      h.appendChild(hint);
+    }
+
+    h.addEventListener("click",function(){toggleSection(key)});
     list.appendChild(h);
-    items.forEach(function(r){list.appendChild(r)});
+
+    if(open&&hasItems){
+      var wrap=document.createElement("div");
+      wrap.className="rail-section-items";
+      items.forEach(function(r){wrap.appendChild(r)});
+      list.appendChild(wrap);
+    }
   }
 
-  if(starredRows.length>0)addSection("starred",starredRows);
-  if(nearbyRows.length>0)addSection("nearby",nearbyRows);
-  if(starredRows.length>0||nearbyRows.length>0)addSection("all stations",restRows);
-  else restRows.forEach(function(r){list.appendChild(r)});
+  var hasAnySections=starredRows.length>0||navigator.geolocation;
+  if(hasAnySections){
+    addSection("starred","starred",starredRows,true);
+    if(navigator.geolocation)addSection("nearby","nearby",nearbyRows,false);
+    addSection("all","all stations",restRows,true);
+  } else {
+    restRows.forEach(function(r){list.appendChild(r)});
+  }
 };
 reorder();
 })();`;
@@ -922,14 +964,39 @@ function railStyles(): string {
       color: #D4A020;
     }
 
-    /* ── Section headers ── */
+    /* ── Section headers (collapsible) ── */
     .rail-section {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
       font-size: 0.8rem;
       font-weight: 600;
       letter-spacing: 0.04em;
       color: var(--text-muted);
-      padding: 0.65rem 1rem 0.3rem;
+      padding: 0.65rem 1rem 0.35rem;
       border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .rail-section:active {
+      color: var(--text-primary);
+    }
+    .rail-section-chevron {
+      font-size: 0.7rem;
+      width: 0.7rem;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .rail-section-hint {
+      margin-left: auto;
+      font-weight: 400;
+      font-size: 0.7rem;
+      opacity: 0.6;
+    }
+    .rail-section-items {
+      display: flex;
+      flex-direction: column;
     }
 
     /* ── Animations ── */
