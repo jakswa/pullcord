@@ -29,7 +29,11 @@ app.use("*", async (c, next) => {
 // Rail host: serve rail landing at /
 app.get("/", async (c, next) => {
   if (c.get("isRailHost")) {
-    return c.redirect("/rail", 302);
+    // Rewrite to /rail handler internally (no redirect, URL stays /)
+    const url = new URL(c.req.url);
+    url.pathname = "/rail";
+    const newReq = new Request(url.toString(), c.req.raw);
+    return app.fetch(newReq, c.env);
   }
   return next();
 });
