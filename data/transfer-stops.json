@@ -1,0 +1,890 @@
+{
+  "generated": "2026-02-28T21:59:09.032Z",
+  "radius_m": 200,
+  "bus_stops": {
+    "101466": {
+      "rail_station": "ASHBY STATION",
+      "rail_stop_id": "908963",
+      "distance_m": 191
+    },
+    "102028": {
+      "rail_station": "GARNETT STATION",
+      "rail_stop_id": "908600",
+      "distance_m": 196
+    },
+    "102046": {
+      "rail_station": "GEORGIA STATE STATION",
+      "rail_stop_id": "908696",
+      "distance_m": 167
+    },
+    "102074": {
+      "rail_station": "GARNETT STATION",
+      "rail_stop_id": "908600",
+      "distance_m": 199
+    },
+    "102078": {
+      "rail_station": "GARNETT STATION",
+      "rail_stop_id": "908600",
+      "distance_m": 192
+    },
+    "102170": {
+      "rail_station": "GEORGIA STATE STATION",
+      "rail_stop_id": "908696",
+      "distance_m": 155
+    },
+    "102173": {
+      "rail_station": "GEORGIA STATE STATION",
+      "rail_stop_id": "908696",
+      "distance_m": 156
+    },
+    "103134": {
+      "rail_station": "FIVE POINTS STATION",
+      "rail_stop_id": "908981",
+      "distance_m": 133
+    },
+    "114082": {
+      "rail_station": "WEST END STATION",
+      "rail_stop_id": "908704",
+      "distance_m": 186
+    },
+    "114152": {
+      "rail_station": "WEST END STATION",
+      "rail_stop_id": "908704",
+      "distance_m": 143
+    },
+    "114900": {
+      "rail_station": "WEST END STATION",
+      "rail_stop_id": "908704",
+      "distance_m": 24
+    },
+    "123016": {
+      "rail_station": "OAKLAND CITY STATION",
+      "rail_stop_id": "908301",
+      "distance_m": 68
+    },
+    "123900": {
+      "rail_station": "OAKLAND CITY STATION",
+      "rail_stop_id": "908301",
+      "distance_m": 118
+    },
+    "136901": {
+      "rail_station": "LAKEWOOD-FT MCPHERSON STATION",
+      "rail_stop_id": "908629",
+      "distance_m": 74
+    },
+    "146330": {
+      "rail_station": "EAST POINT STATION",
+      "rail_stop_id": "908628",
+      "distance_m": 173
+    },
+    "146332": {
+      "rail_station": "EAST POINT STATION",
+      "rail_stop_id": "908628",
+      "distance_m": 174
+    },
+    "146900": {
+      "rail_station": "EAST POINT STATION",
+      "rail_stop_id": "908628",
+      "distance_m": 51
+    },
+    "166042": {
+      "rail_station": "COLLEGE PARK STATION",
+      "rail_stop_id": "908599",
+      "distance_m": 100
+    },
+    "166900": {
+      "rail_station": "COLLEGE PARK STATION",
+      "rail_stop_id": "908599",
+      "distance_m": 77
+    },
+    "166901": {
+      "rail_station": "COLLEGE PARK STATION",
+      "rail_stop_id": "908599",
+      "distance_m": 152
+    },
+    "210431": {
+      "rail_station": "GEORGIA STATE STATION",
+      "rail_stop_id": "908696",
+      "distance_m": 59
+    },
+    "210548": {
+      "rail_station": "AVONDALE STATION",
+      "rail_stop_id": "908438",
+      "distance_m": 83
+    },
+    "210709": {
+      "rail_station": "GEORGIA STATE STATION",
+      "rail_stop_id": "908696",
+      "distance_m": 55
+    },
+    "211300": {
+      "rail_station": "INDIAN CREEK STATION",
+      "rail_stop_id": "908515",
+      "distance_m": 86
+    },
+    "211322": {
+      "rail_station": "WEST END STATION",
+      "rail_stop_id": "908704",
+      "distance_m": 123
+    },
+    "211325": {
+      "rail_station": "OAKLAND CITY STATION",
+      "rail_stop_id": "908301",
+      "distance_m": 33
+    },
+    "211753": {
+      "rail_station": "PEACHTREE CENTER STATION",
+      "rail_stop_id": "908601",
+      "distance_m": 6
+    },
+    "212948": {
+      "rail_station": "COLLEGE PARK STATION",
+      "rail_stop_id": "908599",
+      "distance_m": 154
+    },
+    "212996": {
+      "rail_station": "EAST LAKE STATION",
+      "rail_stop_id": "908566",
+      "distance_m": 55
+    },
+    "212997": {
+      "rail_station": "EAST LAKE STATION",
+      "rail_stop_id": "908566",
+      "distance_m": 67
+    },
+    "212998": {
+      "rail_station": "EAST LAKE STATION",
+      "rail_stop_id": "908566",
+      "distance_m": 157
+    },
+    "212999": {
+      "rail_station": "EAST LAKE STATION",
+      "rail_stop_id": "908566",
+      "distance_m": 150
+    },
+    "213110": {
+      "rail_station": "ARTS CENTER STATION",
+      "rail_stop_id": "906369",
+      "distance_m": 91
+    },
+    "213318": {
+      "rail_station": "GARNETT STATION",
+      "rail_stop_id": "908600",
+      "distance_m": 154
+    },
+    "213319": {
+      "rail_station": "GARNETT STATION",
+      "rail_stop_id": "908600",
+      "distance_m": 159
+    },
+    "213320": {
+      "rail_station": "GARNETT STATION",
+      "rail_stop_id": "908600",
+      "distance_m": 118
+    },
+    "213321": {
+      "rail_station": "GARNETT STATION",
+      "rail_stop_id": "908600",
+      "distance_m": 132
+    },
+    "213845": {
+      "rail_station": "CIVIC CENTER STATION",
+      "rail_stop_id": "908912",
+      "distance_m": 156
+    },
+    "213857": {
+      "rail_station": "KING MEMORIAL STATION",
+      "rail_stop_id": "908436",
+      "distance_m": 51
+    },
+    "213858": {
+      "rail_station": "KING MEMORIAL STATION",
+      "rail_stop_id": "908436",
+      "distance_m": 9
+    },
+    "213859": {
+      "rail_station": "KING MEMORIAL STATION",
+      "rail_stop_id": "908436",
+      "distance_m": 33
+    },
+    "214113": {
+      "rail_station": "CIVIC CENTER STATION",
+      "rail_stop_id": "908912",
+      "distance_m": 134
+    },
+    "600008": {
+      "rail_station": "CIVIC CENTER STATION",
+      "rail_stop_id": "908912",
+      "distance_m": 10
+    },
+    "600023": {
+      "rail_station": "HAMILTON E HOLMES STATION",
+      "rail_stop_id": "907933",
+      "distance_m": 136
+    },
+    "600031": {
+      "rail_station": "FIVE POINTS STATION",
+      "rail_stop_id": "908981",
+      "distance_m": 37
+    },
+    "600032": {
+      "rail_station": "FIVE POINTS STATION",
+      "rail_stop_id": "908981",
+      "distance_m": 66
+    },
+    "600034": {
+      "rail_station": "HAMILTON E HOLMES STATION",
+      "rail_stop_id": "907933",
+      "distance_m": 144
+    },
+    "600035": {
+      "rail_station": "FIVE POINTS STATION",
+      "rail_stop_id": "908981",
+      "distance_m": 178
+    },
+    "900182": {
+      "rail_station": "WEST LAKE STATION",
+      "rail_stop_id": "908023",
+      "distance_m": 108
+    },
+    "900231": {
+      "rail_station": "WEST LAKE STATION",
+      "rail_stop_id": "908023",
+      "distance_m": 49
+    },
+    "900232": {
+      "rail_station": "WEST LAKE STATION",
+      "rail_stop_id": "908023",
+      "distance_m": 45
+    },
+    "900579": {
+      "rail_station": "LENOX STATION",
+      "rail_stop_id": "906827",
+      "distance_m": 182
+    },
+    "900686": {
+      "rail_station": "KENSINGTON STATION",
+      "rail_stop_id": "908634",
+      "distance_m": 33
+    },
+    "900969": {
+      "rail_station": "INMAN PARK-REYNOLDSTOWN STATION",
+      "rail_stop_id": "908437",
+      "distance_m": 189
+    },
+    "901066": {
+      "rail_station": "INMAN PARK-REYNOLDSTOWN STATION",
+      "rail_stop_id": "908437",
+      "distance_m": 108
+    },
+    "901140": {
+      "rail_station": "HAMILTON E HOLMES STATION",
+      "rail_stop_id": "907933",
+      "distance_m": 43
+    },
+    "901155": {
+      "rail_station": "INMAN PARK-REYNOLDSTOWN STATION",
+      "rail_stop_id": "908437",
+      "distance_m": 64
+    },
+    "901189": {
+      "rail_station": "HAMILTON E HOLMES STATION",
+      "rail_stop_id": "907933",
+      "distance_m": 182
+    },
+    "901263": {
+      "rail_station": "VINE CITY STATION",
+      "rail_stop_id": "908958",
+      "distance_m": 37
+    },
+    "901286": {
+      "rail_station": "PEACHTREE CENTER STATION",
+      "rail_stop_id": "908601",
+      "distance_m": 10
+    },
+    "901341": {
+      "rail_station": "WEST LAKE STATION",
+      "rail_stop_id": "908023",
+      "distance_m": 66
+    },
+    "901342": {
+      "rail_station": "WEST LAKE STATION",
+      "rail_stop_id": "908023",
+      "distance_m": 170
+    },
+    "901344": {
+      "rail_station": "WEST LAKE STATION",
+      "rail_stop_id": "908023",
+      "distance_m": 82
+    },
+    "901345": {
+      "rail_station": "WEST LAKE STATION",
+      "rail_stop_id": "908023",
+      "distance_m": 193
+    },
+    "901373": {
+      "rail_station": "PEACHTREE CENTER STATION",
+      "rail_stop_id": "908601",
+      "distance_m": 150
+    },
+    "901789": {
+      "rail_station": "ARTS CENTER STATION",
+      "rail_stop_id": "906369",
+      "distance_m": 51
+    },
+    "902145": {
+      "rail_station": "LINDBERGH CENTER STATION",
+      "rail_stop_id": "908055",
+      "distance_m": 65
+    },
+    "902290": {
+      "rail_station": "FIVE POINTS STATION",
+      "rail_stop_id": "908981",
+      "distance_m": 162
+    },
+    "902514": {
+      "rail_station": "ARTS CENTER STATION",
+      "rail_stop_id": "906369",
+      "distance_m": 158
+    },
+    "902725": {
+      "rail_station": "NORTH SPRINGS STATION",
+      "rail_stop_id": "907766",
+      "distance_m": 52
+    },
+    "902890": {
+      "rail_station": "MEDICAL CENTER STATION",
+      "rail_stop_id": "908885",
+      "distance_m": 151
+    },
+    "903009": {
+      "rail_station": "DUNWOODY STATION",
+      "rail_stop_id": "908047",
+      "distance_m": 47
+    },
+    "903164": {
+      "rail_station": "SANDY SPRINGS STATION",
+      "rail_stop_id": "907845",
+      "distance_m": 19
+    },
+    "903165": {
+      "rail_station": "MEDICAL CENTER STATION",
+      "rail_stop_id": "908885",
+      "distance_m": 54
+    },
+    "903261": {
+      "rail_station": "HAMILTON E HOLMES STATION",
+      "rail_stop_id": "907933",
+      "distance_m": 199
+    },
+    "903320": {
+      "rail_station": "HAMILTON E HOLMES STATION",
+      "rail_stop_id": "907933",
+      "distance_m": 40
+    },
+    "903332": {
+      "rail_station": "FIVE POINTS STATION",
+      "rail_stop_id": "908981",
+      "distance_m": 191
+    },
+    "903391": {
+      "rail_station": "INDIAN CREEK STATION",
+      "rail_stop_id": "908515",
+      "distance_m": 44
+    },
+    "903548": {
+      "rail_station": "ASHBY STATION",
+      "rail_stop_id": "908963",
+      "distance_m": 48
+    },
+    "903601": {
+      "rail_station": "BANKHEAD STATION",
+      "rail_stop_id": "907960",
+      "distance_m": 169
+    },
+    "904262": {
+      "rail_station": "DECATUR STATION",
+      "rail_stop_id": "908700",
+      "distance_m": 194
+    },
+    "904264": {
+      "rail_station": "AVONDALE STATION",
+      "rail_stop_id": "908438",
+      "distance_m": 28
+    },
+    "904322": {
+      "rail_station": "EDGEWOOD-CANDLER PARK STATION",
+      "rail_stop_id": "908699",
+      "distance_m": 141
+    },
+    "904323": {
+      "rail_station": "EAST LAKE STATION",
+      "rail_stop_id": "908566",
+      "distance_m": 81
+    },
+    "904464": {
+      "rail_station": "EDGEWOOD-CANDLER PARK STATION",
+      "rail_stop_id": "908699",
+      "distance_m": 59
+    },
+    "904519": {
+      "rail_station": "BANKHEAD STATION",
+      "rail_stop_id": "907960",
+      "distance_m": 21
+    },
+    "904624": {
+      "rail_station": "BANKHEAD STATION",
+      "rail_stop_id": "907960",
+      "distance_m": 153
+    },
+    "904628": {
+      "rail_station": "ASHBY STATION",
+      "rail_stop_id": "908963",
+      "distance_m": 180
+    },
+    "904642": {
+      "rail_station": "ASHBY STATION",
+      "rail_stop_id": "908963",
+      "distance_m": 46
+    },
+    "904800": {
+      "rail_station": "MIDTOWN STATION",
+      "rail_stop_id": "908375",
+      "distance_m": 36
+    },
+    "904813": {
+      "rail_station": "EDGEWOOD-CANDLER PARK STATION",
+      "rail_stop_id": "908699",
+      "distance_m": 198
+    },
+    "904940": {
+      "rail_station": "AVONDALE STATION",
+      "rail_stop_id": "908438",
+      "distance_m": 178
+    },
+    "904948": {
+      "rail_station": "ASHBY STATION",
+      "rail_stop_id": "908963",
+      "distance_m": 43
+    },
+    "904966": {
+      "rail_station": "NORTH AVENUE STATION",
+      "rail_stop_id": "907914",
+      "distance_m": 126
+    },
+    "905508": {
+      "rail_station": "DORAVILLE STATION",
+      "rail_stop_id": "908845",
+      "distance_m": 42
+    },
+    "905514": {
+      "rail_station": "CHAMBLEE STATION",
+      "rail_stop_id": "908603",
+      "distance_m": 55
+    },
+    "905515": {
+      "rail_station": "CHAMBLEE STATION",
+      "rail_stop_id": "908603",
+      "distance_m": 63
+    },
+    "905610": {
+      "rail_station": "CHAMBLEE STATION",
+      "rail_stop_id": "908603",
+      "distance_m": 183
+    },
+    "905666": {
+      "rail_station": "LENOX STATION",
+      "rail_stop_id": "906827",
+      "distance_m": 26
+    },
+    "905697": {
+      "rail_station": "BROOKHAVEN-OGLETHORPE STATION",
+      "rail_stop_id": "908186",
+      "distance_m": 13
+    },
+    "905887": {
+      "rail_station": "BUCKHEAD STATION",
+      "rail_stop_id": "908639",
+      "distance_m": 166
+    },
+    "905888": {
+      "rail_station": "BUCKHEAD STATION",
+      "rail_stop_id": "908639",
+      "distance_m": 113
+    },
+    "905889": {
+      "rail_station": "BUCKHEAD STATION",
+      "rail_stop_id": "908639",
+      "distance_m": 32
+    },
+    "905890": {
+      "rail_station": "BUCKHEAD STATION",
+      "rail_stop_id": "908639",
+      "distance_m": 50
+    },
+    "907473": {
+      "rail_station": "NORTH AVENUE STATION",
+      "rail_stop_id": "907914",
+      "distance_m": 43
+    }
+  },
+  "rail_stations": {
+    "HAMILTON E HOLMES STATION": {
+      "stop_id": "907933",
+      "lat": 33.754535,
+      "lon": -84.469563,
+      "bus_stops": [
+        "600023",
+        "600034",
+        "901140",
+        "901189",
+        "903261",
+        "903320"
+      ]
+    },
+    "WEST LAKE STATION": {
+      "stop_id": "908023",
+      "lat": 33.753288,
+      "lon": -84.445448,
+      "bus_stops": [
+        "900182",
+        "900231",
+        "900232",
+        "901341",
+        "901342",
+        "901344",
+        "901345"
+      ]
+    },
+    "ASHBY STATION": {
+      "stop_id": "908963",
+      "lat": 33.756478,
+      "lon": -84.417279,
+      "bus_stops": [
+        "101466",
+        "903548",
+        "904628",
+        "904642",
+        "904948"
+      ]
+    },
+    "VINE CITY STATION": {
+      "stop_id": "908958",
+      "lat": 33.756613,
+      "lon": -84.403962,
+      "bus_stops": [
+        "901263"
+      ]
+    },
+    "FIVE POINTS STATION": {
+      "stop_id": "908981",
+      "lat": 33.753978,
+      "lon": -84.391571,
+      "bus_stops": [
+        "103134",
+        "600031",
+        "600032",
+        "600035",
+        "902290",
+        "903332"
+      ]
+    },
+    "GEORGIA STATE STATION": {
+      "stop_id": "908696",
+      "lat": 33.750152,
+      "lon": -84.385898,
+      "bus_stops": [
+        "102046",
+        "102170",
+        "102173",
+        "210431",
+        "210709"
+      ]
+    },
+    "KING MEMORIAL STATION": {
+      "stop_id": "908436",
+      "lat": 33.749902,
+      "lon": -84.375832,
+      "bus_stops": [
+        "213857",
+        "213858",
+        "213859"
+      ]
+    },
+    "INMAN PARK-REYNOLDSTOWN STATION": {
+      "stop_id": "908437",
+      "lat": 33.757339,
+      "lon": -84.352914,
+      "bus_stops": [
+        "900969",
+        "901066",
+        "901155"
+      ]
+    },
+    "EDGEWOOD-CANDLER PARK STATION": {
+      "stop_id": "908699",
+      "lat": 33.761835,
+      "lon": -84.34064,
+      "bus_stops": [
+        "904322",
+        "904464",
+        "904813"
+      ]
+    },
+    "EAST LAKE STATION": {
+      "stop_id": "908566",
+      "lat": 33.765219,
+      "lon": -84.313182,
+      "bus_stops": [
+        "212996",
+        "212997",
+        "212998",
+        "212999",
+        "904323"
+      ]
+    },
+    "DECATUR STATION": {
+      "stop_id": "908700",
+      "lat": 33.77469,
+      "lon": -84.295368,
+      "bus_stops": [
+        "904262"
+      ]
+    },
+    "AVONDALE STATION": {
+      "stop_id": "908438",
+      "lat": 33.775384,
+      "lon": -84.281976,
+      "bus_stops": [
+        "210548",
+        "904264",
+        "904940"
+      ]
+    },
+    "KENSINGTON STATION": {
+      "stop_id": "908634",
+      "lat": 33.772706,
+      "lon": -84.251879,
+      "bus_stops": [
+        "900686"
+      ]
+    },
+    "INDIAN CREEK STATION": {
+      "stop_id": "908515",
+      "lat": 33.769875,
+      "lon": -84.22939,
+      "bus_stops": [
+        "211300",
+        "903391"
+      ]
+    },
+    "COLLEGE PARK STATION": {
+      "stop_id": "908599",
+      "lat": 33.65043,
+      "lon": -84.448634,
+      "bus_stops": [
+        "166042",
+        "166900",
+        "166901",
+        "212948"
+      ]
+    },
+    "EAST POINT STATION": {
+      "stop_id": "908628",
+      "lat": 33.677205,
+      "lon": -84.440623,
+      "bus_stops": [
+        "146330",
+        "146332",
+        "146900"
+      ]
+    },
+    "LAKEWOOD-FT MCPHERSON STATION": {
+      "stop_id": "908629",
+      "lat": 33.700589,
+      "lon": -84.428817,
+      "bus_stops": [
+        "136901"
+      ]
+    },
+    "OAKLAND CITY STATION": {
+      "stop_id": "908301",
+      "lat": 33.717139,
+      "lon": -84.425084,
+      "bus_stops": [
+        "123016",
+        "123900",
+        "211325"
+      ]
+    },
+    "WEST END STATION": {
+      "stop_id": "908704",
+      "lat": 33.736135,
+      "lon": -84.413658,
+      "bus_stops": [
+        "114082",
+        "114152",
+        "114900",
+        "211322"
+      ]
+    },
+    "GARNETT STATION": {
+      "stop_id": "908600",
+      "lat": 33.748817,
+      "lon": -84.395643,
+      "bus_stops": [
+        "102028",
+        "102074",
+        "102078",
+        "213318",
+        "213319",
+        "213320",
+        "213321"
+      ]
+    },
+    "PEACHTREE CENTER STATION": {
+      "stop_id": "908601",
+      "lat": 33.758136,
+      "lon": -84.387595,
+      "bus_stops": [
+        "211753",
+        "901286",
+        "901373"
+      ]
+    },
+    "CIVIC CENTER STATION": {
+      "stop_id": "908912",
+      "lat": 33.766174,
+      "lon": -84.387504,
+      "bus_stops": [
+        "213845",
+        "214113",
+        "600008"
+      ]
+    },
+    "NORTH AVENUE STATION": {
+      "stop_id": "907914",
+      "lat": 33.771607,
+      "lon": -84.387231,
+      "bus_stops": [
+        "904966",
+        "907473"
+      ]
+    },
+    "MIDTOWN STATION": {
+      "stop_id": "908375",
+      "lat": 33.781301,
+      "lon": -84.386347,
+      "bus_stops": [
+        "904800"
+      ]
+    },
+    "ARTS CENTER STATION": {
+      "stop_id": "906369",
+      "lat": 33.789249,
+      "lon": -84.387343,
+      "bus_stops": [
+        "213110",
+        "901789",
+        "902514"
+      ]
+    },
+    "LINDBERGH CENTER STATION": {
+      "stop_id": "908055",
+      "lat": 33.823456,
+      "lon": -84.369329,
+      "bus_stops": [
+        "902145"
+      ]
+    },
+    "LENOX STATION": {
+      "stop_id": "906827",
+      "lat": 33.845348,
+      "lon": -84.358311,
+      "bus_stops": [
+        "900579",
+        "905666"
+      ]
+    },
+    "BROOKHAVEN-OGLETHORPE STATION": {
+      "stop_id": "908186",
+      "lat": 33.860159,
+      "lon": -84.339321,
+      "bus_stops": [
+        "905697"
+      ]
+    },
+    "CHAMBLEE STATION": {
+      "stop_id": "908603",
+      "lat": 33.887723,
+      "lon": -84.305959,
+      "bus_stops": [
+        "905514",
+        "905515",
+        "905610"
+      ]
+    },
+    "DORAVILLE STATION": {
+      "stop_id": "908845",
+      "lat": 33.902599,
+      "lon": -84.280888,
+      "bus_stops": [
+        "905508"
+      ]
+    },
+    "BANKHEAD STATION": {
+      "stop_id": "907960",
+      "lat": 33.772298,
+      "lon": -84.428889,
+      "bus_stops": [
+        "903601",
+        "904519",
+        "904624"
+      ]
+    },
+    "BUCKHEAD STATION": {
+      "stop_id": "908639",
+      "lat": 33.847877,
+      "lon": -84.367672,
+      "bus_stops": [
+        "905887",
+        "905888",
+        "905889",
+        "905890"
+      ]
+    },
+    "MEDICAL CENTER STATION": {
+      "stop_id": "908885",
+      "lat": 33.910748,
+      "lon": -84.351824,
+      "bus_stops": [
+        "902890",
+        "903165"
+      ]
+    },
+    "DUNWOODY STATION": {
+      "stop_id": "908047",
+      "lat": 33.920996,
+      "lon": -84.34424,
+      "bus_stops": [
+        "903009"
+      ]
+    },
+    "SANDY SPRINGS STATION": {
+      "stop_id": "907845",
+      "lat": 33.931618,
+      "lon": -84.351014,
+      "bus_stops": [
+        "903164"
+      ]
+    },
+    "NORTH SPRINGS STATION": {
+      "stop_id": "907766",
+      "lat": 33.944664,
+      "lon": -84.357264,
+      "bus_stops": [
+        "902725"
+      ]
+    }
+  }
+}
