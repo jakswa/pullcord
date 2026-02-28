@@ -86,7 +86,7 @@ const STATION_COORDS: Record<string, [number, number]> = {
 
 // Inline JS — zero external requests, handles polling + starred/nearby reordering
 function buildInlineJS(isLanding: boolean): string {
-  const base = `(function(){var P=1e4,d=document.getElementById("rail-data"),f=document.getElementById("freshness");if(!d||!f)return;var t=Date.now(),p=null,b=window.location.pathname;function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<2?"live":a+"s ago";f.style.color=a>30?"#E85D3A":""}setInterval(u,1e3);u();function q(){fetch(b+"?partial=1",{signal:AbortSignal.timeout(8e3)}).then(function(r){if(r.ok)return r.text()}).then(function(h){if(h){d.innerHTML=h;t=Date.now();u();typeof reorder==="function"&&reorder()}}).catch(function(){})}p=setInterval(q,P);document.addEventListener("visibilitychange",function(){if(document.hidden){clearInterval(p);p=null}else{q();p=setInterval(q,P)}})})();`;
+  const base = `(function(){var P=1e4,d=document.getElementById("rail-data"),f=document.getElementById("freshness");if(!d||!f)return;var t=Date.now(),p=null,b=window.location.pathname;function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<2?"live":a+"s ago";f.style.color=a>30?"#E85D3A":""}setInterval(u,1e3);u();function q(){fetch(b+"?partial=1",{signal:AbortSignal.timeout(8e3)}).then(function(r){if(r.ok)return r.text()}).then(function(h){if(h){d.innerHTML=h;t=Date.now();u();typeof reorder==="function"&&reorder();typeof postUpdate==="function"&&postUpdate()}}).catch(function(){})}p=setInterval(q,P);document.addEventListener("visibilitychange",function(){if(document.hidden){clearInterval(p);p=null}else{q();p=setInterval(q,P)}})})();`;
 
   if (!isLanding) return base;
 
@@ -637,9 +637,26 @@ export function RailTrainPage({
         </div>
         <script dangerouslySetInnerHTML={{ __html: buildInlineJS(false) }} />
         <script dangerouslySetInnerHTML={{ __html: `
-          // Auto-scroll to current stop on first load
-          var c=document.getElementById("rail-current");
-          if(c){c.scrollIntoView({block:"center"})}
+          // First load: record initially-visited stops and hide them.
+          // On poll updates, re-hide those same stops (but newly-visited ones stay visible).
+          (function(){
+            window._initialVisited = new Set();
+            var visited = document.querySelectorAll(".rail-tl-stop.visited");
+            for(var i=0;i<visited.length;i++){
+              var name = visited[i].querySelector(".rail-tl-name");
+              if(name) window._initialVisited.add(name.textContent);
+              visited[i].style.display="none";
+            }
+            window.postUpdate = function(){
+              var stops = document.querySelectorAll(".rail-tl-stop.visited");
+              for(var i=0;i<stops.length;i++){
+                var n = stops[i].querySelector(".rail-tl-name");
+                if(n && window._initialVisited.has(n.textContent)){
+                  stops[i].style.display="none";
+                }
+              }
+            };
+          })();
         ` }} />
       </body>
     </html>
