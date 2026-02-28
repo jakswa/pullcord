@@ -473,7 +473,23 @@ export function RailStationPage({
   );
 }
 
-// Station detail inner (for partials) — with clickable train links
+// Direction labels for section headers
+const DIR_FULL: Record<string, string> = {
+  N: "northbound",
+  S: "southbound",
+  E: "eastbound",
+  W: "westbound",
+};
+
+// Direction arrows for visual cue
+const DIR_ARROW: Record<string, string> = {
+  N: "↑",
+  S: "↓",
+  E: "→",
+  W: "←",
+};
+
+// Station detail inner (for partials) — grouped by direction
 export function RailStationDetail({
   stationName,
   arrivals,
@@ -481,31 +497,53 @@ export function RailStationDetail({
   stationName: string;
   arrivals: RailArrival[];
 }) {
-  // Flat list, sorted by soonest first — destination IS the direction
-  const sorted = [...arrivals].sort((a, b) => a.waitSeconds - b.waitSeconds);
   const colors = LINE_COLORS.dark;
 
+  // Group by direction, sorted by time within each group
+  const byDir = new Map<string, RailArrival[]>();
+  for (const a of arrivals) {
+    const list = byDir.get(a.direction) || [];
+    list.push(a);
+    byDir.set(a.direction, list);
+  }
+
+  // Sort each group by time, cap at 3
+  for (const [dir, list] of byDir) {
+    list.sort((a, b) => a.waitSeconds - b.waitSeconds);
+    byDir.set(dir, list.slice(0, 3));
+  }
+
+  // Order direction groups by earliest arrival
+  const dirOrder = [...byDir.entries()]
+    .sort((a, b) => (a[1][0]?.waitSeconds || 999) - (b[1][0]?.waitSeconds || 999));
+
   return (
-    <div class="rail-detail-list">
-      {sorted.map((a) => {
-        const bg = colors[a.line as keyof typeof colors] || "#666";
-        const isNow = a.waitSeconds < 60;
-        return (
-          <a href={`/rail/train/${a.trainId}`} class="rail-arrival-row">
-            <span class="rail-arrival-dir" style={`background:${bg}`}>
-              {a.direction}
-            </span>
-            <span class="rail-arrival-dest">
-              <span class="rail-arrival-line-label" style={`color:${bg}`}>{a.line.toLowerCase()}</span>
-              {" "}{stationDisplayName(a.destination).toLowerCase()}
-            </span>
-            <span class={`rail-arrival-time${isNow ? " rail-arrival-now" : ""}`}>
-              {isNow ? "NOW" : `${Math.floor(a.waitSeconds / 60)} min`}
-            </span>
-          </a>
-        );
-      })}
-      {sorted.length === 0 && (
+    <div class="rail-detail-grouped">
+      {dirOrder.map(([dir, trains]) => (
+        <div class="rail-dir-group">
+          <div class="rail-dir-header">
+            <span class="rail-dir-arrow">{DIR_ARROW[dir] || ""}</span>
+            <span class="rail-dir-label">{DIR_FULL[dir] || dir}</span>
+          </div>
+          {trains.map((a) => {
+            const bg = colors[a.line as keyof typeof colors] || "#666";
+            const isNow = a.waitSeconds < 60;
+            return (
+              <a href={`/rail/train/${a.trainId}`} class="rail-arrival-row">
+                <span class="rail-arrival-line-dot" style={`background:${bg}`} />
+                <span class="rail-arrival-dest">
+                  <span class="rail-arrival-line-label" style={`color:${bg}`}>{a.line.toLowerCase()}</span>
+                  {" "}{stationDisplayName(a.destination).toLowerCase()}
+                </span>
+                <span class={`rail-arrival-time${isNow ? " rail-arrival-now" : ""}`}>
+                  {isNow ? "NOW" : `${Math.floor(a.waitSeconds / 60)} min`}
+                </span>
+              </a>
+            );
+          })}
+        </div>
+      ))}
+      {arrivals.length === 0 && (
         <div class="rail-empty">No arrivals currently available for this station.</div>
       )}
     </div>
@@ -628,8 +666,11 @@ export function RailTrainTimeline({
         const isNow = match && match.waitSeconds < 60;
         const mins = match ? Math.floor(match.waitSeconds / 60) : 0;
 
+        // Build the slug for this timeline station
+        const stnSlug = stationSlug(stn + " STATION");
+
         return (
-          <div class={cls} style={`--tl-color:${color}`}>
+          <a href={`/rail/${stnSlug}`} class={cls} style={`--tl-color:${color}`}>
             <div class="rail-tl-left">
               <span class="rail-tl-name">{stationDisplayName(stn).toLowerCase()}</span>
               {isCurrent && (
@@ -641,7 +682,7 @@ export function RailTrainTimeline({
                 {isNow ? "NOW" : `${mins}m`}
               </span>
             )}
-          </div>
+          </a>
         );
       })}
     </div>
@@ -946,11 +987,44 @@ function railStyles(): string {
       flex-direction: column;
     }
 
+    /* ── Direction groups ── */
+    .rail-detail-grouped {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .rail-dir-group {
+      padding-bottom: 0.25rem;
+    }
+
+    .rail-dir-header {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.7rem 0 0.3rem;
+    }
+
+    .rail-dir-arrow {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      line-height: 1;
+      width: 1.1rem;
+      text-align: center;
+    }
+
+    .rail-dir-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+
     .rail-arrival-row {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 0.75rem 0;
+      padding: 0.6rem 0 0.6rem 0.3rem;
       text-decoration: none;
       color: inherit;
       border-bottom: 1px solid var(--border-subtle);
@@ -960,16 +1034,10 @@ function railStyles(): string {
       background: var(--border-subtle);
     }
 
-    .rail-arrival-dir {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.75rem;
-      height: 1.75rem;
-      border-radius: 0.25rem;
-      font-size: 0.9rem;
-      font-weight: 800;
-      color: #fff;
+    .rail-arrival-line-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
       flex-shrink: 0;
     }
 
@@ -1037,6 +1105,9 @@ function railStyles(): string {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      text-decoration: none;
+      color: inherit;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .rail-tl-stop::before {
