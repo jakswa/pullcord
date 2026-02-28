@@ -125,6 +125,7 @@ function toggleSection(key){var s=getSections();s[key]=!isOpen(key,key!=="nearby
 window.reorder=function(){
   var list=document.querySelector(".rail-station-list");
   if(!list)return;
+  list.classList.remove("rail-loading");
   var rows=Array.from(list.querySelectorAll(".rail-row"));
   var starred=getStarred();
 
@@ -214,9 +215,6 @@ window.reorder=function(){
 // If user previously enabled nearby, silently re-request geo on load
 if(isOpen("nearby",false))requestGeo();
 reorder();
-// Reveal list after first reorder (prevents unsorted flash)
-var l=document.querySelector(".rail-station-list");
-if(l)l.classList.remove("rail-loading");
 })();`;
 
   return base + landing;
