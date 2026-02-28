@@ -60,7 +60,13 @@ Reverse direction. When viewing a rail station on `/rail`:
 2. Fetch bus predictions for those stops
 3. Group by route, show ETAs
 
-This is heavier — multiple bus stops per station, multiple routes per stop. Might want a "Transfer Buses" expandable section rather than always-visible pills.
+**UX:** Collapsible "nearby buses" section at the bottom of the station detail view. Same toggle pattern as landing page sections. Default collapsed — rail riders who don't need a bus aren't cluttered.
+
+Most valuable at **terminal stations** where buses start/end their routes (which is most MARTA bus routes by design — they feed into rail). Mid-route bus stops near rail are less useful since direction/timing is less predictable.
+
+Shows route number + headsign + next ETA. One row per route, not per stop (a station might have 3 bus stops but they're all serving the same routes).
+
+This is heavier than Phase 2 — multiple bus stops per station, multiple routes per stop. The bus prediction engine already exists though. Main concern is latency: fetching predictions for 3-5 bus stops adds ~1-2s. Could pre-fetch on the server side or lazy-load client-side after rail data renders.
 
 ### Phase 4: Transfer Awareness in Predictions
 
@@ -82,6 +88,24 @@ The endgame: when you're viewing a bus route and your stop is a transfer point, 
 - **Five Points** (4 lines): Rail pills already handle the 2×2 grid layout
 - **Station name normalization**: GTFS uses "HAMILTON E HOLMES STATION", rail API returns "HAMILTON E HOLMES" — need a fuzzy matcher or canonical name map
 - **Rate limiting**: Rail API calls per station could add up if many users hit transfer stops — the 20s cache helps but might need to batch
+
+## Rail-to-Rail Transfers
+
+### The Only True Transfer: Five Points
+Five Points is the only cross-platform transfer (Red/Gold N/S ↔ Blue/Green E/W). Already handled naturally — station detail shows all 4 directions on one screen.
+
+### Shared Track (Not Transfers)
+- **Red/Gold share track** Airport → Lindbergh (split northbound at Lindbergh)
+- **Blue/Green share track** H.E. Holmes → Five Points (split eastbound at Five Points)
+
+Same platform, different trains. Not a transfer — just need to be on the right one.
+
+### The Lindbergh Problem
+Off-peak, Red Line terminates at Lindbergh instead of North Springs. Riders on Gold heading north hit Lindbergh and need to know: "Is there a Red train continuing north?" The train timeline view could help here — show which lines serve each upcoming station. A Gold train's timeline showing Lindbergh could indicate "🔴 Red Line connections" at that stop. This turns the train view into a trip planner, not just a tracker.
+
+**Implementation idea:** Each station in the train timeline could show small colored dots for other lines that serve it. Data is static (known from GTFS route/stop mapping). Rider on Gold sees Lindbergh has a red dot → knows they can transfer. Especially valuable for the off-peak Red Line truncation.
+
+**No action yet — planning only.**
 
 ## Data Snapshot (200m radius)
 
