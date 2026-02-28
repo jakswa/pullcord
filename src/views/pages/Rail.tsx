@@ -353,59 +353,32 @@ export function RailStationDetail({
   stationName: string;
   arrivals: RailArrival[];
 }) {
-  const byDir = new Map<string, RailArrival[]>();
-  for (const a of arrivals) {
-    const list = byDir.get(a.direction) || [];
-    list.push(a);
-    byDir.set(a.direction, list);
-  }
-  for (const [, list] of byDir) {
-    list.sort((a, b) => a.waitSeconds - b.waitSeconds);
-  }
-
-  const dirOrder = ["N", "S", "E", "W"];
-  const dirNames: Record<string, string> = {
-    N: "Northbound",
-    S: "Southbound",
-    E: "Eastbound",
-    W: "Westbound",
-  };
-
+  // Flat list, sorted by soonest first — destination IS the direction
+  const sorted = [...arrivals].sort((a, b) => a.waitSeconds - b.waitSeconds);
   const colors = LINE_COLORS.dark;
 
   return (
-    <div class="rail-detail-groups">
-      {dirOrder
-        .filter((d) => byDir.has(d))
-        .map((dir) => {
-          const list = byDir.get(dir)!;
-          return (
-            <div class="rail-dir-group">
-              <h2 class="rail-dir-heading">{dirNames[dir] || dir}</h2>
-              <div class="rail-dir-arrivals">
-                {list.map((a) => {
-                  const bg = colors[a.line as keyof typeof colors] || "#666";
-                  const isNow = a.waitSeconds < 60;
-                  return (
-                    <a href={`/rail/train/${a.trainId}`} class="rail-arrival-row">
-                      <span class="rail-arrival-line" style={`background:${bg}`}>
-                        {a.line.charAt(0)}
-                      </span>
-                      <span class="rail-arrival-dest">
-                        {stationDisplayName(a.destination).toLowerCase()}
-                      </span>
-                      <span class="rail-arrival-train-id">#{a.trainId}</span>
-                      <span class={`rail-arrival-time${isNow ? " rail-arrival-now" : ""}`}>
-                        {isNow ? "NOW" : `${Math.floor(a.waitSeconds / 60)} min`}
-                      </span>
-                    </a>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      {byDir.size === 0 && (
+    <div class="rail-detail-list">
+      {sorted.map((a) => {
+        const bg = colors[a.line as keyof typeof colors] || "#666";
+        const isNow = a.waitSeconds < 60;
+        return (
+          <a href={`/rail/train/${a.trainId}`} class="rail-arrival-row">
+            <span class="rail-arrival-line" style={`background:${bg}`}>
+              {a.line.charAt(0)}
+            </span>
+            <span class="rail-arrival-dest">
+              <span class="rail-arrival-arrow">→</span>
+              {" "}{stationDisplayName(a.destination).toLowerCase()}
+            </span>
+            <span class="rail-arrival-train-id">#{a.trainId}</span>
+            <span class={`rail-arrival-time${isNow ? " rail-arrival-now" : ""}`}>
+              {isNow ? "NOW" : `${Math.floor(a.waitSeconds / 60)} min`}
+            </span>
+          </a>
+        );
+      })}
+      {sorted.length === 0 && (
         <div class="rail-empty">No arrivals currently available for this station.</div>
       )}
     </div>
@@ -816,35 +789,24 @@ function railStyles(): string {
       padding: 0.75rem 1rem;
     }
 
-    .rail-dir-group {
-      margin-bottom: 1.25rem;
-    }
-
-    .rail-dir-heading {
-      font-size: 0.85rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      margin: 0 0 0.4rem;
-      padding-bottom: 0.3rem;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .rail-dir-arrivals {
+    .rail-detail-list {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+    }
+
+    .rail-arrival-arrow {
+      color: var(--text-muted);
+      margin-right: 0.15rem;
     }
 
     .rail-arrival-row {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 0.6rem 0;
+      padding: 0.75rem 0;
       text-decoration: none;
       color: inherit;
-      border-radius: 0.25rem;
+      border-bottom: 1px solid var(--border-subtle);
       -webkit-tap-highlight-color: transparent;
     }
     .rail-arrival-row:active {
