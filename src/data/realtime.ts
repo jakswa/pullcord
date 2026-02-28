@@ -45,6 +45,7 @@ interface ArrivalPrediction {
   adherenceSec?: number | null;
   etaSource?: 'marta' | 'computed'; // 'computed' = vehicle position + schedule deltas
   martaEtaSeconds?: number; // original MARTA ETA before computed override (for comparison)
+  rescued?: boolean; // true = ghost vehicle rescue (no valid MARTA trip update existed)
   // Route enrichment — present when routeInfo provided
   routeId?: string;
   routeShortName?: string;
@@ -436,6 +437,7 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
           staleSeconds: veh.staleSeconds,
           tier: 'active',
           etaSource: 'computed',
+          rescued: true,
         };
 
         // Route enrichment (multi-route mode)

@@ -726,8 +726,7 @@ class PullcordApp {
     const tierEl = document.getElementById('hero-tier');
     if (tier === 'active') {
       const stale = this.staleTier(this.heroPrediction.staleSeconds);
-      const isRescued = this.heroPrediction.etaSource === 'computed' && !this.heroPrediction.martaEtaSeconds;
-      tierEl.innerHTML = isRescued ? `📡 ${stale.html}` : stale.html;
+      tierEl.innerHTML = this.heroPrediction.rescued ? `📡 ${stale.html}` : stale.html;
       tierEl.className = 'd-hero-tier tier-active';
     } else if (tier === 'next') {
       tierEl.innerHTML = '<span class="dot-next"></span> On another run';
@@ -1011,7 +1010,7 @@ class PullcordApp {
     let statusHtml;
     if (tier === 'active') {
       const st = this.staleTier(pred.staleSeconds);
-      statusHtml = pred.etaSource === 'computed' && !pred.martaEtaSeconds ? `📡 ${st.html}` : st.html;
+      statusHtml = pred.rescued ? `📡 ${st.html}` : st.html;
     } else if (tier === 'next') {
       statusHtml = '<span class="dot-next"></span> Next run';
     } else {
