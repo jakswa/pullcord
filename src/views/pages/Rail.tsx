@@ -17,6 +17,31 @@ const LINE_COLORS = {
   },
 };
 
+// ── Station orderings for train timeline (north→south per line) ──
+const LINE_STATIONS: Record<string, string[]> = {
+  RED: [
+    "Airport", "College Park", "East Point", "Lakewood", "Oakland City", "West End",
+    "Garnett", "Five Points", "Peachtree Center", "Civic Center", "North Ave",
+    "Midtown", "Arts Center", "Lindbergh", "Buckhead", "Medical Center", "Dunwoody",
+    "Sandy Springs", "North Springs",
+  ],
+  GOLD: [
+    "Airport", "College Park", "East Point", "Lakewood", "Oakland City", "West End",
+    "Garnett", "Five Points", "Peachtree Center", "Civic Center", "North Ave",
+    "Midtown", "Arts Center", "Lindbergh", "Lenox", "Brookhaven", "Chamblee", "Doraville",
+  ],
+  BLUE: [
+    "Hamilton E Holmes", "West Lake", "Ashby", "Vine City", "Omni Dome",
+    "Five Points", "Georgia State", "King Memorial", "Inman Park",
+    "Edgewood Candler Park", "East Lake", "Decatur", "Avondale", "Kensington",
+    "Indian Creek",
+  ],
+  GREEN: [
+    "Bankhead", "Ashby", "Vine City", "Omni Dome", "Five Points", "Georgia State",
+    "King Memorial", "Inman Park", "Edgewood Candler Park",
+  ],
+};
+
 // Inline JS — zero external requests
 const INLINE_JS = `(function(){var P=1e4,d=document.getElementById("rail-data"),f=document.getElementById("freshness");if(!d||!f)return;var t=Date.now(),p=null,b=window.location.pathname;function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<2?"live":a+"s ago";f.style.color=a>30?"#E85D3A":""}setInterval(u,1e3);u();function q(){fetch(b+"?partial=1",{signal:AbortSignal.timeout(8e3)}).then(function(r){if(r.ok)return r.text()}).then(function(h){if(h){d.innerHTML=h;t=Date.now();u()}}).catch(function(){})}p=setInterval(q,P);document.addEventListener("visibilitychange",function(){if(document.hidden){clearInterval(p);p=null}else{q();p=setInterval(q,P)}})})();`;
 
@@ -28,9 +53,7 @@ const DIR_LABELS: Record<string, string> = {
   W: "W",
 };
 
-// Canonical station order (north-south on each line, interleaved sensibly)
-// Station names must match the MARTA API exactly
-// Alphabetical — stable order regardless of live data
+// Canonical station order — alphabetical for landing page
 const STATION_ORDER = [
   "AIRPORT STATION",
   "ARTS CENTER STATION",
@@ -93,8 +116,11 @@ function formatTime(seconds: number): string {
   return `:${mins.toString().padStart(2, "0")}`;
 }
 
+function normalizeStation(s: string): string {
+  return s.toUpperCase().replace(/ STATION$/i, "").trim();
+}
+
 function buildStationRows(arrivals: RailArrival[]): StationRow[] {
-  // Group by station
   const byStation = new Map<string, RailArrival[]>();
   for (const a of arrivals) {
     const list = byStation.get(a.station) || [];
@@ -102,13 +128,10 @@ function buildStationRows(arrivals: RailArrival[]): StationRow[] {
     byStation.set(a.station, list);
   }
 
-  // Build ordered list — stations with data first (in canonical order), then any extras
   const seen = new Set<string>();
   const rows: StationRow[] = [];
 
-  // All known stations, whether they have data or not
   const allStations = [...STATION_ORDER];
-  // Add any stations from API not in our list
   for (const name of byStation.keys()) {
     if (!allStations.includes(name)) {
       allStations.push(name);
@@ -120,8 +143,7 @@ function buildStationRows(arrivals: RailArrival[]): StationRow[] {
     seen.add(stationName);
 
     const stationArrivals = byStation.get(stationName) || [];
-    
-    // Soonest arrival per direction
+
     const bestByDir = new Map<string, RailArrival>();
     for (const a of stationArrivals) {
       const existing = bestByDir.get(a.direction);
@@ -130,7 +152,6 @@ function buildStationRows(arrivals: RailArrival[]): StationRow[] {
       }
     }
 
-    // Sort pills: N, S, E, W
     const dirOrder = ["N", "S", "E", "W"];
     const pills: StationPill[] = dirOrder
       .filter((d) => bestByDir.has(d))
@@ -172,7 +193,6 @@ function Pill({ pill, mode = "dark" }: { pill: StationPill; mode?: "dark" | "lig
 
 // ── Four-direction pill grid (Five Points) ──
 function FourPillGrid({ pills, mode = "dark" }: { pills: StationPill[]; mode?: "dark" | "light" }) {
-  // Arrange as 2×2: [N, E] / [S, W]
   const byDir = new Map(pills.map((p) => [p.direction, p]));
   const grid = [
     ["N", "E"],
@@ -228,65 +248,6 @@ export function RailStationList({ arrivals }: { arrivals: RailArrival[] }) {
   );
 }
 
-// ── Test cases section ──
-function TestCases() {
-  const testRows: StationRow[] = [
-    {
-      name: "Airport",
-      slug: "airport",
-      pills: [{ direction: "S", waitSeconds: 1320, line: "GOLD" }],
-      isFourDir: false,
-    },
-    {
-      name: "Arts Center",
-      slug: "arts-center",
-      pills: [
-        { direction: "N", waitSeconds: 1080, line: "RED" },
-        { direction: "S", waitSeconds: 780, line: "GOLD" },
-      ],
-      isFourDir: false,
-    },
-    {
-      name: "Five Points",
-      slug: "five-points",
-      pills: [
-        { direction: "N", waitSeconds: 600, line: "RED" },
-        { direction: "S", waitSeconds: 300, line: "GOLD" },
-        { direction: "E", waitSeconds: 300, line: "BLUE" },
-        { direction: "W", waitSeconds: 960, line: "GREEN" },
-      ],
-      isFourDir: true,
-    },
-    {
-      name: "Bankhead",
-      slug: "bankhead",
-      pills: [],
-      isFourDir: false,
-    },
-    {
-      name: "Midtown",
-      slug: "midtown",
-      pills: [
-        { direction: "N", waitSeconds: 30, line: "RED" },
-        { direction: "S", waitSeconds: 45, line: "GOLD" },
-      ],
-      isFourDir: false,
-    },
-  ];
-
-  return (
-    <div class="rail-test-section">
-      {/* <!-- TEST CASES --> */}
-      <div class="rail-test-header">test cases</div>
-      <div class="rail-station-list">
-        {testRows.map((row) => (
-          <StationRowEl row={row} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ── Full landing page ──
 export function RailLandingPage({ arrivals, standalone = false }: { arrivals: RailArrival[]; standalone?: boolean }) {
   const title = standalone ? "MARTA Rail" : "MARTA Rail — Pullcord";
@@ -325,7 +286,6 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
             <div id="rail-data">
               <RailStationList arrivals={arrivals} />
             </div>
-            <TestCases />
           </main>
         </div>
         <script>{INLINE_JS}</script>
@@ -344,20 +304,6 @@ export function RailStationPage({
   arrivals: RailArrival[];
   standalone?: boolean;
 }) {
-  // Group by direction
-  const byDir = new Map<string, RailArrival[]>();
-  for (const a of arrivals) {
-    const list = byDir.get(a.direction) || [];
-    list.push(a);
-    byDir.set(a.direction, list);
-  }
-
-  // Sort each direction by wait time
-  for (const [, list] of byDir) {
-    list.sort((a, b) => a.waitSeconds - b.waitSeconds);
-  }
-
-  const dirOrder = ["N", "S", "E", "W"];
   const displayName = stationDisplayName(stationName);
   const title = standalone
     ? `${displayName} — MARTA Rail`
@@ -399,7 +345,7 @@ export function RailStationPage({
   );
 }
 
-// Station detail inner (for partials)
+// Station detail inner (for partials) — with clickable train links
 export function RailStationDetail({
   stationName,
   arrivals,
@@ -441,17 +387,18 @@ export function RailStationDetail({
                   const bg = colors[a.line as keyof typeof colors] || "#666";
                   const isNow = a.waitSeconds < 60;
                   return (
-                    <div class="rail-arrival-row">
+                    <a href={`/rail/train/${a.trainId}`} class="rail-arrival-row">
                       <span class="rail-arrival-line" style={`background:${bg}`}>
                         {a.line.charAt(0)}
                       </span>
                       <span class="rail-arrival-dest">
                         {stationDisplayName(a.destination).toLowerCase()}
                       </span>
+                      <span class="rail-arrival-train-id">#{a.trainId}</span>
                       <span class={`rail-arrival-time${isNow ? " rail-arrival-now" : ""}`}>
                         {isNow ? "NOW" : `${Math.floor(a.waitSeconds / 60)} min`}
                       </span>
-                    </div>
+                    </a>
                   );
                 })}
               </div>
@@ -465,25 +412,196 @@ export function RailStationDetail({
   );
 }
 
-// ── Styles (inlined to avoid CSS build dependency) ──
+// ── Train timeline page ──
+export function RailTrainPage({
+  trainId,
+  arrivals,
+  standalone = false,
+}: {
+  trainId: string;
+  arrivals: RailArrival[];
+  standalone?: boolean;
+}) {
+  const trainArrivals = arrivals.filter((a) => a.trainId === trainId);
+  const hasData = trainArrivals.length > 0;
+  const line = hasData ? trainArrivals[0].line : "";
+  const destination = hasData ? stationDisplayName(trainArrivals[0].destination) : "Unknown";
+  const color = hasData ? (LINE_COLORS.dark[line as keyof typeof LINE_COLORS["dark"]] || "#666") : "#666";
+
+  const title = standalone
+    ? `Train ${trainId} — MARTA Rail`
+    : `Train ${trainId} — MARTA Rail — Pullcord`;
+
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+        <title>{title}</title>
+        {standalone && <link rel="manifest" href="/manifest.json" />}
+        {standalone && <meta name="theme-color" content="#1a1a2e" />}
+        <style>{railStyles()}</style>
+        <style>{trainTimelineStyles(color)}</style>
+      </head>
+      <body class="rail-body">
+        <div class="rail-shell">
+          <header class="rail-header">
+            <div class="rail-header-top">
+              <a href="/rail" class="rail-back" aria-label="Back to all stations">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M15 10H5M5 10L10 5M5 10L10 15" />
+                </svg>
+              </a>
+              <div class="rail-train-header-info">
+                <span class="rail-train-id">Train {trainId}</span>
+                {hasData && (
+                  <span class="rail-train-line-badge" style={`background:${color}`}>
+                    {line}
+                  </span>
+                )}
+              </div>
+              <span class="rail-freshness" id="freshness">—</span>
+            </div>
+            {hasData && (
+              <div class="rail-train-dest">→ {destination.toLowerCase()}</div>
+            )}
+          </header>
+          <main class="rail-main rail-train-main">
+            <div id="rail-data">
+              <RailTrainTimeline trainId={trainId} arrivals={arrivals} />
+            </div>
+          </main>
+        </div>
+        <script>{INLINE_JS}</script>
+      </body>
+    </html>
+  );
+}
+
+// Train timeline inner (for partials)
+export function RailTrainTimeline({
+  trainId,
+  arrivals,
+}: {
+  trainId: string;
+  arrivals: RailArrival[];
+}) {
+  const trainArrivals = arrivals.filter((a) => a.trainId === trainId);
+
+  if (trainArrivals.length === 0) {
+    return (
+      <div class="rail-empty">
+        No data for train {trainId}. It may have completed its trip.
+      </div>
+    );
+  }
+
+  const line = trainArrivals[0].line;
+  const direction = trainArrivals[0].direction;
+  const color = LINE_COLORS.dark[line as keyof typeof LINE_COLORS["dark"]] || "#666";
+
+  // Get station order for this line, reversed if heading south/west
+  let stationOrder = LINE_STATIONS[line] || [];
+  if (direction === "S" || direction === "W") {
+    stationOrder = [...stationOrder].reverse();
+  }
+
+  // Find the soonest arrival — that's where the train is
+  const soonest = [...trainArrivals].sort((a, b) => a.waitSeconds - b.waitSeconds)[0];
+  const currentNorm = normalizeStation(soonest.station);
+
+  let foundCurrent = false;
+
+  return (
+    <div class="rail-timeline">
+      <div class="rail-tl-line" style={`background:${color}`}></div>
+      {stationOrder.map((stn) => {
+        const stnNorm = normalizeStation(stn);
+        const match = trainArrivals.find((a) => normalizeStation(a.station) === stnNorm);
+        const isCurrent = stnNorm === currentNorm;
+
+        if (isCurrent) foundCurrent = true;
+        const visited = !foundCurrent;
+
+        const cls = isCurrent ? "rail-tl-stop current" : visited ? "rail-tl-stop visited" : "rail-tl-stop";
+
+        const isNow = match && match.waitSeconds < 60;
+        const mins = match ? Math.floor(match.waitSeconds / 60) : 0;
+
+        return (
+          <div class={cls} style={`--tl-color:${color}`}>
+            <div class="rail-tl-left">
+              <span class="rail-tl-name">{stationDisplayName(stn).toLowerCase()}</span>
+              {isCurrent && (
+                <span class="rail-tl-here" style={`background:${color}`}>HERE</span>
+              )}
+            </div>
+            {match && (
+              <span class={`rail-tl-time${isNow ? " rail-tl-now" : ""}`}>
+                {isNow ? "NOW" : `${mins}m`}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Dynamic train timeline styles (per-line color) ──
+function trainTimelineStyles(color: string): string {
+  return `
+    .rail-tl-line { box-shadow: 0 0 6px ${color}44; }
+    .rail-tl-stop::before { border-color: ${color}; }
+    .rail-tl-stop.current::before {
+      background: ${color};
+      border-color: ${color};
+      box-shadow: 0 0 8px ${color}88;
+    }
+    .rail-tl-stop.current .rail-tl-name {
+      color: ${color};
+    }
+  `;
+}
+
+// ── Styles ──
 function railStyles(): string {
   return `
-    /* ── Rail base ── */
-    .rail-body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      font-size: 16px;
-      -webkit-font-smoothing: antialiased;
-      background: #0f0f0f;
-      color: #d4d0c8;
-      overflow-x: hidden;
+    /* ── CSS Variables (design system tokens) ── */
+    :root {
+      --bg-primary: #0f0f0f;
+      --bg-surface: #1a1a18;
+      --text-primary: #d4d0c8;
+      --text-body: #b0a898;
+      --text-muted: #807870;
+      --border-color: #2a2a26;
+      --border-subtle: #1e1e1c;
+      --brand: #E85D3A;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
     }
 
     @media (prefers-color-scheme: light) {
-      .rail-body {
-        background: #f5f0eb;
-        color: #3B2820;
+      :root {
+        --bg-primary: #f5f0eb;
+        --bg-surface: #ece5dc;
+        --text-primary: #3B2820;
+        --text-body: #5C4030;
+        --text-muted: #A89282;
+        --border-color: #d8cfc4;
+        --border-subtle: #e0d8cf;
       }
+    }
+
+    /* ── Rail base ── */
+    .rail-body {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      overflow-x: hidden;
     }
 
     .rail-shell {
@@ -503,16 +621,9 @@ function railStyles(): string {
       position: sticky;
       top: 0;
       z-index: 10;
-      background: #1a1a18;
-      border-bottom: 1px solid #2a2a26;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
       padding: 0.65rem 0.75rem;
-    }
-
-    @media (prefers-color-scheme: light) {
-      .rail-header {
-        background: #ece5dc;
-        border-bottom-color: #d8cfc4;
-      }
     }
 
     .rail-header-top {
@@ -524,7 +635,7 @@ function railStyles(): string {
     }
 
     .rail-back {
-      color: #a09888;
+      color: var(--text-muted);
       display: flex;
       align-items: center;
       text-decoration: none;
@@ -532,7 +643,7 @@ function railStyles(): string {
       border-radius: 0.25rem;
       flex-shrink: 0;
     }
-    .rail-back:active { color: #E85D3A; }
+    .rail-back:active { color: var(--brand); }
 
     .rail-title {
       font-size: 1.2rem;
@@ -546,11 +657,50 @@ function railStyles(): string {
     }
 
     .rail-freshness {
+      font-family: var(--font-mono);
       font-size: 0.85rem;
-      color: #807870;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-muted);
       flex-shrink: 0;
       min-width: 3rem;
       text-align: right;
+    }
+
+    /* ── Train header extras ── */
+    .rail-train-header-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .rail-train-id {
+      font-size: 1.2rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .rail-train-line-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.1rem 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+
+    .rail-train-dest {
+      max-width: 600px;
+      margin: 0.15rem auto 0;
+      padding-left: 2rem;
+      font-size: 0.95rem;
+      color: var(--text-muted);
     }
 
     /* ── Main content ── */
@@ -575,21 +725,12 @@ function railStyles(): string {
       padding: 0.85rem 1rem;
       text-decoration: none;
       color: inherit;
-      border-bottom: 1px solid #1e1e1c;
+      border-bottom: 1px solid var(--border-subtle);
       min-height: 2.25rem;
       -webkit-tap-highlight-color: transparent;
     }
     .rail-row:active {
-      background: #1e1e1c;
-    }
-
-    @media (prefers-color-scheme: light) {
-      .rail-row {
-        border-bottom-color: #e0d8cf;
-      }
-      .rail-row:active {
-        background: #e8e0d6;
-      }
+      background: var(--border-subtle);
     }
 
     .rail-station-name {
@@ -623,8 +764,10 @@ function railStyles(): string {
       width: 66px;
       height: 1.9rem;
       border-radius: 0.3rem;
+      font-family: var(--font-mono);
       font-size: 1rem;
       font-weight: 700;
+      font-variant-numeric: tabular-nums;
       color: #fff;
       white-space: nowrap;
       letter-spacing: 0.02em;
@@ -636,14 +779,13 @@ function railStyles(): string {
     }
 
     .rail-pill-empty {
-      background: #2a2a26;
+      background: var(--border-color);
       color: #555;
       width: 66px;
     }
 
     @media (prefers-color-scheme: light) {
       .rail-pill-empty {
-        background: #d8cfc4;
         color: #aaa;
       }
     }
@@ -669,28 +811,6 @@ function railStyles(): string {
       50% { opacity: 0.5; }
     }
 
-    /* ── Test section ── */
-    .rail-test-section {
-      margin-top: 1.5rem;
-      border-top: 2px dashed #2a2a26;
-      padding-top: 0.5rem;
-    }
-
-    @media (prefers-color-scheme: light) {
-      .rail-test-section {
-        border-top-color: #d8cfc4;
-      }
-    }
-
-    .rail-test-header {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #555;
-      padding: 0.25rem 0.75rem 0.25rem;
-      font-weight: 600;
-    }
-
     /* ── Station detail ── */
     .rail-station-detail {
       padding: 0.75rem 1rem;
@@ -705,17 +825,10 @@ function railStyles(): string {
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: #807870;
+      color: var(--text-muted);
       margin: 0 0 0.4rem;
       padding-bottom: 0.3rem;
-      border-bottom: 1px solid #2a2a26;
-    }
-
-    @media (prefers-color-scheme: light) {
-      .rail-dir-heading {
-        color: #8B7D6B;
-        border-bottom-color: #d8cfc4;
-      }
+      border-bottom: 1px solid var(--border-color);
     }
 
     .rail-dir-arrivals {
@@ -729,6 +842,13 @@ function railStyles(): string {
       align-items: center;
       gap: 0.5rem;
       padding: 0.6rem 0;
+      text-decoration: none;
+      color: inherit;
+      border-radius: 0.25rem;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rail-arrival-row:active {
+      background: var(--border-subtle);
     }
 
     .rail-arrival-line {
@@ -753,25 +873,143 @@ function railStyles(): string {
       text-overflow: ellipsis;
     }
 
+    .rail-arrival-train-id {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      opacity: 0.6;
+    }
+
     .rail-arrival-time {
+      font-family: var(--font-mono);
       font-size: 1.1rem;
       font-weight: 700;
+      font-variant-numeric: tabular-nums;
       flex-shrink: 0;
       min-width: 3rem;
       text-align: right;
-      font-variant-numeric: tabular-nums;
     }
 
     .rail-arrival-now {
-      color: #E85D3A;
+      color: var(--brand);
       animation: rail-pulse 1.5s ease-in-out infinite;
     }
 
     .rail-empty {
       text-align: center;
       padding: 2rem 1rem;
-      color: #807870;
+      color: var(--text-muted);
       font-size: 1rem;
+    }
+
+    /* ── Train timeline ── */
+    .rail-train-main {
+      padding: 0.75rem 1rem;
+    }
+
+    .rail-timeline {
+      position: relative;
+      padding: 0.5rem 0 0.5rem 2rem;
+      margin-left: 0.75rem;
+    }
+
+    .rail-tl-line {
+      position: absolute;
+      left: 0.7rem;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      border-radius: 2px;
+      opacity: 0.7;
+    }
+
+    .rail-tl-stop {
+      position: relative;
+      padding: 0.65rem 0 0.65rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .rail-tl-stop::before {
+      content: '';
+      position: absolute;
+      left: -1.1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 3px solid var(--tl-color, #666);
+      background: var(--bg-primary);
+      z-index: 1;
+    }
+
+    .rail-tl-stop.visited {
+      opacity: 0.3;
+    }
+
+    .rail-tl-stop.visited::before {
+      background: var(--tl-color, #666);
+    }
+
+    .rail-tl-stop.current::before {
+      width: 16px;
+      height: 16px;
+      left: -1.2rem;
+      animation: rail-tl-pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes rail-tl-pulse {
+      0%, 100% { opacity: 1; transform: translateY(-50%) scale(1); }
+      50% { opacity: 0.6; transform: translateY(-50%) scale(0.85); }
+    }
+
+    .rail-tl-left {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .rail-tl-name {
+      font-size: 1.15rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .rail-tl-stop.current .rail-tl-name {
+      font-weight: 700;
+    }
+
+    .rail-tl-here {
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 0.1rem 0.35rem;
+      border-radius: 0.2rem;
+      color: #fff;
+      animation: rail-pulse 1.2s step-end infinite;
+      flex-shrink: 0;
+      letter-spacing: 0.04em;
+    }
+
+    .rail-tl-time {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+      margin-left: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    .rail-tl-now {
+      color: var(--brand);
+      animation: rail-pulse 1.5s ease-in-out infinite;
     }
   `;
 }
