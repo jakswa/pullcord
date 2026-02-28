@@ -175,14 +175,12 @@ window.reorder=function(){
     txt.textContent=label;
     h.appendChild(txt);
 
-    var action=document.createElement("span");
-    action.className="rail-section-action";
-    if(key==="nearby"&&!userPos){
-      action.textContent=isOpen("nearby",false)?"locating…":"enable";
-    } else {
-      action.textContent=open?"hide":"show";
-    }
-    h.appendChild(action);
+    var toggle=document.createElement("span");
+    toggle.className="rail-toggle"+(open?" on":"");
+    var knob=document.createElement("span");
+    knob.className="rail-toggle-knob";
+    toggle.appendChild(knob);
+    h.appendChild(toggle);
 
     h.addEventListener("click",function(){toggleSection(key)});
     list.appendChild(h);
@@ -971,20 +969,41 @@ function railStyles(): string {
       font-weight: 600;
       letter-spacing: 0.04em;
       color: var(--text-muted);
-      padding: 0.75rem 1rem 0.4rem;
+      padding: 0.85rem 1rem;
+      min-height: 3rem;
       border-bottom: 1px solid var(--border-subtle);
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
     }
     .rail-section:active {
-      color: var(--text-primary);
+      background: var(--border-subtle);
     }
-    .rail-section-action {
+    .rail-toggle {
       margin-left: auto;
-      font-weight: 400;
-      font-size: 0.85rem;
-      opacity: 0.5;
+      width: 36px;
+      height: 20px;
+      border-radius: 10px;
+      background: var(--border-color);
+      position: relative;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .rail-toggle.on {
+      background: var(--brand);
+    }
+    .rail-toggle-knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      transition: left 0.15s;
+    }
+    .rail-toggle.on .rail-toggle-knob {
+      left: 18px;
     }
     .rail-section-items {
       display: flex;
