@@ -72,6 +72,16 @@ Direction letters (N/S/E/W) on pills as non-color backup.
 
 ---
 
+## Mobile First — Non-Negotiable
+
+Every design decision starts from a 390px phone screen. Period.
+
+- **Minimum font size:** 0.85rem (13.6px). Nothing smaller ships.
+- **Minimum touch target:** 44px / 3rem height. Rows, buttons, toggles.
+- **No desktop-first patterns:** No hover-only affordances, no tiny chevrons, no faded hints that require squinting.
+- **Test on mobile viewport before committing.** Playwright at 390×844 is the baseline.
+- **When in doubt, go bigger.** It's easier to shrink than to hear "fonts are too small" again.
+
 ## Typography Scale
 
 ### Bus Pages
