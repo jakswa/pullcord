@@ -673,35 +673,35 @@ export function RailTrainTimeline({
   const soonest = [...trainArrivals].sort((a, b) => a.waitSeconds - b.waitSeconds)[0];
   const currentNorm = normalizeStation(soonest.station);
 
-  let foundCurrent = false;
+  // Split into visited, current, and upcoming
+  const currentIdx = stationOrder.findIndex((stn) => normalizeStation(stn) === currentNorm);
+  const visitedStops = currentIdx > 0 ? stationOrder.slice(0, currentIdx) : [];
+  const currentAndFuture = stationOrder.slice(Math.max(currentIdx, 0));
 
   return (
-    <div class="rail-timeline">
+    <div class="rail-timeline" style={`--tl-color:${color}`}>
       <div class="rail-tl-line" style={`background:${color}`}></div>
-      {stationOrder.map((stn) => {
+      {visitedStops.length > 0 && (
+        <div class="rail-tl-passed">
+          {visitedStops.length} stop{visitedStops.length > 1 ? "s" : ""} passed
+        </div>
+      )}
+      {currentAndFuture.map((stn) => {
         const stnNorm = normalizeStation(stn);
         const match = trainArrivals.find((a) => normalizeStation(a.station) === stnNorm);
         const isCurrent = stnNorm === currentNorm;
 
-        if (isCurrent) foundCurrent = true;
-        const visited = !foundCurrent;
-
-        const cls = isCurrent ? "rail-tl-stop current" : visited ? "rail-tl-stop visited" : "rail-tl-stop";
+        const cls = isCurrent ? "rail-tl-stop current" : "rail-tl-stop";
 
         const isNow = match && match.waitSeconds < 60;
         const mins = match ? Math.floor(match.waitSeconds / 60) : 0;
 
-        // Build the slug for this timeline station
         const stnSlug = stationSlug(stn + " STATION");
 
         return (
-          <a href={`/rail/${stnSlug}`} class={cls} style={`--tl-color:${color}`}>
-            <div class="rail-tl-left">
-              <span class="rail-tl-name">{stationDisplayName(stn).toLowerCase()}</span>
-              {isCurrent && (
-                <span class="rail-tl-here" style={`background:${color}`}>HERE</span>
-              )}
-            </div>
+          <a href={`/rail/${stnSlug}`} class={cls}>
+            <span class="rail-tl-dot" style={`background:${color}`}></span>
+            <span class="rail-tl-name">{stationDisplayName(stn).toLowerCase()}</span>
             {match && (
               <span class={`rail-tl-time${isNow ? " rail-tl-now" : ""}`}>
                 {isNow ? "NOW" : `${mins}m`}
@@ -717,15 +717,9 @@ export function RailTrainTimeline({
 // ── Dynamic train timeline styles (per-line color) ──
 function trainTimelineStyles(color: string): string {
   return `
-    .rail-tl-line { box-shadow: 0 0 6px ${color}44; }
-    .rail-tl-stop::before { border-color: ${color}; }
-    .rail-tl-stop.current::before {
-      background: ${color};
-      border-color: ${color};
-      box-shadow: 0 0 8px ${color}88;
-    }
     .rail-tl-stop.current .rail-tl-name {
       color: ${color};
+      font-weight: 700;
     }
   `;
 }
@@ -1174,93 +1168,69 @@ function railStyles(): string {
 
     .rail-timeline {
       position: relative;
-      padding: 0.5rem 0 0.5rem 2rem;
-      margin-left: 0.75rem;
+      padding: 0.5rem 1rem;
     }
 
     .rail-tl-line {
       position: absolute;
-      left: 0.7rem;
+      left: 1.65rem;
       top: 0;
       bottom: 0;
-      width: 4px;
+      width: 3px;
       border-radius: 2px;
-      opacity: 0.7;
+      opacity: 0.35;
+    }
+
+    .rail-tl-passed {
+      position: relative;
+      padding: 0.5rem 0 0.5rem 2.25rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      opacity: 0.5;
     }
 
     .rail-tl-stop {
       position: relative;
-      padding: 0.65rem 0 0.65rem 1.25rem;
+      padding: 0.7rem 0 0.7rem 2.25rem;
       display: flex;
       align-items: center;
-      justify-content: space-between;
       text-decoration: none;
       color: inherit;
       -webkit-tap-highlight-color: transparent;
+      min-height: 3rem;
     }
 
-    .rail-tl-stop::before {
-      content: '';
+    .rail-tl-dot {
       position: absolute;
-      left: -1.1rem;
+      left: 0.65rem;
       top: 50%;
       transform: translateY(-50%);
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
-      border: 3px solid var(--tl-color, #666);
-      background: var(--bg-primary);
       z-index: 1;
+      flex-shrink: 0;
     }
 
-    .rail-tl-stop.visited {
-      opacity: 0.3;
-    }
-
-    .rail-tl-stop.visited::before {
-      background: var(--tl-color, #666);
-    }
-
-    .rail-tl-stop.current::before {
-      width: 16px;
-      height: 16px;
-      left: -1.2rem;
+    .rail-tl-stop.current .rail-tl-dot {
+      width: 18px;
+      height: 18px;
+      left: 0.52rem;
       animation: rail-tl-pulse 1.5s ease-in-out infinite;
+      box-shadow: 0 0 8px var(--tl-color, #666);
     }
 
     @keyframes rail-tl-pulse {
       0%, 100% { opacity: 1; transform: translateY(-50%) scale(1); }
-      50% { opacity: 0.6; transform: translateY(-50%) scale(0.85); }
-    }
-
-    .rail-tl-left {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      min-width: 0;
-      flex: 1;
+      50% { opacity: 0.7; transform: translateY(-50%) scale(0.85); }
     }
 
     .rail-tl-name {
-      font-size: 1.15rem;
+      font-size: 1.1rem;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-
-    .rail-tl-stop.current .rail-tl-name {
-      font-weight: 700;
-    }
-
-    .rail-tl-here {
-      font-size: 0.8rem;
-      font-weight: 800;
-      padding: 0.1rem 0.35rem;
-      border-radius: 0.2rem;
-      color: #fff;
-      animation: rail-pulse 1.2s step-end infinite;
-      flex-shrink: 0;
-      letter-spacing: 0.04em;
+      flex: 1;
     }
 
     .rail-tl-time {
