@@ -859,7 +859,7 @@ function railStyles(): string {
       max-width: 600px;
       width: 100%;
       margin: 0 auto;
-      padding: 0.25rem 0;
+      padding: 0;
     }
 
     /* ── Station list ── */
