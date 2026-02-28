@@ -455,6 +455,7 @@ function railStyles(): string {
     .rail-body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 16px;
       -webkit-font-smoothing: antialiased;
       background: #0f0f0f;
       color: #d4d0c8;
@@ -510,7 +511,7 @@ function railStyles(): string {
     .rail-back:active { color: #E85D3A; }
 
     .rail-title {
-      font-size: 1.1rem;
+      font-size: 1.2rem;
       font-weight: 700;
       margin: 0;
       flex: 1;
@@ -521,7 +522,7 @@ function railStyles(): string {
     }
 
     .rail-freshness {
-      font-size: 0.75rem;
+      font-size: 0.85rem;
       color: #807870;
       flex-shrink: 0;
       min-width: 3rem;
@@ -547,7 +548,7 @@ function railStyles(): string {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 0.45rem 0.75rem;
+      padding: 0.85rem 1rem;
       text-decoration: none;
       color: inherit;
       border-bottom: 1px solid #1e1e1c;
@@ -633,7 +634,7 @@ function railStyles(): string {
     /* ── No data ── */
     .rail-no-data {
       color: #555;
-      font-size: 0.9rem;
+      font-size: 1rem;
       min-width: 66px;
       text-align: center;
     }
@@ -658,7 +659,7 @@ function railStyles(): string {
     }
 
     .rail-test-header {
-      font-size: 0.7rem;
+      font-size: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       color: #555;
@@ -668,7 +669,7 @@ function railStyles(): string {
 
     /* ── Station detail ── */
     .rail-station-detail {
-      padding: 0.5rem 0.75rem;
+      padding: 0.75rem 1rem;
     }
 
     .rail-dir-group {
@@ -676,7 +677,7 @@ function railStyles(): string {
     }
 
     .rail-dir-heading {
-      font-size: 0.8rem;
+      font-size: 0.85rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.08em;
@@ -703,17 +704,17 @@ function railStyles(): string {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 0.4rem 0;
+      padding: 0.6rem 0;
     }
 
     .rail-arrival-line {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 1.5rem;
-      height: 1.5rem;
+      width: 1.75rem;
+      height: 1.75rem;
       border-radius: 0.25rem;
-      font-size: 0.75rem;
+      font-size: 0.85rem;
       font-weight: 800;
       color: #fff;
       flex-shrink: 0;
@@ -721,7 +722,7 @@ function railStyles(): string {
 
     .rail-arrival-dest {
       flex: 1;
-      font-size: 0.9rem;
+      font-size: 1.05rem;
       min-width: 0;
       white-space: nowrap;
       overflow: hidden;
@@ -729,7 +730,7 @@ function railStyles(): string {
     }
 
     .rail-arrival-time {
-      font-size: 0.95rem;
+      font-size: 1.1rem;
       font-weight: 700;
       flex-shrink: 0;
       min-width: 3rem;
@@ -746,7 +747,7 @@ function railStyles(): string {
       text-align: center;
       padding: 2rem 1rem;
       color: #807870;
-      font-size: 0.9rem;
+      font-size: 1rem;
     }
   `;
 }
