@@ -492,14 +492,13 @@ export function RailStationDetail({
         const isNow = a.waitSeconds < 60;
         return (
           <a href={`/rail/train/${a.trainId}`} class="rail-arrival-row">
-            <span class="rail-arrival-line" style={`background:${bg}`}>
-              {a.line.charAt(0)}
+            <span class="rail-arrival-dir" style={`background:${bg}`}>
+              {a.direction}
             </span>
             <span class="rail-arrival-dest">
-              <span class="rail-arrival-arrow">→</span>
+              <span class="rail-arrival-line-label" style={`color:${bg}`}>{a.line.toLowerCase()}</span>
               {" "}{stationDisplayName(a.destination).toLowerCase()}
             </span>
-            <span class="rail-arrival-train-id">#{a.trainId}</span>
             <span class={`rail-arrival-time${isNow ? " rail-arrival-now" : ""}`}>
               {isNow ? "NOW" : `${Math.floor(a.waitSeconds / 60)} min`}
             </span>
@@ -947,11 +946,6 @@ function railStyles(): string {
       flex-direction: column;
     }
 
-    .rail-arrival-arrow {
-      color: var(--text-muted);
-      margin-right: 0.15rem;
-    }
-
     .rail-arrival-row {
       display: flex;
       align-items: center;
@@ -966,14 +960,14 @@ function railStyles(): string {
       background: var(--border-subtle);
     }
 
-    .rail-arrival-line {
+    .rail-arrival-dir {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       width: 1.75rem;
       height: 1.75rem;
       border-radius: 0.25rem;
-      font-size: 0.85rem;
+      font-size: 0.9rem;
       font-weight: 800;
       color: #fff;
       flex-shrink: 0;
@@ -988,13 +982,10 @@ function railStyles(): string {
       text-overflow: ellipsis;
     }
 
-    .rail-arrival-train-id {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      font-variant-numeric: tabular-nums;
-      color: var(--text-muted);
-      flex-shrink: 0;
-      opacity: 0.6;
+    .rail-arrival-line-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-right: 0.1rem;
     }
 
     .rail-arrival-time {
