@@ -6,21 +6,67 @@ import aboutRoutes from "./routes/about.js";
 import exploreRoutes from "./routes/explore.js";
 import rideRoutes from "./routes/ride.js";
 import railRoutes from "./routes/rail.js";
+import railCandidates from "./routes/rail-candidates.js";
 import apiRoutes from "./routes/api.js";
-import railRoutes from "./routes/rail.js";
+
+const RAIL_HOST = process.env.RAIL_HOST || ""; // e.g. "train.home.jake.town"
+
 type Env = {
   Variables: {
-    // Add any context variables here if needed
+    isRailHost: boolean;
   };
 };
 
 const app = new Hono<Env>();
 
+// Host detection — set isRailHost for downstream routes
+app.use("*", async (c, next) => {
+  const host = (c.req.header("host") || "").split(":")[0]; // strip port
+  c.set("isRailHost", RAIL_HOST !== "" && host === RAIL_HOST);
+  await next();
+});
+
+// Rail host: serve rail landing at /
+app.get("/", async (c, next) => {
+  if (c.get("isRailHost")) {
+    return c.redirect("/rail", 302);
+  }
+  return next();
+});
+
+// Rail host: serve rail manifest at /manifest.json
+app.get("/manifest.json", async (c, next) => {
+  if (c.get("isRailHost")) {
+    return c.json({
+      name: "MARTA Rail",
+      short_name: "Rail",
+      description: "Real-time MARTA rail arrivals for all 38 stations.",
+      start_url: "/rail",
+      display: "standalone",
+      background_color: "#0f0f0f",
+      theme_color: "#1a1a2e",
+      orientation: "portrait",
+      icons: [
+        {
+          src: "/public/icons/rail-192.png",
+          sizes: "192x192",
+          type: "image/png",
+        },
+        {
+          src: "/public/icons/rail-512.png",
+          sizes: "512x512",
+          type: "image/png",
+        },
+      ],
+    });
+  }
+  return next();
+});
+
 // Security headers
 app.use("*", async (c, next) => {
   await next();
-  
-  // Add security headers
+
   c.header("X-Content-Type-Options", "nosniff");
   c.header("X-Frame-Options", "DENY");
   c.header("X-XSS-Protection", "1; mode=block");
@@ -40,6 +86,7 @@ app.route("/", aboutRoutes);
 app.route("/", exploreRoutes);
 app.route("/", rideRoutes);
 app.route("/", railRoutes);
+app.route("/", railCandidates);
 
 // Serve push SW from root scope (SW scope = path of the file)
 app.get("/push-sw.js", async (c) => {
@@ -54,26 +101,31 @@ app.get("/push-sw.js", async (c) => {
 
 // Health check endpoint
 app.get("/health", (c) => {
-  return c.json({ 
+  return c.json({
     status: "healthy",
     timestamp: new Date().toISOString(),
-    version: "1.0.0"
+    version: "1.0.0",
   });
 });
 
 // Error handling
 app.onError((err, c) => {
   console.error("Application error:", err);
-  
-  // Return JSON for API routes
+
   if (c.req.path.startsWith("/api/")) {
-    return c.json({ 
-      error: process.env.NODE_ENV === "development" ? err.message : "Internal server error"
-    }, 500);
+    return c.json(
+      {
+        error:
+          process.env.NODE_ENV === "development"
+            ? err.message
+            : "Internal server error",
+      },
+      500,
+    );
   }
-  
-  // Return HTML for page routes
-  return c.html(`
+
+  return c.html(
+    `
     <html>
       <head>
         <title>Error — Pullcord</title>
@@ -91,23 +143,24 @@ app.onError((err, c) => {
         <div class="error">
           <h1>Something went wrong</h1>
           <p>We're sorry, but an error occurred while processing your request.</p>
-          ${process.env.NODE_ENV === "development" ? `<p><code>${err.message}</code></p>` : ''}
+          ${process.env.NODE_ENV === "development" ? `<p><code>${err.message}</code></p>` : ""}
           <p><a href="/">← Back to Home</a></p>
         </div>
       </body>
     </html>
-  `, 500);
+  `,
+    500,
+  );
 });
 
 // 404 handler
 app.notFound((c) => {
-  // Return JSON for API routes
   if (c.req.path.startsWith("/api/")) {
     return c.json({ error: "Not found" }, 404);
   }
-  
-  // Return HTML for page routes
-  return c.html(`
+
+  return c.html(
+    `
     <html>
       <head>
         <title>Not Found — Pullcord</title>
@@ -129,7 +182,9 @@ app.notFound((c) => {
         </div>
       </body>
     </html>
-  `, 404);
+  `,
+    404,
+  );
 });
 
 export default app;
