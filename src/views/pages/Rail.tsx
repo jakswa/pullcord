@@ -459,6 +459,7 @@ function railStyles(): string {
       -webkit-font-smoothing: antialiased;
       background: #0f0f0f;
       color: #d4d0c8;
+      overflow-x: hidden;
     }
 
     @media (prefers-color-scheme: light) {
@@ -472,6 +473,12 @@ function railStyles(): string {
       min-height: 100dvh;
       display: flex;
       flex-direction: column;
+      max-width: 100vw;
+      overflow-x: hidden;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
     }
 
     /* ── Header ── */
