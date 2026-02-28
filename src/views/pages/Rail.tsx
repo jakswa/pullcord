@@ -558,9 +558,9 @@ export function RailStationDetail({
             <span class="rail-arrival-line-pill" style={`background:${bg}`}>
               {a.line.toLowerCase()}
             </span>
+            {isBoarding && <span class="rail-badge-boarding">boarding</span>}
             <span class="rail-arrival-dest">
               {stationDisplayName(a.destination).toLowerCase()}
-              {isBoarding && <span class="rail-badge-boarding">board</span>}
             </span>
             <span class={`rail-arrival-time${isNow ? " rail-arrival-now" : ""}`}>
               {isScheduled ? "~" : ""}{isNow ? "NOW" : `${Math.floor(a.waitSeconds / 60)} min`}
