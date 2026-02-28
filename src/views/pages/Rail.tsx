@@ -830,9 +830,9 @@ function railStyles(): string {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 0.1rem 0.5rem;
+      padding: 0.15rem 0.5rem;
       border-radius: 0.25rem;
-      font-size: 0.8rem;
+      font-size: 0.85rem;
       font-weight: 800;
       color: #fff;
       letter-spacing: 0.04em;
@@ -843,7 +843,7 @@ function railStyles(): string {
       max-width: 600px;
       margin: 0.15rem auto 0;
       padding-left: 2rem;
-      font-size: 0.95rem;
+      font-size: 1rem;
       color: var(--text-muted);
     }
 
@@ -969,11 +969,11 @@ function railStyles(): string {
       display: flex;
       align-items: center;
       gap: 0.35rem;
-      font-size: 0.8rem;
+      font-size: 0.95rem;
       font-weight: 600;
       letter-spacing: 0.04em;
       color: var(--text-muted);
-      padding: 0.65rem 1rem 0.35rem;
+      padding: 0.75rem 1rem 0.4rem;
       border-bottom: 1px solid var(--border-subtle);
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
@@ -983,15 +983,15 @@ function railStyles(): string {
       color: var(--text-primary);
     }
     .rail-section-chevron {
-      font-size: 0.7rem;
-      width: 0.7rem;
+      font-size: 0.85rem;
+      width: 0.85rem;
       text-align: center;
       flex-shrink: 0;
     }
     .rail-section-hint {
       margin-left: auto;
       font-weight: 400;
-      font-size: 0.7rem;
+      font-size: 0.85rem;
       opacity: 0.6;
     }
     .rail-section-items {
@@ -1052,9 +1052,9 @@ function railStyles(): string {
     }
 
     .rail-arrival-line-label {
-      font-size: 0.8rem;
+      font-size: 0.85rem;
       font-weight: 700;
-      margin-right: 0.1rem;
+      margin-right: 0.15rem;
     }
 
     .rail-arrival-time {
@@ -1165,7 +1165,7 @@ function railStyles(): string {
     }
 
     .rail-tl-here {
-      font-size: 0.7rem;
+      font-size: 0.8rem;
       font-weight: 800;
       padding: 0.1rem 0.35rem;
       border-radius: 0.2rem;
