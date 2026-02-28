@@ -42,8 +42,135 @@ const LINE_STATIONS: Record<string, string[]> = {
   ],
 };
 
-// Inline JS — zero external requests
-const INLINE_JS = `(function(){var P=1e4,d=document.getElementById("rail-data"),f=document.getElementById("freshness");if(!d||!f)return;var t=Date.now(),p=null,b=window.location.pathname;function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<2?"live":a+"s ago";f.style.color=a>30?"#E85D3A":""}setInterval(u,1e3);u();function q(){fetch(b+"?partial=1",{signal:AbortSignal.timeout(8e3)}).then(function(r){if(r.ok)return r.text()}).then(function(h){if(h){d.innerHTML=h;t=Date.now();u()}}).catch(function(){})}p=setInterval(q,P);document.addEventListener("visibilitychange",function(){if(document.hidden){clearInterval(p);p=null}else{q();p=setInterval(q,P)}})})();`;
+// Station coordinates for nearby feature [lat, lng]
+const STATION_COORDS: Record<string, [number, number]> = {
+  "airport": [33.64056, -84.44620],
+  "arts-center": [33.78926, -84.38727],
+  "ashby": [33.75648, -84.41728],
+  "avondale": [33.77538, -84.28198],
+  "bankhead": [33.77241, -84.42892],
+  "brookhaven": [33.86016, -84.33932],
+  "buckhead": [33.84788, -84.36767],
+  "chamblee": [33.88772, -84.30596],
+  "civic-center": [33.76616, -84.38754],
+  "college-park": [33.65043, -84.44863],
+  "decatur": [33.77469, -84.29537],
+  "doraville": [33.90254, -84.28075],
+  "dunwoody": [33.92099, -84.34440],
+  "east-lake": [33.76522, -84.31318],
+  "east-point": [33.67699, -84.44057],
+  "edgewood-candler-park": [33.76183, -84.34064],
+  "five-points": [33.75398, -84.39157],
+  "garnett": [33.74882, -84.39564],
+  "georgia-state": [33.75015, -84.38590],
+  "hamilton-e-holmes": [33.75454, -84.46956],
+  "indian-creek": [33.76987, -84.22939],
+  "inman-park": [33.75734, -84.35291],
+  "kensington": [33.77263, -84.25200],
+  "king-memorial": [33.74990, -84.37583],
+  "lakewood": [33.70059, -84.42882],
+  "lenox": [33.84531, -84.35821],
+  "lindbergh": [33.82346, -84.36933],
+  "medical-center": [33.91069, -84.35162],
+  "midtown": [33.78123, -84.38653],
+  "north-ave": [33.77179, -84.38674],
+  "north-springs": [33.94491, -84.35725],
+  "oakland-city": [33.71723, -84.42549],
+  "omni-dome": [33.75790, -84.39650],
+  "peachtree-center": [33.75811, -84.38757],
+  "sandy-springs": [33.93169, -84.35100],
+  "vine-city": [33.75661, -84.40396],
+  "west-end": [33.73606, -84.41362],
+  "west-lake": [33.75329, -84.44545],
+};
+
+// Inline JS — zero external requests, handles polling + starred/nearby reordering
+function buildInlineJS(isLanding: boolean): string {
+  const base = `(function(){var P=1e4,d=document.getElementById("rail-data"),f=document.getElementById("freshness");if(!d||!f)return;var t=Date.now(),p=null,b=window.location.pathname;function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<2?"live":a+"s ago";f.style.color=a>30?"#E85D3A":""}setInterval(u,1e3);u();function q(){fetch(b+"?partial=1",{signal:AbortSignal.timeout(8e3)}).then(function(r){if(r.ok)return r.text()}).then(function(h){if(h){d.innerHTML=h;t=Date.now();u();typeof reorder==="function"&&reorder()}}).catch(function(){})}p=setInterval(q,P);document.addEventListener("visibilitychange",function(){if(document.hidden){clearInterval(p);p=null}else{q();p=setInterval(q,P)}})})();`;
+
+  if (!isLanding) return base;
+
+  // Landing page gets starred + nearby logic
+  const landing = `
+(function(){
+var SK="rail-starred",coords=window.__COORDS||{};
+function getStarred(){try{return JSON.parse(localStorage.getItem(SK))||[]}catch(e){return[]}}
+function setStarred(a){localStorage.setItem(SK,JSON.stringify(a))}
+function toggleStar(slug){var s=getStarred(),i=s.indexOf(slug);if(i>-1)s.splice(i,1);else s.push(slug);setStarred(s);reorder()}
+
+// Haversine in km
+function dist(a,b){var R=6371,dLat=(b[0]-a[0])*Math.PI/180,dLon=(b[1]-a[1])*Math.PI/180;var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+
+var userPos=null;
+function tryGeo(){if(!navigator.geolocation)return;navigator.geolocation.getCurrentPosition(function(p){userPos=[p.coords.latitude,p.coords.longitude];reorder()},function(){},{ maximumAge:120000,timeout:5000 })}
+tryGeo();
+
+function getSlug(row){var h=row.getAttribute("href");return h?h.replace("/rail/",""):""}
+
+window.reorder=function(){
+  var list=document.querySelector(".rail-station-list");
+  if(!list)return;
+  var rows=Array.from(list.querySelectorAll(".rail-row"));
+  var starred=getStarred();
+
+  // Remove existing section headers
+  list.querySelectorAll(".rail-section").forEach(function(el){el.remove()});
+
+  // Remove existing star buttons and re-add
+  rows.forEach(function(row){
+    var old=row.querySelector(".rail-star");
+    if(old)old.remove();
+    var slug=getSlug(row);
+    var btn=document.createElement("span");
+    btn.className="rail-star"+(starred.indexOf(slug)>-1?" starred":"");
+    btn.textContent=starred.indexOf(slug)>-1?"★":"☆";
+    btn.setAttribute("role","button");
+    btn.setAttribute("aria-label",starred.indexOf(slug)>-1?"Unstar station":"Star station");
+    btn.addEventListener("click",function(e){e.preventDefault();e.stopPropagation();toggleStar(slug)});
+    row.insertBefore(btn,row.firstChild);
+  });
+
+  // Compute nearby (top 3 within 5km)
+  var nearby=[];
+  if(userPos){
+    var dists=rows.map(function(r){var s=getSlug(r);var c=coords[s];return{row:r,slug:s,d:c?dist(userPos,c):999}}).sort(function(a,b){return a.d-b.d});
+    nearby=dists.filter(function(x){return x.d<5}).slice(0,3).map(function(x){return x.slug});
+  }
+
+  // Sort: starred first, then nearby, then alphabetical (original order)
+  var starredSet=new Set(starred);
+  var nearbySet=new Set(nearby);
+
+  var starredRows=[],nearbyRows=[],restRows=[];
+  rows.forEach(function(r){
+    var s=getSlug(r);
+    if(starredSet.has(s))starredRows.push(r);
+    else if(nearbySet.has(s))nearbyRows.push(r);
+    else restRows.push(r);
+  });
+
+  // Clear and rebuild
+  while(list.firstChild)list.removeChild(list.firstChild);
+
+  function addSection(label,items){
+    if(items.length===0)return;
+    var h=document.createElement("div");
+    h.className="rail-section";
+    h.textContent=label;
+    list.appendChild(h);
+    items.forEach(function(r){list.appendChild(r)});
+  }
+
+  if(starredRows.length>0)addSection("starred",starredRows);
+  if(nearbyRows.length>0)addSection("nearby",nearbyRows);
+  if(starredRows.length>0||nearbyRows.length>0)addSection("all stations",restRows);
+  else restRows.forEach(function(r){list.appendChild(r)});
+};
+reorder();
+})();`;
+
+  return base + landing;
+}
 
 // Map direction codes to short labels
 const DIR_LABELS: Record<string, string> = {
@@ -288,7 +415,8 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
             </div>
           </main>
         </div>
-        <script>{INLINE_JS}</script>
+        <script dangerouslySetInnerHTML={{ __html: `window.__COORDS=${JSON.stringify(STATION_COORDS)};` }} />
+        <script dangerouslySetInnerHTML={{ __html: buildInlineJS(true) }} />
       </body>
     </html>
   );
@@ -338,8 +466,8 @@ export function RailStationPage({
             </div>
           </main>
         </div>
-        <script>{`window.__RAIL_STATION = ${JSON.stringify(stationName)};`}</script>
-        <script>{INLINE_JS}</script>
+        <script dangerouslySetInnerHTML={{ __html: `window.__RAIL_STATION = ${JSON.stringify(stationName)};` }} />
+        <script dangerouslySetInnerHTML={{ __html: buildInlineJS(false) }} />
       </body>
     </html>
   );
@@ -445,7 +573,7 @@ export function RailTrainPage({
             </div>
           </main>
         </div>
-        <script>{INLINE_JS}</script>
+        <script dangerouslySetInnerHTML={{ __html: buildInlineJS(false) }} />
       </body>
     </html>
   );
@@ -776,6 +904,31 @@ function railStyles(): string {
       font-size: 1rem;
       min-width: 66px;
       text-align: center;
+    }
+
+    /* ── Star button ── */
+    .rail-star {
+      flex-shrink: 0;
+      font-size: 1.2rem;
+      line-height: 1;
+      color: var(--text-muted);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      padding: 0.1rem 0.15rem;
+      user-select: none;
+    }
+    .rail-star.starred {
+      color: #D4A020;
+    }
+
+    /* ── Section headers ── */
+    .rail-section {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      padding: 0.65rem 1rem 0.3rem;
+      border-bottom: 1px solid var(--border-subtle);
     }
 
     /* ── Animations ── */
