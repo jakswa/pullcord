@@ -288,25 +288,35 @@ function TestCases() {
 }
 
 // ── Full landing page ──
-export function RailLandingPage({ arrivals }: { arrivals: RailArrival[] }) {
+export function RailLandingPage({ arrivals, standalone = false }: { arrivals: RailArrival[]; standalone?: boolean }) {
+  const title = standalone ? "MARTA Rail" : "MARTA Rail — Pullcord";
+  const backHref = standalone ? "/rail" : "/";
+  const backLabel = standalone ? "Refresh" : "Back to home";
+
   return (
     <html lang="en">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-        <title>MARTA Rail — Pullcord</title>
+        <title>{title}</title>
         <meta name="description" content="Real-time MARTA rail arrivals for all 38 stations." />
+        {standalone && <link rel="manifest" href="/manifest.json" />}
+        {standalone && <meta name="apple-mobile-web-app-capable" content="yes" />}
+        {standalone && <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />}
+        {standalone && <meta name="theme-color" content="#1a1a2e" />}
         <style>{railStyles()}</style>
       </head>
       <body class="rail-body">
         <div class="rail-shell">
           <header class="rail-header">
             <div class="rail-header-top">
-              <a href="/" class="rail-back" aria-label="Back to home">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M15 10H5M5 10L10 5M5 10L10 15" />
-                </svg>
-              </a>
+              {!standalone && (
+                <a href={backHref} class="rail-back" aria-label={backLabel}>
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 10H5M5 10L10 5M5 10L10 15" />
+                  </svg>
+                </a>
+              )}
               <h1 class="rail-title">marta rail</h1>
               <span class="rail-freshness" id="freshness">—</span>
             </div>
@@ -328,9 +338,11 @@ export function RailLandingPage({ arrivals }: { arrivals: RailArrival[] }) {
 export function RailStationPage({
   stationName,
   arrivals,
+  standalone = false,
 }: {
   stationName: string;
   arrivals: RailArrival[];
+  standalone?: boolean;
 }) {
   // Group by direction
   const byDir = new Map<string, RailArrival[]>();
@@ -347,13 +359,18 @@ export function RailStationPage({
 
   const dirOrder = ["N", "S", "E", "W"];
   const displayName = stationDisplayName(stationName);
+  const title = standalone
+    ? `${displayName} — MARTA Rail`
+    : `${displayName} — MARTA Rail — Pullcord`;
 
   return (
     <html lang="en">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-        <title>{displayName} — MARTA Rail — Pullcord</title>
+        <title>{title}</title>
+        {standalone && <link rel="manifest" href="/manifest.json" />}
+        {standalone && <meta name="theme-color" content="#1a1a2e" />}
         <style>{railStyles()}</style>
       </head>
       <body class="rail-body">

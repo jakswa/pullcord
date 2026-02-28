@@ -13,19 +13,20 @@ const app = new Hono();
 app.get("/rail", async (c) => {
   const arrivals = await fetchArrivals();
   const partial = c.req.query("partial");
+  const isRailHost = c.get("isRailHost" as any) || false;
 
   if (partial === "1") {
-    // Return just the station list HTML for live updates
     return c.html(<RailStationList arrivals={arrivals} />);
   }
 
-  return c.html(<RailLandingPage arrivals={arrivals} />);
+  return c.html(<RailLandingPage arrivals={arrivals} standalone={isRailHost} />);
 });
 
 // GET /rail/:slug — station detail
 app.get("/rail/:slug", async (c) => {
   const slug = c.req.param("slug");
   const arrivals = await fetchArrivals();
+  const isRailHost = c.get("isRailHost" as any) || false;
 
   // Find matching station
   const stationArrivals = arrivals.filter(
@@ -33,8 +34,6 @@ app.get("/rail/:slug", async (c) => {
   );
 
   if (stationArrivals.length === 0) {
-    // Check if the station exists at all (might just have no current arrivals)
-    // Try to find a station name that matches the slug
     const allStations = new Set(arrivals.map((a) => a.station));
     let matchedStation = "";
     for (const s of allStations) {
@@ -45,8 +44,6 @@ app.get("/rail/:slug", async (c) => {
     }
 
     if (!matchedStation) {
-      // Station not found at all — could be valid but no trains running
-      // Try to reconstruct station name from slug
       matchedStation = slug
         .split("-")
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -62,7 +59,7 @@ app.get("/rail/:slug", async (c) => {
     }
 
     return c.html(
-      <RailStationPage stationName={matchedStation} arrivals={[]} />
+      <RailStationPage stationName={matchedStation} arrivals={[]} standalone={isRailHost} />
     );
   }
 
@@ -76,7 +73,7 @@ app.get("/rail/:slug", async (c) => {
   }
 
   return c.html(
-    <RailStationPage stationName={stationName} arrivals={stationArrivals} />
+    <RailStationPage stationName={stationName} arrivals={stationArrivals} standalone={isRailHost} />
   );
 });
 
