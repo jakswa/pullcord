@@ -636,6 +636,11 @@ export function RailTrainPage({
           </main>
         </div>
         <script dangerouslySetInnerHTML={{ __html: buildInlineJS(false) }} />
+        <script dangerouslySetInnerHTML={{ __html: `
+          // Auto-scroll to current stop on first load
+          var c=document.getElementById("rail-current");
+          if(c){c.scrollIntoView({block:"center"})}
+        ` }} />
       </body>
     </html>
   );
@@ -673,25 +678,20 @@ export function RailTrainTimeline({
   const soonest = [...trainArrivals].sort((a, b) => a.waitSeconds - b.waitSeconds)[0];
   const currentNorm = normalizeStation(soonest.station);
 
-  // Split into visited, current, and upcoming
   const currentIdx = stationOrder.findIndex((stn) => normalizeStation(stn) === currentNorm);
-  const visitedStops = currentIdx > 0 ? stationOrder.slice(0, currentIdx) : [];
-  const currentAndFuture = stationOrder.slice(Math.max(currentIdx, 0));
+  let foundCurrent = false;
 
   return (
     <div class="rail-timeline" style={`--tl-color:${color}`}>
       <div class="rail-tl-line" style={`background:${color}`}></div>
-      {visitedStops.length > 0 && (
-        <div class="rail-tl-passed">
-          {visitedStops.length} stop{visitedStops.length > 1 ? "s" : ""} passed
-        </div>
-      )}
-      {currentAndFuture.map((stn) => {
+      {stationOrder.map((stn) => {
         const stnNorm = normalizeStation(stn);
         const match = trainArrivals.find((a) => normalizeStation(a.station) === stnNorm);
         const isCurrent = stnNorm === currentNorm;
+        if (isCurrent) foundCurrent = true;
+        const visited = !foundCurrent;
 
-        const cls = isCurrent ? "rail-tl-stop current" : "rail-tl-stop";
+        const cls = isCurrent ? "rail-tl-stop current" : visited ? "rail-tl-stop visited" : "rail-tl-stop";
 
         const isNow = match && match.waitSeconds < 60;
         const mins = match ? Math.floor(match.waitSeconds / 60) : 0;
@@ -699,10 +699,10 @@ export function RailTrainTimeline({
         const stnSlug = stationSlug(stn + " STATION");
 
         return (
-          <a href={`/rail/${stnSlug}`} class={cls}>
+          <a href={`/rail/${stnSlug}`} class={cls} id={isCurrent ? "rail-current" : undefined}>
             <span class="rail-tl-dot" style={`background:${color}`}></span>
             <span class="rail-tl-name">{stationDisplayName(stn).toLowerCase()}</span>
-            {match && (
+            {match && !visited && (
               <span class={`rail-tl-time${isNow ? " rail-tl-now" : ""}`}>
                 {isNow ? "NOW" : `${mins}m`}
               </span>
@@ -1181,12 +1181,13 @@ function railStyles(): string {
       opacity: 0.35;
     }
 
-    .rail-tl-passed {
-      position: relative;
-      padding: 0.5rem 0 0.5rem 2.25rem;
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      opacity: 0.5;
+    .rail-tl-stop.visited {
+      opacity: 0.3;
+    }
+    .rail-tl-stop.visited .rail-tl-dot {
+      width: 8px;
+      height: 8px;
+      left: 0.84rem;
     }
 
     .rail-tl-stop {
@@ -1244,8 +1245,8 @@ function railStyles(): string {
     }
 
     .rail-tl-now {
-      color: var(--brand);
-      animation: rail-pulse 1.5s ease-in-out infinite;
+      color: #4ADE80;
+      font-weight: 800;
     }
   `;
 }
