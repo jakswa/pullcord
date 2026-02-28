@@ -542,8 +542,16 @@ export function RailStationDetail({
       {sorted.map((a) => {
         const bg = colors[a.line as keyof typeof colors] || "#666";
         const isNow = a.waitSeconds < 60;
+        const isScheduled = !a.isRealtime;
+        const isBoarding = a.isRealtime && !a.hasStarted && a.isFirstStop;
+        const rowClass = `rail-arrival-row${isScheduled ? " rail-scheduled" : ""}${isBoarding ? " rail-boarding" : ""}`;
+
+        // Scheduled entries have no trainId — render as div (not tappable)
+        const Tag = isScheduled ? "div" : "a";
+        const linkProps = isScheduled ? {} : { href: `/rail/train/${a.trainId}` };
+
         return (
-          <a href={`/rail/train/${a.trainId}`} class="rail-arrival-row">
+          <Tag {...linkProps} class={rowClass}>
             <span class="rail-arrival-dir">
               {a.direction}
             </span>
@@ -552,11 +560,12 @@ export function RailStationDetail({
             </span>
             <span class="rail-arrival-dest">
               {stationDisplayName(a.destination).toLowerCase()}
+              {isBoarding && <span class="rail-badge-boarding">board</span>}
             </span>
             <span class={`rail-arrival-time${isNow ? " rail-arrival-now" : ""}`}>
-              {isNow ? "NOW" : `${Math.floor(a.waitSeconds / 60)} min`}
+              {isScheduled ? "~" : ""}{isNow ? "NOW" : `${Math.floor(a.waitSeconds / 60)} min`}
             </span>
-          </a>
+          </Tag>
         );
       })}
       {sorted.length === 0 && (
@@ -1125,6 +1134,30 @@ function railStyles(): string {
     .rail-arrival-now {
       color: var(--brand);
       animation: rail-pulse 1.5s ease-in-out infinite;
+    }
+
+    /* Scheduled (non-realtime) — muted, not tappable */
+    .rail-scheduled {
+      opacity: 0.45;
+      cursor: default;
+    }
+    .rail-scheduled:active {
+      background: transparent;
+    }
+
+    /* Boarding — train at terminal, can board now */
+    .rail-badge-boarding {
+      display: inline-block;
+      margin-left: 0.4rem;
+      padding: 0.1rem 0.35rem;
+      border-radius: 0.2rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: #2d8a4e;
+      color: #fff;
+      vertical-align: middle;
     }
 
     .rail-empty {
