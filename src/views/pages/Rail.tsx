@@ -972,13 +972,14 @@ function railStyles(): string {
       color: var(--text-muted);
       padding: 0.85rem 1rem;
       min-height: 3rem;
-      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
     }
     .rail-section:active {
-      background: var(--border-subtle);
+      background: var(--border-color);
     }
     .rail-toggle {
       margin-left: auto;
