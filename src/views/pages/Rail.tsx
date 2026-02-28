@@ -181,10 +181,10 @@ window.reorder=function(){
     h.appendChild(chevron);
     h.appendChild(txt);
 
-    if(key==="nearby"&&!userPos&&!geoRequested){
+    if(key==="nearby"&&!userPos){
       var hint=document.createElement("span");
       hint.className="rail-section-hint";
-      hint.textContent="tap to enable";
+      hint.textContent=isOpen("nearby",false)?"locating…":"tap to enable";
       h.appendChild(hint);
     }
 
@@ -208,6 +208,8 @@ window.reorder=function(){
     restRows.forEach(function(r){list.appendChild(r)});
   }
 };
+// If user previously enabled nearby, silently re-request geo on load
+if(isOpen("nearby",false))requestGeo();
 reorder();
 })();`;
 
