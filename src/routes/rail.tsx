@@ -5,6 +5,8 @@ import {
   RailStationList,
   RailStationPage,
   RailStationDetail,
+  RailTrainPage,
+  RailTrainTimeline,
 } from "../views/pages/Rail.js";
 
 const app = new Hono();
@@ -20,6 +22,22 @@ app.get("/rail", async (c) => {
   }
 
   return c.html(<RailLandingPage arrivals={arrivals} standalone={isRailHost} />);
+});
+
+// GET /rail/train/:trainId — train timeline
+app.get("/rail/train/:trainId", async (c) => {
+  const trainId = c.req.param("trainId");
+  const arrivals = await fetchArrivals();
+  const partial = c.req.query("partial");
+  const isRailHost = c.get("isRailHost" as any) || false;
+
+  if (partial === "1") {
+    return c.html(<RailTrainTimeline trainId={trainId} arrivals={arrivals} />);
+  }
+
+  return c.html(
+    <RailTrainPage trainId={trainId} arrivals={arrivals} standalone={isRailHost} />
+  );
 });
 
 // GET /rail/:slug — station detail
