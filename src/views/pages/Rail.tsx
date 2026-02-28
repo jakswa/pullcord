@@ -103,16 +103,21 @@ function setSections(o){localStorage.setItem(SEC,JSON.stringify(o))}
 // Haversine in km
 function dist(a,b){var R=6371,dLat=(b[0]-a[0])*Math.PI/180,dLon=(b[1]-a[1])*Math.PI/180;var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 
-var userPos=null,geoRequested=false;
+var userPos=null,geoRequested=false,GEO_KEY="rail-geo";
+
+// Restore cached position immediately
+try{var cached=JSON.parse(sessionStorage.getItem(GEO_KEY));if(cached&&Date.now()-cached.ts<300000)userPos=[cached.lat,cached.lng]}catch(e){}
 
 function requestGeo(){
   if(geoRequested||!navigator.geolocation)return;
   geoRequested=true;
+  // Use cached position immediately, refresh in background
+  if(userPos)reorder();
   navigator.geolocation.getCurrentPosition(function(p){
     userPos=[p.coords.latitude,p.coords.longitude];
+    try{sessionStorage.setItem(GEO_KEY,JSON.stringify({lat:userPos[0],lng:userPos[1],ts:Date.now()}))}catch(e){}
     reorder();
   },function(){
-    // Permission denied or error — collapse nearby
     var s=getSections();s.nearby=false;setSections(s);reorder();
   },{ maximumAge:120000,timeout:8000 });
 }
@@ -1028,7 +1033,7 @@ function railStyles(): string {
 
     /* Nearby skeleton rows */
     .rail-skel-row {
-      height: 3.2rem;
+      height: 3.7rem;
       border-bottom: 1px solid var(--border-subtle);
       background: linear-gradient(90deg, transparent 0%, var(--border-subtle) 50%, transparent 100%);
       background-size: 200% 100%;
