@@ -991,7 +991,7 @@ function railStyles(): string {
       transition: background 0.15s;
     }
     .rail-toggle.on {
-      background: var(--brand);
+      background: #888;
     }
     .rail-toggle-knob {
       position: absolute;
