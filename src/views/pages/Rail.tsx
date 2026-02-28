@@ -142,14 +142,16 @@ window.reorder=function(){
     row.insertBefore(btn,row.firstChild);
   });
 
-  // Compute nearby
+  var starredSet=new Set(starred);
+
+  // Compute nearby (top 3 non-starred, sorted by distance)
   var nearby=[];
   if(userPos){
-    var dists=rows.map(function(r){var s=getSlug(r);var c=coords[s];return{slug:s,d:c?dist(userPos,c):999}}).sort(function(a,b){return a.d-b.d});
+    var dists=rows.map(function(r){var s=getSlug(r);var c=coords[s];return{slug:s,d:c?dist(userPos,c):999}}).filter(function(x){return!starredSet.has(x.slug)}).sort(function(a,b){return a.d-b.d});
     nearby=dists.slice(0,3).map(function(x){return x.slug});
   }
 
-  var starredSet=new Set(starred),nearbySet=new Set(nearby);
+  var nearbySet=new Set(nearby);
   var starredRows=[],nearbyRows=[],restRows=[];
   rows.forEach(function(r){
     var s=getSlug(r);
