@@ -16,6 +16,8 @@ interface Stop {
   stop_name: string;
   stop_lat: number;
   stop_lon: number;
+  nearest_rail_station?: string;
+  nearest_rail_distance_m?: number;
 }
 
 interface Trip {
@@ -197,7 +199,7 @@ class MARTADatabase {
   // Get single stop
   getStop(stopId: string): Stop | null {
     return this.db.prepare(`
-      SELECT stop_id, stop_name, stop_lat, stop_lon 
+      SELECT stop_id, stop_name, stop_lat, stop_lon, nearest_rail_station, nearest_rail_distance_m
       FROM stops 
       WHERE stop_id = ?
     `).get(stopId) as Stop | null;

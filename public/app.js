@@ -22,6 +22,11 @@ class PullcordApp {
     // Countdown timer (ticks every second between polls)
     this.countdownTimer = null;
 
+    // Rail transfer state
+    this.railEnabled = false;
+    this.railArrivals = [];
+    this.railStation = null;
+
     // Pull cord state
     this.cordActive = false;
     this.cordId = null;
@@ -348,6 +353,7 @@ class PullcordApp {
     this.initMapToggle();
     this.initRefreshBtn();
     this.initFavoriteBtn();
+    this.initRailToggle();
 
     // Multi-route: track which route is currently loaded for map/progress
     if (this.multiRoute) {
@@ -590,6 +596,54 @@ class PullcordApp {
     });
 
     update();
+  }
+
+  initRailToggle() {
+    const btn = document.getElementById('rail-toggle');
+    if (!btn) return;
+    this.railStation = btn.dataset.station;
+
+    btn.addEventListener('click', () => {
+      this.railEnabled = !this.railEnabled;
+      btn.classList.toggle('d-rail-active', this.railEnabled);
+      if (this.railEnabled && this.railArrivals.length === 0) {
+        this.fetchRailArrivals();
+      } else {
+        this.renderUpcoming(this.lastPredictions);
+      }
+    });
+  }
+
+  async fetchRailArrivals() {
+    try {
+      const resp = await fetch('/api/rail', { signal: AbortSignal.timeout(8000) });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      // Filter to our station, normalize name for matching
+      const stationNorm = this.railStation.replace(/\s+/g, ' ').trim().toUpperCase();
+      this.railArrivals = (data.arrivals || [])
+        .filter(a => a.station.replace(/\s+/g, ' ').trim().toUpperCase() === stationNorm)
+        .map(a => ({
+          headsign: a.destination,
+          etaSeconds: a.waitSeconds,
+          tier: a.isRealtime ? 'active' : 'scheduled',
+          isRail: true,
+          line: a.line,
+          direction: a.direction,
+          trainId: a.trainId,
+          isRealtime: a.isRealtime,
+        }));
+      this.renderUpcoming(this.lastPredictions);
+    } catch (e) {
+      console.error('Rail fetch error:', e);
+    }
+
+    // Refresh rail data every 20s
+    if (!this._railTimer) {
+      this._railTimer = setInterval(() => {
+        if (this.railEnabled) this.fetchRailArrivals();
+      }, 20000);
+    }
   }
 
   updateTimestamp() {
@@ -953,12 +1007,18 @@ class PullcordApp {
 
     section.style.display = '';
 
+    // Mix in rail arrivals if enabled
+    const allPreds = this.railEnabled && this.railArrivals.length > 0
+      ? [...predictions, ...this.railArrivals]
+      : [...predictions];
+
     // Flat list sorted by arrival time — hero stays in list, highlighted
-    const sorted = [...predictions].sort((a, b) => a.etaSeconds - b.etaSeconds);
+    const sorted = allPreds.sort((a, b) => a.etaSeconds - b.etaSeconds);
     const heroVid = this.heroPrediction?.vehicleId;
     const heroTripId = this.heroPrediction?.tripId;
 
     list.innerHTML = sorted.map(pred => {
+      if (pred.isRail) return this.renderRailRow(pred);
       const isHero = heroVid
         ? (pred.vehicleId === heroVid && pred.tripId === heroTripId)
         : (pred === this.heroPrediction);
@@ -1052,6 +1112,33 @@ class PullcordApp {
           <div class="d-upcoming-label">${tier !== 'active' && minutes < 1 ? '' : minutes < 1 ? '' : 'min'}</div>
         </div>
       </div>
+    `;
+  }
+
+  renderRailRow(pred) {
+    const minutes = Math.floor(pred.etaSeconds / 60);
+    const lineColors = { RED: '#E05555', GOLD: '#D4A020', BLUE: '#4A9FE5', GREEN: '#3BAA6E' };
+    const color = lineColors[pred.line] || '#888';
+    const isScheduled = !pred.isRealtime;
+    const opacity = isScheduled ? 'opacity:0.45' : '';
+    const timePrefix = isScheduled ? '~' : '';
+    const href = pred.trainId ? `/rail/train/${pred.trainId}` : '#';
+
+    return `
+      <a class="d-upcoming-row d-rail-row" style="--row-color:${color};${opacity}" href="${href}">
+        <div class="d-upcoming-info">
+          <div class="d-upcoming-headsign">
+            <span class="d-rail-dir">${pred.direction}</span>
+            <span class="d-rail-line" style="background:${color}">${pred.line.toLowerCase()}</span>
+            ${this.esc(pred.headsign || '')}
+          </div>
+          <div class="d-upcoming-meta"><span class="dot-live"></span> 🚇 Rail transfer</div>
+        </div>
+        <div class="d-upcoming-time">
+          <div class="d-upcoming-minutes">${minutes < 1 ? 'NOW' : timePrefix + minutes}</div>
+          <div class="d-upcoming-label">${minutes < 1 ? '' : 'min'}</div>
+        </div>
+      </a>
     `;
   }
 
