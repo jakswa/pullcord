@@ -544,12 +544,14 @@ export function RailStationDetail({
         const isNow = a.waitSeconds < 60;
         return (
           <a href={`/rail/train/${a.trainId}`} class="rail-arrival-row">
-            <span class="rail-arrival-dir" style={`background:${bg}`}>
+            <span class="rail-arrival-dir">
               {a.direction}
             </span>
+            <span class="rail-arrival-line-pill" style={`background:${bg}`}>
+              {a.line.toLowerCase()}
+            </span>
             <span class="rail-arrival-dest">
-              <span class="rail-arrival-line-label" style={`color:${bg}`}>{a.line.toLowerCase()}</span>
-              {" "}{stationDisplayName(a.destination).toLowerCase()}
+              {stationDisplayName(a.destination).toLowerCase()}
             </span>
             <span class={`rail-arrival-time${isNow ? " rail-arrival-now" : ""}`}>
               {isNow ? "NOW" : `${Math.floor(a.waitSeconds / 60)} min`}
@@ -1081,10 +1083,24 @@ function railStyles(): string {
       width: 1.75rem;
       height: 1.75rem;
       border-radius: 0.25rem;
-      font-size: 0.9rem;
+      font-size: 1rem;
       font-weight: 800;
+      color: var(--text-primary);
+      background: var(--border-color);
+      flex-shrink: 0;
+    }
+
+    .rail-arrival-line-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.2rem;
+      font-size: 0.85rem;
+      font-weight: 700;
       color: #fff;
       flex-shrink: 0;
+      letter-spacing: 0.02em;
     }
 
     .rail-arrival-dest {
@@ -1094,12 +1110,6 @@ function railStyles(): string {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-
-    .rail-arrival-line-label {
-      font-size: 0.85rem;
-      font-weight: 700;
-      margin-right: 0.15rem;
     }
 
     .rail-arrival-time {
