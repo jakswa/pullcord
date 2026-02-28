@@ -146,7 +146,7 @@ window.reorder=function(){
   var nearby=[];
   if(userPos){
     var dists=rows.map(function(r){var s=getSlug(r);var c=coords[s];return{slug:s,d:c?dist(userPos,c):999}}).sort(function(a,b){return a.d-b.d});
-    nearby=dists.filter(function(x){return x.d<5}).slice(0,3).map(function(x){return x.slug});
+    nearby=dists.slice(0,3).map(function(x){return x.slug});
   }
 
   var starredSet=new Set(starred),nearbySet=new Set(nearby);
