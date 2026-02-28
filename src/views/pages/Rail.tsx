@@ -185,9 +185,10 @@ window.reorder=function(){
     h.addEventListener("click",function(){toggleSection(key)});
     list.appendChild(h);
 
-    if(open&&hasItems){
+    if(hasItems){
       var wrap=document.createElement("div");
       wrap.className="rail-section-items";
+      if(!open)wrap.style.display="none";
       items.forEach(function(r){wrap.appendChild(r)});
       list.appendChild(wrap);
     }
