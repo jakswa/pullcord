@@ -191,6 +191,12 @@ window.reorder=function(){
       if(!open)wrap.style.display="none";
       items.forEach(function(r){wrap.appendChild(r)});
       list.appendChild(wrap);
+    } else if(key==="nearby"&&open&&!userPos){
+      // Skeleton while waiting for geolocation
+      var skel=document.createElement("div");
+      skel.className="rail-section-items rail-skeleton";
+      for(var i=0;i<3;i++){var row=document.createElement("div");row.className="rail-skel-row";skel.appendChild(row)}
+      list.appendChild(skel);
     }
   }
 
@@ -206,6 +212,9 @@ window.reorder=function(){
 // If user previously enabled nearby, silently re-request geo on load
 if(isOpen("nearby",false))requestGeo();
 reorder();
+// Reveal list after first reorder (prevents unsorted flash)
+var l=document.querySelector(".rail-station-list");
+if(l)l.classList.remove("rail-loading");
 })();`;
 
   return base + landing;
@@ -406,7 +415,7 @@ export function RailStationList({ arrivals }: { arrivals: RailArrival[] }) {
   const rows = buildStationRows(arrivals);
 
   return (
-    <div class="rail-station-list">
+    <div class="rail-station-list rail-loading">
       {rows.map((row) => (
         <StationRowEl row={row} />
       ))}
@@ -716,7 +725,7 @@ function railStyles(): string {
       --text-body: #b0a898;
       --text-muted: #807870;
       --border-color: #2a2a26;
-      --border-subtle: #2a2a26;
+      --border-subtle: #333330;
       --brand: #E85D3A;
       --font-sans: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif;
       --font-mono: ui-monospace, Cascadia Code, Source Code Pro, Menlo, Consolas, monospace;
@@ -1010,6 +1019,24 @@ function railStyles(): string {
     .rail-section-items {
       display: flex;
       flex-direction: column;
+    }
+
+    /* Hide list until JS reorders (prevents unsorted flash) */
+    .rail-loading {
+      visibility: hidden;
+    }
+
+    /* Nearby skeleton rows */
+    .rail-skel-row {
+      height: 3.2rem;
+      border-bottom: 1px solid var(--border-subtle);
+      background: linear-gradient(90deg, transparent 0%, var(--border-subtle) 50%, transparent 100%);
+      background-size: 200% 100%;
+      animation: rail-shimmer 1.5s ease-in-out infinite;
+    }
+    @keyframes rail-shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
     }
 
     /* ── Animations ── */
