@@ -39,15 +39,15 @@ export const AboutPage = () => (
         <h2 class="about-h2">By the numbers</h2>
         <div class="about-stats">
           <div class="about-stat">
-            <span class="about-stat-number">63</span>
+            <span class="about-stat-number">110+</span>
             <span class="about-stat-label">commits</span>
           </div>
           <div class="about-stat">
-            <span class="about-stat-number">6k</span>
+            <span class="about-stat-number">9k</span>
             <span class="about-stat-label">lines of code</span>
           </div>
           <div class="about-stat">
-            <span class="about-stat-number">7</span>
+            <span class="about-stat-number">8</span>
             <span class="about-stat-label">dependencies</span>
           </div>
           <div class="about-stat">
@@ -68,6 +68,13 @@ export const AboutPage = () => (
       {/* Updates — moved up: what's new is more interesting than stack details */}
       <section class="about-section">
         <h2 class="about-h2">Updates</h2>
+
+        <div class="about-update">
+          <div class="about-update-date">Feb 27</div>
+          <div class="about-update-text">
+            <strong>Ghost bus rescue.</strong> MARTA's real-time feed sometimes stops updating arrival predictions for buses that are clearly still running — their GPS is broadcasting, but the predicted times go stale by hours. Previously, these "ghost" buses just vanished from your stop's arrival list. Now Pullcord detects them and computes an ETA from the bus's actual GPS position. Also cleaned up stale predictions that showed as "—" with no useful time.
+          </div>
+        </div>
 
         <div class="about-update">
           <div class="about-update-date">Feb 19</div>
@@ -167,7 +174,7 @@ export const AboutPage = () => (
       <section class="about-section">
         <h2 class="about-h2">Data</h2>
         <p>Real-time bus positions and predictions come from <a href="https://www.itsmarta.com/MARTA-Developer-resources.aspx" class="about-link" target="_blank" rel="noopener">MARTA's GTFS-RT feeds</a>, updated every ~30 seconds. Stop locations, routes, and schedules come from MARTA's static GTFS data.</p>
-        <p>ETAs for tracked buses are computed from vehicle GPS positions and scheduled inter-stop times — not MARTA's prediction feed, which has known accuracy issues.</p>
+        <p>ETAs for tracked buses are computed from vehicle GPS positions and scheduled inter-stop times. MARTA's predicted arrival times are used as a starting point when available, but Pullcord overrides them with GPS-based estimates when the bus is being actively tracked — and rescues buses whose predictions go stale entirely.</p>
       </section>
 
       {/* Why "Pullcord" */}
