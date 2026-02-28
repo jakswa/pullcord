@@ -346,85 +346,50 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
     }
   }
 
-  // Computed ETA: for active-tier vehicles with known positions, replace MARTA's
-  // treadmill ETA with our own based on vehicle position + scheduled inter-stop deltas.
+  // Unified active-tier ETA: for ALL vehicles with GPS positions, compute ETA from
+  // vehicle position + scheduled inter-stop deltas. Updates existing MARTA predictions
+  // (preserving martaEtaSeconds) or synthesizes new ones for ghost vehicles (rescued: true).
   if (vehicles && vehicles.length > 0) {
-    // Build vehicle position lookup
-    const vehiclePos = new Map(vehicles.map(v => [v.vehicleId, v]));
+    const existingByTrip = new Map(
+      arrivals.filter(a => a.tripId).map(a => [a.tripId!, a])
+    );
 
-    // Collect tripIds that have active vehicles
-    const activeTripIdsForETA = arrivals
-      .filter(a => a.tier === 'active' && a.tripId && a.vehicleId && vehiclePos.has(a.vehicleId))
-      .map(a => a.tripId!);
-
-    if (activeTripIdsForETA.length > 0) {
-      // One batch query for all trip stop sequences
-      const tripStopSeqs = getTripStopSequences(activeTripIdsForETA);
-
-      for (const arr of arrivals) {
-        if (arr.tier !== 'active' || !arr.tripId || !arr.vehicleId) continue;
-        const veh = vehiclePos.get(arr.vehicleId);
-        const rawStops = tripStopSeqs.get(arr.tripId);
-        if (!veh || !rawStops) continue;
-
-        // Convert to TripStop format
-        const tripStops: TripStop[] = rawStops.map(s => ({
-          stop_id: s.stop_id,
-          lat: s.lat,
-          lon: s.lon,
-          sequence: s.sequence,
-          arrivalSec: parseTimeToSec(s.arrival_time),
-        }));
-
-        const eta = computeETA(veh.lat, veh.lon, tripStops, allStopIds, veh.staleSeconds);
-        if (eta !== null) {
-          arr.martaEtaSeconds = arr.etaSeconds; // preserve MARTA's original for comparison
-          arr.etaSeconds = eta;
-          arr.etaSource = 'computed';
-        }
-      }
-    }
-
-    // Ghost vehicle rescue: MARTA's trip update feed sometimes has stale arrival times
-    // (hours in the past) for trips that are actively running. The -120s filter above
-    // correctly drops those, but it means we miss real buses approaching the stop.
-    // Fix: check vehicle positions for active trips that serve our stop but have no
-    // prediction in the arrivals array, and synthesize one from GPS + schedule deltas.
-    const arrivedVehicleTrips = new Set(arrivals.map(a => `${a.vehicleId}:${a.tripId}`));
-    const rescueTripIds: string[] = [];
-    const rescueVehicles: Map<string, VehiclePosition> = new Map(); // tripId → vehicle
+    // One batch query for all vehicle trip stop sequences
+    const allVehicleTripIds = vehicles
+      .filter(v => v.tripId && v.vehicleId)
+      .map(v => v.tripId);
+    const tripStopSeqs = allVehicleTripIds.length > 0
+      ? getTripStopSequences(allVehicleTripIds) : new Map();
 
     for (const veh of vehicles) {
       if (!veh.tripId || !veh.vehicleId) continue;
-      // Skip if we already have a prediction for this vehicle on this trip
-      if (arrivedVehicleTrips.has(`${veh.vehicleId}:${veh.tripId}`)) continue;
-      rescueTripIds.push(veh.tripId);
-      rescueVehicles.set(veh.tripId, veh);
-    }
 
-    if (rescueTripIds.length > 0) {
-      const rescueStopSeqs = getTripStopSequences(rescueTripIds);
+      const rawStops = tripStopSeqs.get(veh.tripId);
+      if (!rawStops) continue;
 
-      for (const [tripId, rawStops] of rescueStopSeqs) {
-        // Does this trip serve any of our target stops?
-        if (!rawStops.some(s => allStopIds.has(s.stop_id))) continue;
+      // For rescue candidates, verify trip serves our target stops
+      const existing = existingByTrip.get(veh.tripId);
+      if (!existing && !rawStops.some(s => allStopIds.has(s.stop_id))) continue;
 
-        const veh = rescueVehicles.get(tripId);
-        if (!veh) continue;
+      const tripStops: TripStop[] = rawStops.map(s => ({
+        stop_id: s.stop_id,
+        lat: s.lat,
+        lon: s.lon,
+        sequence: s.sequence,
+        arrivalSec: parseTimeToSec(s.arrival_time),
+      }));
 
-        const tripStops: TripStop[] = rawStops.map(s => ({
-          stop_id: s.stop_id,
-          lat: s.lat,
-          lon: s.lon,
-          sequence: s.sequence,
-          arrivalSec: parseTimeToSec(s.arrival_time),
-        }));
+      const eta = computeETA(veh.lat, veh.lon, tripStops, allStopIds, veh.staleSeconds);
+      if (eta === null) continue;
 
-        const eta = computeETA(veh.lat, veh.lon, tripStops, allStopIds, veh.staleSeconds);
-        if (eta === null) continue;
-
-        // Look up trip metadata
-        const trip = tripLookup.get(tripId);
+      if (existing && existing.tier === 'active') {
+        // Override existing MARTA prediction with computed ETA
+        existing.martaEtaSeconds = existing.etaSeconds;
+        existing.etaSeconds = eta;
+        existing.etaSource = 'computed';
+      } else if (!existing) {
+        // Ghost vehicle rescue — synthesize prediction
+        const trip = tripLookup.get(veh.tripId);
         if (!trip) continue;
         if (routeFilter && !routeFilter.has(trip.route_id)) continue;
 
@@ -432,7 +397,7 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
           headsign: trip.trip_headsign || 'Unknown Destination',
           directionId: trip.direction_id,
           vehicleId: veh.vehicleId,
-          tripId,
+          tripId: veh.tripId,
           etaSeconds: eta,
           staleSeconds: veh.staleSeconds,
           tier: 'active',
@@ -440,7 +405,6 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
           rescued: true,
         };
 
-        // Route enrichment (multi-route mode)
         if (routeInfo) {
           const ri = routeInfo.get(trip.route_id);
           arrival.routeId = trip.route_id;
