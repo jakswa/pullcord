@@ -577,8 +577,8 @@ function railStyles(): string {
       --border-color: #2a2a26;
       --border-subtle: #1e1e1c;
       --brand: #E85D3A;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif;
+      --font-mono: ui-monospace, Cascadia Code, Source Code Pro, Menlo, Consolas, monospace;
     }
 
     @media (prefers-color-scheme: light) {
