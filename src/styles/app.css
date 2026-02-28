@@ -729,7 +729,7 @@
      STALENESS DOTS (shared)
      ────────────────────────────── */
 
-  .dot-live, .dot-delayed, .dot-stale, .dot-lost {
+  .dot-live, .dot-delayed, .dot-stale, .dot-lost, .dot-rescued {
     display: inline-block;
     width: 7px;
     height: 7px;
@@ -739,6 +739,7 @@
   }
 
   .dot-live { background: var(--live-green); animation: d-blink 2s ease-in-out infinite; }
+  .dot-rescued { background: #f59e0b; animation: d-blink 2s ease-in-out infinite; }
   .dot-delayed { background: var(--live-delayed); animation: d-blink 2s ease-in-out infinite; }
   .dot-stale { background: var(--dot-stale); }
   .dot-lost { background: var(--dot-lost); }
