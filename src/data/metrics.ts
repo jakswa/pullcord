@@ -6,7 +6,8 @@ import { Database } from "bun:sqlite";
 import path from "path";
 import { getTripLookup, getRoutes } from "./db";
 import { getAllVehicles, isVehicleCacheWarm, type VehiclePosition } from "./realtime";
-import { fetchArrivals as fetchRailArrivals, isRailCacheWarm } from "../rail/api";
+// Rail sampling paused — no good KPI yet
+// import { fetchArrivals as fetchRailArrivals, isRailCacheWarm } from "../rail/api";
 import { parseTimeToSec, type TripStop } from "./eta";
 
 const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "data", "marta.db");
@@ -357,12 +358,10 @@ export async function collectMetrics(): Promise<void> {
   const now = Date.now();
   if (now - lastSampleTs < SAMPLE_INTERVAL) return;
 
-  // Only sample when users are active — if caches are cold,
+  // Only sample when users are active — if the vehicle cache is cold,
   // no one's using the app and we'd be making unnecessary API calls.
   // Gaps in the time series double as anonymous usage signal.
-  const busWarm = isVehicleCacheWarm();
-  const railWarm = isRailCacheWarm();
-  if (!busWarm && !railWarm) return;
+  if (!isVehicleCacheWarm()) return;
 
   lastSampleTs = now;
 
@@ -370,8 +369,9 @@ export async function collectMetrics(): Promise<void> {
   const db = getDb();
 
   try {
-    const busSamples = busWarm ? await sampleBusMetrics() : [];
-    const railSamples = railWarm ? await sampleRailMetrics() : [];
+    const busSamples = await sampleBusMetrics();
+    // Rail sampling paused — no good KPI yet. Re-enable when we find one.
+    const railSamples: RailSample[] = [];
 
     const insert = db.prepare(
       `INSERT INTO metrics (ts, kind, route_id, vehicles, ghost_count, avg_delay_sec, trips_active, trips_scheduled)
