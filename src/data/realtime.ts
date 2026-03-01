@@ -214,6 +214,12 @@ class RealtimeDataService {
       });
   }
 
+  // True if the vehicle cache was populated by a recent user request.
+  // Used by metrics to avoid API calls when nobody's using the app.
+  isCacheWarm(): boolean {
+    return this.vehicleCache !== null && Date.now() - this.vehicleCache.timestamp < 5 * 60 * 1000;
+  }
+
   // All bus vehicles across all routes (for metrics).
   // Simpler than getVehicles() — skips headsign/direction correction.
   async getAllVehicles(tripLookup: Map<string, Trip>): Promise<VehiclePosition[]> {
@@ -522,6 +528,12 @@ export { findArrivals };
 // Leverages the same cached proto fetch as getVehicles().
 export async function getAllVehicles(tripLookup: Map<string, Trip>): Promise<VehiclePosition[]> {
   return realtimeService.getAllVehicles(tripLookup);
+}
+
+// True if vehicle data was recently fetched by a user request.
+// Metrics uses this to avoid API calls when the app is idle.
+export function isVehicleCacheWarm(): boolean {
+  return realtimeService.isCacheWarm();
 }
 
 export type { VehiclePosition, PredictionUpdate, ArrivalPrediction };
