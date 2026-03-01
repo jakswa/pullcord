@@ -130,15 +130,13 @@ function RailCards({ lines }: { lines: RailLineSnapshot[] }) {
     <div class="s-rail-grid">
       {lines.map(l => {
         const color = LINE_COLORS[l.line] || "#666";
-        const total = l.realtime + l.scheduled;
-        const rtPct = total > 0 ? Math.round((l.realtime / total) * 100) : 0;
+        const avgMin = l.avgWait > 0 ? (l.avgWait / 60).toFixed(0) : "—";
         return (
           <div class="s-rail-card" style={`border-color:${color}`}>
             <div class="s-rail-line" style={`color:${color}`}>{l.line}</div>
             <div class="s-rail-trains">{l.trains}</div>
             <div class="s-rail-sub">trains</div>
-            <div class="s-rail-bar"><div class="s-rail-fill" style={`width:${rtPct}%;background:${color}`}></div></div>
-            <div class="s-rail-pct">{rtPct}% realtime</div>
+            <div class="s-rail-wait">{avgMin}m avg wait</div>
           </div>
         );
       })}
@@ -386,9 +384,7 @@ function statsCSS(): string {
     .s-rail-line{font-size:.85rem;font-weight:700;letter-spacing:1px;margin-bottom:.25rem}
     .s-rail-trains{font-size:2rem;font-weight:700;font-variant-numeric:tabular-nums}
     .s-rail-sub{font-size:.75rem;color:rgba(255,255,255,.4)}
-    .s-rail-bar{height:4px;background:rgba(255,255,255,.08);border-radius:2px;margin:.5rem 0 .25rem;overflow:hidden}
-    .s-rail-fill{height:100%;border-radius:2px}
-    .s-rail-pct{font-size:.75rem;color:rgba(255,255,255,.35);font-variant-numeric:tabular-nums}
+    .s-rail-wait{font-size:.8rem;color:rgba(255,255,255,.4);margin-top:.5rem;font-variant-numeric:tabular-nums}
 
     .s-meta{font-size:.8rem;color:rgba(255,255,255,.2);text-align:center;padding:1rem 0}
 
