@@ -80,6 +80,11 @@ async function _refresh(): Promise<RailArrival[]> {
   return data;
 }
 
+// True if rail data was recently fetched by a user request.
+export function isRailCacheWarm(): boolean {
+  return cache !== null && Date.now() - cache.ts < 5 * 60 * 1000;
+}
+
 export function stationSlug(name: string): string {
   return name
     .toLowerCase()
