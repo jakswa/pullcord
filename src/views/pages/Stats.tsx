@@ -1,5 +1,5 @@
 // Stats dashboard — MARTA operational health
-// Hero: schedule adherence. Secondary: delay, ghosts. SVG sparklines.
+// Hero: on-time performance. Secondary: delay, coverage, ghosts. SVG sparklines.
 
 import { getLatestSnapshot, getSystemTimeSeries, getLatestRouteSnapshots, type SystemSnapshot, type TimeSeriesPoint, type RouteSnapshot } from "../../data/metrics.js";
 import { getRoutes } from "../../data/db.js";
@@ -57,7 +57,13 @@ function formatVal(v: number, unit: string): string {
   return String(Math.round(v));
 }
 
-function adherenceColor(pct: number): string {
+function onTimeColor(pct: number): string {
+  if (pct >= 0.75) return "#3BAA6E";
+  if (pct >= 0.50) return "#D4A020";
+  return "#E05555";
+}
+
+function coverageColor(pct: number): string {
   if (pct >= 0.85) return "#3BAA6E";
   if (pct >= 0.65) return "#D4A020";
   return "#E05555";
@@ -76,31 +82,28 @@ function RouteTable({ routes, nameMap }: { routes: RouteSnapshot[]; nameMap: Map
   // Filter out rail routes that leak into bus metrics
   const busRoutes = routes.filter(r => !RAIL_IDS.has(nameMap.get(r.routeId) || r.routeId));
 
-  // Three groups: underserved (has buses but below 100%), missing (0 buses, scheduled), surplus (no schedule data)
-  const underserved = busRoutes.filter(r => r.tripsScheduled > 0 && r.vehicles > 0 && (r.adherence ?? 1) < 1);
+  // Routes with delay data — sort by worst on-time first, then worst delay
+  const withData = busRoutes.filter(r => r.vehicles > 0 && r.avgDelay !== null);
   const missing = busRoutes.filter(r => r.tripsScheduled > 0 && r.vehicles === 0);
-  const surplus = busRoutes.filter(r => r.tripsScheduled === 0 && r.vehicles > 0);
+  const noDelay = busRoutes.filter(r => r.vehicles > 0 && r.avgDelay === null);
 
-  // Sort underserved by adherence (worst first), missing by scheduled count, surplus by vehicles
-  underserved.sort((a, b) => (a.adherence ?? 0) - (b.adherence ?? 0));
+  withData.sort((a, b) => (a.onTime ?? 0) - (b.onTime ?? 0));
   missing.sort((a, b) => b.tripsScheduled - a.tripsScheduled);
-  surplus.sort((a, b) => b.vehicles - a.vehicles);
 
-  const top = [...underserved, ...missing.slice(0, 10), ...surplus.slice(0, 5)].slice(0, 25);
+  const top = [...withData, ...missing.slice(0, 10), ...noDelay.slice(0, 5)].slice(0, 25);
 
   return (
     <div class="s-table">
       <div class="s-table-head">
         <span class="s-th s-th-route">Route</span>
         <span class="s-th s-th-num">Buses</span>
-        <span class="s-th s-th-num">Sched</span>
-        <span class="s-th s-th-num">Adherence</span>
+        <span class="s-th s-th-num">On-time</span>
         <span class="s-th s-th-num">Delay</span>
       </div>
       {top.map(r => {
         const name = nameMap.get(r.routeId) || r.routeId;
-        const adhPct = r.adherence !== null ? Math.round(r.adherence * 100) : null;
-        const adhColor = adhPct !== null ? adherenceColor(r.adherence!) : "rgba(255,255,255,0.15)";
+        const otPct = r.onTime !== null ? Math.round(r.onTime * 100) : null;
+        const otColor = otPct !== null ? onTimeColor(r.onTime!) : "rgba(255,255,255,0.15)";
         const delayMin = r.avgDelay !== null ? Math.abs(r.avgDelay / 60).toFixed(1) : null;
         const delSign = r.avgDelay !== null ? (r.avgDelay >= 0 ? "+" : "-") : "";
         const delColor = r.avgDelay !== null ? delayColor(r.avgDelay) : "rgba(255,255,255,0.15)";
@@ -110,8 +113,7 @@ function RouteTable({ routes, nameMap }: { routes: RouteSnapshot[]; nameMap: Map
           <div class={`s-table-row${dimRow ? " s-dim" : ""}`}>
             <span class="s-td s-td-route">{name}</span>
             <span class="s-td s-td-num">{r.vehicles}</span>
-            <span class="s-td s-td-num">{r.tripsScheduled || "—"}</span>
-            <span class="s-td s-td-num" style={`color:${adhColor}`}>{adhPct !== null ? `${adhPct}%` : "—"}</span>
+            <span class="s-td s-td-num" style={`color:${otColor}`}>{otPct !== null ? `${otPct}%` : "—"}</span>
             <span class="s-td s-td-num" style={`color:${delColor}`}>{delayMin !== null ? `${delSign}${delayMin}m` : "—"}</span>
           </div>
         );
@@ -137,7 +139,7 @@ export function StatsPage() {
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <title>System Stats — Pullcord</title>
-        <meta name="description" content="MARTA schedule adherence and operational health." />
+        <meta name="description" content="MARTA on-time performance and operational health." />
         <meta name="theme-color" content="#090e1a" />
         <link rel="icon" type="image/svg+xml" href="/public/icons/favicon.svg" />
         <style>{statsCSS()}</style>
@@ -192,28 +194,29 @@ export function StatsContent({
     );
   }
 
-  const adhPct = snapshot.busAdherence !== null ? Math.round(snapshot.busAdherence * 100) : null;
-  const adhColor = adhPct !== null ? adherenceColor(snapshot.busAdherence!) : "#666";
+  const otPct = snapshot.busOnTime !== null ? Math.round(snapshot.busOnTime * 100) : null;
+  const otColor = otPct !== null ? onTimeColor(snapshot.busOnTime!) : "#666";
   const delayMin = snapshot.busAvgDelay !== null ? (snapshot.busAvgDelay / 60).toFixed(1) : null;
+  const covPct = snapshot.busCoverage !== null ? Math.round(snapshot.busCoverage * 100) : null;
 
   // Time series data
-  const adhPoints = timeSeries
-    .filter(p => p.scheduled > 0)
-    .map(p => (p.vehicles / p.scheduled) * 100);
+  const onTimePoints = timeSeries
+    .filter(p => (p.vehicles - p.ghosts) > 0 && p.onTimeCount != null)
+    .map(p => (p.onTimeCount / (p.vehicles - p.ghosts)) * 100);
   const delayPoints = timeSeries
     .filter(p => p.avgDelay !== null)
     .map(p => (p.avgDelay as number) / 60);
 
   return (
     <div class="s-content">
-      {/* ── Hero: Adherence ── */}
+      {/* ── Hero: On-time ── */}
       <section class="s-hero">
-        <div class="s-hero-big" style={`color:${adhColor}`}>
-          {adhPct !== null ? `${adhPct}%` : "—"}
+        <div class="s-hero-big" style={`color:${otColor}`}>
+          {otPct !== null ? `${otPct}%` : "—"}
         </div>
-        <div class="s-hero-label">schedule adherence</div>
+        <div class="s-hero-label">on-time performance</div>
         <div class="s-hero-sub">
-          {snapshot.busVehicles} of {snapshot.busScheduled} scheduled buses running
+          {snapshot.busOnTimeCount} of {snapshot.busDelayCount} buses within 5 min of schedule
         </div>
       </section>
 
@@ -226,12 +229,14 @@ export function StatsContent({
           <div class="s-card-label">avg delay</div>
         </div>
         <div class="s-card">
-          <div class="s-card-val">{snapshot.busVehicles}</div>
-          <div class="s-card-label">buses tracked</div>
+          <div class="s-card-val" style={covPct !== null ? `color:${coverageColor(snapshot.busCoverage!)}` : ""}>
+            {covPct !== null ? `${covPct}%` : "—"}
+          </div>
+          <div class="s-card-label">coverage</div>
         </div>
         <div class="s-card">
-          <div class="s-card-val">{snapshot.busScheduled}</div>
-          <div class="s-card-label">scheduled</div>
+          <div class="s-card-val">{snapshot.busVehicles}</div>
+          <div class="s-card-label">buses</div>
         </div>
         <div class="s-card">
           <div class="s-card-val">{snapshot.busGhosts}</div>
@@ -239,11 +244,11 @@ export function StatsContent({
         </div>
       </section>
 
-      {/* ── Adherence trend ── */}
-      {adhPoints.length >= 2 && (
+      {/* ── On-time trend ── */}
+      {onTimePoints.length >= 2 && (
         <section class="s-section">
-          <h2 class="s-h2">Adherence — last {hoursOfData}h</h2>
-          <Sparkline points={adhPoints} color={adhColor} label="adh" unit="%" yMin={0} yMax={100} />
+          <h2 class="s-h2">On-time — last {hoursOfData}h</h2>
+          <Sparkline points={onTimePoints} color={otColor} label="ontime" unit="%" yMin={0} yMax={100} />
         </section>
       )}
 
@@ -257,12 +262,12 @@ export function StatsContent({
 
       {/* ── Route breakdown ── */}
       <section class="s-section">
-        <h2 class="s-h2">Routes — worst adherence first</h2>
+        <h2 class="s-h2">Routes — worst on-time first</h2>
         <RouteTable routes={routeSnapshots} nameMap={nameMap} />
       </section>
 
       <div class="s-meta">
-        Samples only when riders are active · {timeSeries.length} data points · {hoursOfData}h
+        On-time = within ±5 min · Coverage = buses / scheduled trips · {timeSeries.length} samples · {hoursOfData}h
       </div>
     </div>
   );
