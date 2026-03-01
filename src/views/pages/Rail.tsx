@@ -109,15 +109,16 @@ var userPos=null,geoRequested=false,GEO_KEY="rail-geo";
 try{var cached=JSON.parse(sessionStorage.getItem(GEO_KEY));if(cached&&Date.now()-cached.ts<300000)userPos=[cached.lat,cached.lng]}catch(e){}
 
 function requestGeo(){
-  if(geoRequested||!navigator.geolocation)return;
-  geoRequested=true;
+  if(!navigator.geolocation)return;
   // Use cached position immediately, refresh in background
-  if(userPos)reorder();
+  if(userPos){reorder();if(geoRequested)return}
+  geoRequested=true;
   navigator.geolocation.getCurrentPosition(function(p){
     userPos=[p.coords.latitude,p.coords.longitude];
     try{sessionStorage.setItem(GEO_KEY,JSON.stringify({lat:userPos[0],lng:userPos[1],ts:Date.now()}))}catch(e){}
     reorder();
-  },function(){
+  },function(err){
+    geoRequested=false;
     var s=getSections();s.nearby=false;setSections(s);reorder();
   },{ maximumAge:120000,timeout:8000 });
 }
@@ -439,7 +440,7 @@ export function RailStationList({ arrivals }: { arrivals: RailArrival[] }) {
 
 // ── Full landing page ──
 export function RailLandingPage({ arrivals, standalone = false }: { arrivals: RailArrival[]; standalone?: boolean }) {
-  const title = standalone ? "MARTA Rail" : "MARTA Rail — Pullcord";
+  const title = standalone ? "marta.io rail" : "MARTA Rail — Pullcord";
   const backHref = standalone ? "/rail" : "/";
   const backLabel = standalone ? "Refresh" : "Back to home";
 
@@ -457,7 +458,7 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         {standalone && <meta property="og:url" content="https://beta.marta.io/" />}
-        <meta property="og:site_name" content="MARTA Rail" />
+        <meta property="og:site_name" content="marta.io" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={title} />
         <meta name="twitter:description" content="Real-time MARTA rail arrivals for all 38 stations." />
@@ -465,7 +466,7 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
         {standalone && <link rel="manifest" href="/manifest.json" />}
         {standalone && <meta name="apple-mobile-web-app-capable" content="yes" />}
         {standalone && <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />}
-        <meta name="apple-mobile-web-app-title" content="MARTA Rail" />
+        <meta name="apple-mobile-web-app-title" content="marta.io rail" />
         <link rel="apple-touch-icon" href="/public/icons/rail-192.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/rail-favicon.png" />
         <meta name="theme-color" content="#1a1a2e" />
@@ -482,7 +483,7 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
                   </svg>
                 </a>
               )}
-              <h1 class="rail-title">marta rail</h1>
+              <h1 class="rail-title">marta.io <span style="opacity:0.5">rail</span></h1>
               <span class="rail-freshness" id="freshness">—</span>
             </div>
           </header>
@@ -491,6 +492,10 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
               <RailStationList arrivals={arrivals} />
             </div>
           </main>
+          <footer class="rail-footer">
+            Real-time MARTA data via public API. Not affiliated with or endorsed by MARTA.
+            {!standalone && <span> · <a href="/about">About Pullcord</a></span>}
+          </footer>
         </div>
         <script dangerouslySetInnerHTML={{ __html: `window.__COORDS=${JSON.stringify(STATION_COORDS)};` }} />
         <script dangerouslySetInnerHTML={{ __html: buildInlineJS(true) }} />
@@ -511,7 +516,7 @@ export function RailStationPage({
 }) {
   const displayName = stationDisplayName(stationName);
   const title = standalone
-    ? `${displayName} — MARTA Rail`
+    ? `${displayName} — marta.io rail`
     : `${displayName} — MARTA Rail — Pullcord`;
 
   return (
@@ -623,7 +628,7 @@ export function RailTrainPage({
   const color = hasData ? (LINE_COLORS.dark[line as keyof typeof LINE_COLORS["dark"]] || "#666") : "#666";
 
   const title = standalone
-    ? `Train ${trainId} — MARTA Rail`
+    ? `Train ${trainId} — marta.io rail`
     : `Train ${trainId} — MARTA Rail — Pullcord`;
 
   return (
@@ -842,6 +847,15 @@ function railStyles(): string {
       max-width: 100vw;
       overflow-x: hidden;
     }
+    .rail-footer {
+      padding: 1.5rem 1rem 2rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.3);
+      line-height: 1.5;
+    }
+    .rail-footer a { color: rgba(255,255,255,0.4); text-decoration: none; }
+    .rail-footer a:hover { color: rgba(255,255,255,0.6); }
 
     *, *::before, *::after {
       box-sizing: border-box;
