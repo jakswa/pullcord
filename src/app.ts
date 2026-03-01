@@ -41,9 +41,9 @@ app.get("/", async (c, next) => {
 app.get("/manifest.json", async (c, next) => {
   if (c.get("isRailHost")) {
     return c.json({
-      name: "MARTA Rail",
+      name: "marta.io rail",
       short_name: "Rail",
-      description: "Real-time MARTA rail arrivals for all 38 stations.",
+      description: "Real-time MARTA rail arrivals for all 38 stations. Not affiliated with MARTA.",
       start_url: "/rail",
       display: "standalone",
       background_color: "#0f0f0f",
