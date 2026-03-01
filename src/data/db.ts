@@ -56,7 +56,16 @@ class MARTADatabase {
   constructor() {
     // One-time migration: add group_id column to stops if missing
     this.ensureGroupId();
+    // Ensure transfer columns exist (added later, may be missing on older DBs)
+    this.ensureTransferColumns();
     this.db = new Database(DB_PATH, { readonly: true });
+  }
+
+  private ensureTransferColumns() {
+    const db = new Database(DB_PATH);
+    try { db.run('ALTER TABLE stops ADD COLUMN nearest_rail_station TEXT'); } catch {}
+    try { db.run('ALTER TABLE stops ADD COLUMN nearest_rail_distance_m INTEGER'); } catch {}
+    db.close();
   }
 
   private ensureGroupId() {
@@ -198,11 +207,20 @@ class MARTADatabase {
 
   // Get single stop
   getStop(stopId: string): Stop | null {
-    return this.db.prepare(`
-      SELECT stop_id, stop_name, stop_lat, stop_lon, nearest_rail_station, nearest_rail_distance_m
-      FROM stops 
-      WHERE stop_id = ?
-    `).get(stopId) as Stop | null;
+    try {
+      return this.db.prepare(`
+        SELECT stop_id, stop_name, stop_lat, stop_lon, nearest_rail_station, nearest_rail_distance_m
+        FROM stops 
+        WHERE stop_id = ?
+      `).get(stopId) as Stop | null;
+    } catch {
+      // Fallback if transfer columns don't exist yet
+      return this.db.prepare(`
+        SELECT stop_id, stop_name, stop_lat, stop_lon
+        FROM stops 
+        WHERE stop_id = ?
+      `).get(stopId) as Stop | null;
+    }
   }
 
   // Get all stop IDs in the same group (paired directional stops at same location).
