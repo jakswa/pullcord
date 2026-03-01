@@ -3,6 +3,7 @@ import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, get
 import { getVehicles, findArrivals, getStopArrivals } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
 import { getVapidPublicKey, registerCord, cancelCord, cordExists, getActiveCordCount, testFireAll } from "../data/push.js";
+import { getLatestSnapshot, getSystemTimeSeries, getLatestRouteSnapshots, getLatestRailSnapshots, getRouteTimeSeries } from "../data/metrics.js";
 
 const app = new Hono();
 
@@ -373,6 +374,39 @@ app.get("/push/status", (c) => {
 app.post("/push/test", async (c) => {
   const sent = await testFireAll();
   return c.json({ sent });
+});
+
+// ── Metrics ──
+
+// GET /api/metrics/snapshot — latest system-wide snapshot
+app.get("/metrics/snapshot", (c) => {
+  const snapshot = getLatestSnapshot();
+  if (!snapshot) return c.json({ error: "No metrics collected yet" }, 404);
+  return c.json(snapshot);
+});
+
+// GET /api/metrics/system?hours=24 — system-level time series
+app.get("/metrics/system", (c) => {
+  const hours = Math.min(168, Math.max(1, parseInt(c.req.query("hours") || "24")));
+  return c.json(getSystemTimeSeries(hours));
+});
+
+// GET /api/metrics/routes — latest per-route snapshots
+app.get("/metrics/routes", (c) => {
+  return c.json(getLatestRouteSnapshots());
+});
+
+// GET /api/metrics/rail — latest per-line rail snapshots
+app.get("/metrics/rail", (c) => {
+  return c.json(getLatestRailSnapshots());
+});
+
+// GET /api/metrics/route/:routeId?hours=24 — single route time series
+app.get("/metrics/route/:routeId", (c) => {
+  const routeId = c.req.param("routeId");
+  if (!ROUTE_ID_RE.test(routeId)) return c.json({ error: "Invalid routeId" }, 400);
+  const hours = Math.min(168, Math.max(1, parseInt(c.req.query("hours") || "24")));
+  return c.json(getRouteTimeSeries(routeId, hours));
 });
 
 export default app;
