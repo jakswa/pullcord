@@ -6,7 +6,6 @@ import aboutRoutes from "./routes/about.js";
 import exploreRoutes from "./routes/explore.js";
 import rideRoutes from "./routes/ride.js";
 import railRoutes from "./routes/rail.js";
-// Rail shootout candidates kept in src/routes/rail-candidates.ts for reference
 import apiRoutes from "./routes/api.js";
 
 const RAIL_HOST = process.env.RAIL_HOST || ""; // e.g. "train.home.jake.town"
@@ -99,7 +98,6 @@ app.route("/", aboutRoutes);
 app.route("/", exploreRoutes);
 app.route("/", rideRoutes);
 app.route("/", railRoutes);
-// Shootout candidates removed — reference: src/routes/rail-candidates.ts
 
 // Serve push SW from root scope (SW scope = path of the file)
 app.get("/push-sw.js", async (c) => {
