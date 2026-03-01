@@ -3,7 +3,7 @@ export const AboutPage = () => (
     <div class="about-content">
       {/* Header */}
       <div class="about-header">
-        <a href="/" class="about-back">
+        <a href="/" class="about-back" onclick="if(history.length>1){history.back();return false}">
           <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
           </svg>

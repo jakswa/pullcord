@@ -2,7 +2,7 @@ export const RidePage = ({ tripId, stopId, routeId }: { tripId: string; stopId: 
   <div class="ride-shell">
     {/* Header */}
     <div class="ride-header">
-      <a href={stopId ? `/bus?route=${routeId}&stop=${stopId}` : "/"} class="ride-back" aria-label="Back">
+      <a href={stopId ? `/bus?route=${routeId}&stop=${stopId}` : "/"} class="ride-back" aria-label="Back" onclick="if(history.length>1){history.back();return false}">
         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>

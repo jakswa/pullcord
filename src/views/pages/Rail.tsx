@@ -131,7 +131,7 @@ window.reorder=function(){
   var list=document.querySelector(".rail-station-list");
   if(!list)return;
   list.classList.remove("rail-loading");
-  var rows=Array.from(list.querySelectorAll(".rail-row"));
+  var rows=Array.from(list.querySelectorAll(".rail-row:not([data-clone])"));
   var starred=getStarred();
 
   // Remove old sections/stars
@@ -158,17 +158,26 @@ window.reorder=function(){
   }
 
   var nearbySet=new Set(nearby);
-  var starredRows=[],nearbyRows=[],restRows=[];
+  var starredRows=[],nearbyRows=[],allRows=[];
   rows.forEach(function(r){
     var s=getSlug(r);
     if(starredSet.has(s))starredRows.push(r);
     else if(nearbySet.has(s))nearbyRows.push(r);
-    else restRows.push(r);
+    allRows.push(r);
   });
 
   while(list.firstChild)list.removeChild(list.firstChild);
 
-  function addSection(key,label,items,defaultOpen){
+  function cloneRow(r){
+    var s=getSlug(r);
+    var c=r.cloneNode(true);
+    c.setAttribute("data-clone","1");
+    var btn=c.querySelector(".rail-star");
+    if(btn)btn.addEventListener("click",function(e){e.preventDefault();e.stopPropagation();toggleStar(s)});
+    return c;
+  }
+
+  function addSection(key,label,items,defaultOpen,cloneItems){
     var open=isOpen(key,defaultOpen);
     var hasItems=items.length>0;
     // nearby always shows as a section (it's the geo opt-in)
@@ -197,7 +206,7 @@ window.reorder=function(){
       var wrap=document.createElement("div");
       wrap.className="rail-section-items";
       if(!open)wrap.style.display="none";
-      items.forEach(function(r){wrap.appendChild(r)});
+      items.forEach(function(r){wrap.appendChild(cloneItems?cloneRow(r):r)});
       list.appendChild(wrap);
     } else if(key==="nearby"&&open&&!userPos){
       // Skeleton while waiting for geolocation
@@ -210,11 +219,11 @@ window.reorder=function(){
 
   var hasAnySections=starredRows.length>0||navigator.geolocation;
   if(hasAnySections){
-    addSection("starred","starred",starredRows,true);
-    if(navigator.geolocation)addSection("nearby","nearby",nearbyRows,false);
-    addSection("all","all stations",restRows,true);
+    addSection("starred","starred",starredRows,true,true);
+    if(navigator.geolocation)addSection("nearby","nearby",nearbyRows,false,true);
+    addSection("all","all stations",allRows,true,false);
   } else {
-    restRows.forEach(function(r){list.appendChild(r)});
+    allRows.forEach(function(r){list.appendChild(r)});
   }
 };
 // If user previously enabled nearby, silently re-request geo on load
@@ -504,7 +513,7 @@ export function RailStationPage({
         <div class="rail-shell">
           <header class="rail-header">
             <div class="rail-header-top">
-              <a href="/rail" class="rail-back" aria-label="Back to all stations">
+              <a href="/rail" class="rail-back" aria-label="Back to all stations" onclick="if(history.length>1){history.back();return false}">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M15 10H5M5 10L10 5M5 10L10 15" />
                 </svg>
@@ -610,7 +619,7 @@ export function RailTrainPage({
         <div class="rail-shell">
           <header class="rail-header">
             <div class="rail-header-top">
-              <a href="/rail" class="rail-back" aria-label="Back to all stations">
+              <a href="/rail" class="rail-back" aria-label="Back to all stations" onclick="if(history.length>1){history.back();return false}">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M15 10H5M5 10L10 5M5 10L10 15" />
                 </svg>
@@ -685,41 +694,57 @@ export function RailTrainTimeline({
   const direction = trainArrivals[0].direction;
   const color = LINE_COLORS.dark[line as keyof typeof LINE_COLORS["dark"]] || "#666";
 
-  // Get station order for this line, reversed if heading south/west
-  let stationOrder = LINE_STATIONS[line] || [];
+  // Build ordered stop list from API data, using LINE_STATIONS for sort order
+  const lineOrder = LINE_STATIONS[line] || [];
+  const orderIndex = new Map<string, number>();
+  lineOrder.forEach((stn, i) => orderIndex.set(normalizeStation(stn), i));
+
+  // Deduplicate API stations by normalized name, keep the arrival data
+  const seenStations = new Map<string, RailArrival>();
+  for (const a of trainArrivals) {
+    const norm = normalizeStation(a.station);
+    if (!seenStations.has(norm)) seenStations.set(norm, a);
+  }
+
+  // Sort by line order (known stations first), then unknowns by waitSeconds
+  let apiStations = [...seenStations.entries()].sort((a, b) => {
+    const idxA = orderIndex.get(a[0]) ?? 999;
+    const idxB = orderIndex.get(b[0]) ?? 999;
+    if (idxA !== idxB) return idxA - idxB;
+    return a[1].waitSeconds - b[1].waitSeconds;
+  });
+
+  // Reverse for S/W direction
   if (direction === "S" || direction === "W") {
-    stationOrder = [...stationOrder].reverse();
+    apiStations = apiStations.reverse();
   }
 
   // Find the soonest arrival — that's where the train is
   const soonest = [...trainArrivals].sort((a, b) => a.waitSeconds - b.waitSeconds)[0];
   const currentNorm = normalizeStation(soonest.station);
 
-  const currentIdx = stationOrder.findIndex((stn) => normalizeStation(stn) === currentNorm);
   let foundCurrent = false;
 
   return (
     <div class="rail-timeline" style={`--tl-color:${color}`}>
       <div class="rail-tl-line" style={`background:${color}`}></div>
-      {stationOrder.map((stn) => {
-        const stnNorm = normalizeStation(stn);
-        const match = trainArrivals.find((a) => normalizeStation(a.station) === stnNorm);
+      {apiStations.map(([stnNorm, arrival]) => {
         const isCurrent = stnNorm === currentNorm;
         if (isCurrent) foundCurrent = true;
         const visited = !foundCurrent;
 
         const cls = isCurrent ? "rail-tl-stop current" : visited ? "rail-tl-stop visited" : "rail-tl-stop";
 
-        const isNow = match && match.waitSeconds < 60;
-        const mins = match ? Math.floor(match.waitSeconds / 60) : 0;
+        const isNow = arrival.waitSeconds < 60;
+        const mins = Math.floor(arrival.waitSeconds / 60);
 
-        const stnSlug = stationSlug(stn + " STATION");
+        const stnSlug = stationSlug(arrival.station);
 
         return (
           <a href={`/rail/${stnSlug}`} class={cls} id={isCurrent ? "rail-current" : undefined}>
             <span class="rail-tl-dot" style={`background:${color}`}></span>
-            <span class="rail-tl-name">{stationDisplayName(stn).toLowerCase()}</span>
-            {match && !visited && (
+            <span class="rail-tl-name">{stationDisplayName(arrival.station).toLowerCase()}</span>
+            {!visited && (
               <span class={`rail-tl-time${isNow ? " rail-tl-now" : ""}`}>
                 {isNow ? "NOW" : `${mins}m`}
               </span>
@@ -1085,8 +1110,9 @@ function railStyles(): string {
     .rail-arrival-row {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.75rem 0;
+      gap: 0.35rem;
+      padding: 0.35rem 0;
+      min-height: 2.75rem;
       text-decoration: none;
       color: inherit;
       border-bottom: 1px solid var(--border-subtle);
@@ -1100,10 +1126,10 @@ function railStyles(): string {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 1.75rem;
-      height: 1.75rem;
-      border-radius: 0.25rem;
-      font-size: 1rem;
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 0.2rem;
+      font-size: 1.05rem;
       font-weight: 800;
       color: var(--text-primary);
       background: var(--border-color);
@@ -1114,9 +1140,9 @@ function railStyles(): string {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 0.15rem 0.4rem;
+      padding: 0.1rem 0.35rem;
       border-radius: 0.2rem;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       font-weight: 700;
       color: #fff;
       flex-shrink: 0;
@@ -1125,7 +1151,7 @@ function railStyles(): string {
 
     .rail-arrival-dest {
       flex: 1;
-      font-size: 1.05rem;
+      font-size: 1.15rem;
       min-width: 0;
       white-space: nowrap;
       overflow: hidden;
@@ -1134,7 +1160,7 @@ function railStyles(): string {
 
     .rail-arrival-time {
       font-family: var(--font-mono);
-      font-size: 1.1rem;
+      font-size: 1.2rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
       flex-shrink: 0;
@@ -1159,10 +1185,9 @@ function railStyles(): string {
     /* Boarding — train at terminal, can board now */
     .rail-badge-boarding {
       display: inline-block;
-      margin-left: 0.4rem;
-      padding: 0.1rem 0.35rem;
+      padding: 0.05rem 0.3rem;
       border-radius: 0.2rem;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.04em;
@@ -1242,7 +1267,7 @@ function railStyles(): string {
     }
 
     .rail-tl-name {
-      font-size: 1.1rem;
+      font-size: 1.15rem;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1251,7 +1276,7 @@ function railStyles(): string {
 
     .rail-tl-time {
       font-family: var(--font-mono);
-      font-size: 1.1rem;
+      font-size: 1.2rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
       flex-shrink: 0;
@@ -1260,8 +1285,13 @@ function railStyles(): string {
     }
 
     .rail-tl-now {
-      color: #fff;
+      color: var(--brand);
       font-weight: 800;
+    }
+    @media (prefers-color-scheme: dark) {
+      .rail-tl-now {
+        color: #fff;
+      }
     }
   `;
 }
