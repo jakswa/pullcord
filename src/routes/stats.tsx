@@ -13,7 +13,6 @@ app.get("/stats", (c) => {
   const railSnapshots = getLatestRailSnapshots();
   const routes = getRoutes();
   const nameMap = new Map(routes.map(r => [r.route_id, r.route_short_name]));
-  const busPoints = timeSeries.map(p => p.vehicles);
   const firstTs = timeSeries.length > 0 ? timeSeries[0].ts : 0;
   const lastTs = timeSeries.length > 0 ? timeSeries[timeSeries.length - 1].ts : 0;
   const hoursOfData = ((lastTs - firstTs) / 3600).toFixed(1);
@@ -22,12 +21,11 @@ app.get("/stats", (c) => {
     return c.html(
       <StatsContent
         snapshot={snapshot}
-        busPoints={busPoints}
+        timeSeries={timeSeries}
         routeSnapshots={routeSnapshots}
         railSnapshots={railSnapshots}
         nameMap={nameMap}
         hoursOfData={hoursOfData}
-        dataPoints={timeSeries.length}
       />
     );
   }
