@@ -214,6 +214,35 @@ class RealtimeDataService {
       });
   }
 
+  // All bus vehicles across all routes (for metrics).
+  // Simpler than getVehicles() — skips headsign/direction correction.
+  async getAllVehicles(tripLookup: Map<string, Trip>): Promise<VehiclePosition[]> {
+    const entities = await this.getVehiclePositions();
+    const timestamp = Date.now();
+
+    return entities
+      .filter(entity => {
+        if (!entity.vehicle?.trip?.tripId || !entity.vehicle?.position) return false;
+        return tripLookup.has(entity.vehicle.trip.tripId);
+      })
+      .map(entity => {
+        const vehicle = entity.vehicle;
+        const trip = tripLookup.get(vehicle.trip.tripId)!;
+        const vehicleTimestamp = vehicle.timestamp ? parseInt(vehicle.timestamp) * 1000 : timestamp;
+        const staleSeconds = Math.floor((timestamp - vehicleTimestamp) / 1000);
+
+        return {
+          id: entity.id,
+          vehicleId: vehicle.vehicle?.id || entity.id,
+          lat: vehicle.position.latitude,
+          lon: vehicle.position.longitude,
+          tripId: vehicle.trip.tripId,
+          headsign: trip.trip_headsign,
+          directionId: trip.direction_id,
+          staleSeconds,
+        };
+      });
+  }
 }
 
 // ─────────────────────────────────────
@@ -488,5 +517,11 @@ export async function getStopArrivals(
 
 // Direct access to the shared core — for callers that need tier classification or custom options
 export { findArrivals };
+
+// All bus vehicles across all routes — for metrics/adherence computation.
+// Leverages the same cached proto fetch as getVehicles().
+export async function getAllVehicles(tripLookup: Map<string, Trip>): Promise<VehiclePosition[]> {
+  return realtimeService.getAllVehicles(tripLookup);
+}
 
 export type { VehiclePosition, PredictionUpdate, ArrivalPrediction };
