@@ -54,23 +54,19 @@ class MARTADatabase {
   private tripLookupCache: Map<string, Trip> | null = null;
 
   constructor() {
-    // One-time migration: add group_id column to stops if missing
-    this.ensureGroupId();
-    // Ensure transfer columns exist (added later, may be missing on older DBs)
-    this.ensureTransferColumns();
+    // Run all migrations with a single writable connection, then open readonly
+    this.runMigrations();
     this.db = new Database(DB_PATH, { readonly: true });
   }
 
-  private ensureTransferColumns() {
+  private runMigrations() {
     const db = new Database(DB_PATH);
+
+    // Transfer columns (added later, may be missing on older DBs)
     try { db.run('ALTER TABLE stops ADD COLUMN nearest_rail_station TEXT'); } catch {}
     try { db.run('ALTER TABLE stops ADD COLUMN nearest_rail_distance_m INTEGER'); } catch {}
-    db.close();
-  }
 
-  private ensureGroupId() {
-    const db = new Database(DB_PATH);
-    // Check if stops.group_id column exists
+    // Group ID column for paired stop resolution
     const cols = db.prepare("PRAGMA table_info(stops)").all() as Array<{ name: string }>;
     const hasGroupId = cols.some(c => c.name === 'group_id');
     if (!hasGroupId) {
@@ -84,8 +80,10 @@ class MARTADatabase {
       const count = db.prepare('SELECT COUNT(*) as c FROM stops WHERE group_id IS NOT NULL').get() as any;
       console.log(`📦 Added stops.group_id (${count.c} stops)`);
     }
+
     // Drop legacy stop_groups table if it exists
     db.exec(`DROP TABLE IF EXISTS stop_groups`);
+
     db.close();
   }
 
@@ -118,6 +116,7 @@ class MARTADatabase {
     // "five points" matches "FIVE POINTS STATION"
     // "mem gib" matches "MEMORIAL DR SE @ GIBSON ST SE"
     const words = query.trim().split(/\s+/).filter(w => w.length > 0);
+    words.splice(8);
     if (words.length === 0) return [];
     
     const whereClauses = words.map(() => `stop_name LIKE ?`);
