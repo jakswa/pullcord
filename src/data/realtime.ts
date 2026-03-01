@@ -1,6 +1,6 @@
 import { load } from "protobufjs";
 import path from "path";
-import { getScheduledArrivals, getStopIdsByName, getTripStopSequences } from "./db";
+import { getScheduledArrivals, getStopIdsByName, getTripStopSequences, type Trip } from "./db";
 import { computeETA, parseTimeToSec, type TripStop } from "./eta";
 
 const VEHICLE_POSITIONS_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb";
@@ -54,7 +54,7 @@ interface ArrivalPrediction {
 
 interface FindArrivalsOptions {
   stopId: string;
-  tripLookup: Map<string, any>;
+  tripLookup: Map<string, Trip>;
   routeFilter?: Set<string>;  // only include these route IDs (undefined = all in tripLookup)
   routeInfo?: Map<string, { route_short_name: string; route_color: string }>;
   vehicles?: VehiclePosition[];  // provide for tier classification
@@ -66,6 +66,7 @@ interface CachedData<T> {
 }
 
 class RealtimeDataService {
+  // protobufjs Root type is deeply nested/recursive and not worth wrapping
   private protoRoot: any = null;
   private vehicleCache: CachedData<any[]> | null = null;
   private tripUpdatesCache: CachedData<any[]> | null = null;
@@ -155,7 +156,7 @@ class RealtimeDataService {
     return entities;
   }
 
-  async getVehicles(routeId: string, tripLookup: Map<string, any>): Promise<VehiclePosition[]> {
+  async getVehicles(routeId: string, tripLookup: Map<string, Trip>): Promise<VehiclePosition[]> {
     const entities = await this.getVehiclePositions();
     const timestamp = Date.now();
 
@@ -342,7 +343,7 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
           arr.adherenceSec = computeAdherenceSec(arr._rtArrivalSec, schedTime);
         }
       }
-      delete (arr as any)._rtArrivalSec;
+      delete arr._rtArrivalSec;
     }
   }
 
@@ -439,12 +440,12 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
 // PUBLIC API — thin wrappers over findArrivals()
 // ─────────────────────────────────────
 
-export async function getVehicles(routeId: string, tripLookup: Map<string, any>): Promise<VehiclePosition[]> {
+export async function getVehicles(routeId: string, tripLookup: Map<string, Trip>): Promise<VehiclePosition[]> {
   return realtimeService.getVehicles(routeId, tripLookup);
 }
 
 // Single-route predictions (no tier classification — use findArrivals directly for tiers)
-export async function getPredictions(routeId: string, stopId: string, tripLookup: Map<string, any>): Promise<PredictionUpdate[]> {
+export async function getPredictions(routeId: string, stopId: string, tripLookup: Map<string, Trip>): Promise<PredictionUpdate[]> {
   return findArrivals({
     stopId,
     tripLookup,
@@ -462,7 +463,7 @@ export interface StopArrival extends PredictionUpdate {
 export async function getStopArrivals(
   stopId: string,
   routes: Array<{ route_id: string; route_short_name: string; route_color: string }>,
-  tripLookup: Map<string, any>
+  tripLookup: Map<string, Trip>
 ): Promise<StopArrival[]> {
   const routeInfo = new Map(
     routes.map(r => [r.route_id, { route_short_name: r.route_short_name, route_color: r.route_color }])
