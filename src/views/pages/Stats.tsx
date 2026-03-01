@@ -74,16 +74,23 @@ function delayColor(sec: number): string {
 }
 
 // ── Route table ──
-function RouteTable({ routes, nameMap }: { routes: RouteSnapshot[]; nameMap: Map<string, string> }) {
-  // Sort by adherence ascending (worst first), routes with no scheduled trips at end
-  const sorted = [...routes].sort((a, b) => {
-    if (a.adherence === null && b.adherence === null) return b.vehicles - a.vehicles;
-    if (a.adherence === null) return 1;
-    if (b.adherence === null) return -1;
-    return a.adherence - b.adherence;
-  });
+const RAIL_IDS = new Set(["BLUE", "GREEN", "RED", "GOLD"]);
 
-  const top = sorted.slice(0, 20);
+function RouteTable({ routes, nameMap }: { routes: RouteSnapshot[]; nameMap: Map<string, string> }) {
+  // Filter out rail routes that leak into bus metrics
+  const busRoutes = routes.filter(r => !RAIL_IDS.has(nameMap.get(r.routeId) || r.routeId));
+
+  // Three groups: underserved (has buses but below 100%), missing (0 buses, scheduled), surplus (no schedule data)
+  const underserved = busRoutes.filter(r => r.tripsScheduled > 0 && r.vehicles > 0 && (r.adherence ?? 1) < 1);
+  const missing = busRoutes.filter(r => r.tripsScheduled > 0 && r.vehicles === 0);
+  const surplus = busRoutes.filter(r => r.tripsScheduled === 0 && r.vehicles > 0);
+
+  // Sort underserved by adherence (worst first), missing by scheduled count, surplus by vehicles
+  underserved.sort((a, b) => (a.adherence ?? 0) - (b.adherence ?? 0));
+  missing.sort((a, b) => b.tripsScheduled - a.tripsScheduled);
+  surplus.sort((a, b) => b.vehicles - a.vehicles);
+
+  const top = [...underserved, ...missing.slice(0, 10), ...surplus.slice(0, 5)].slice(0, 25);
 
   return (
     <div class="s-table">
@@ -97,17 +104,19 @@ function RouteTable({ routes, nameMap }: { routes: RouteSnapshot[]; nameMap: Map
       {top.map(r => {
         const name = nameMap.get(r.routeId) || r.routeId;
         const adhPct = r.adherence !== null ? Math.round(r.adherence * 100) : null;
-        const adhColor = adhPct !== null ? adherenceColor(r.adherence!) : "rgba(255,255,255,0.2)";
-        const delayMin = r.avgDelay !== null ? (r.avgDelay / 60).toFixed(1) : "—";
-        const delColor = r.avgDelay !== null ? delayColor(r.avgDelay) : "rgba(255,255,255,0.2)";
+        const adhColor = adhPct !== null ? adherenceColor(r.adherence!) : "rgba(255,255,255,0.15)";
+        const delayMin = r.avgDelay !== null ? Math.abs(r.avgDelay / 60).toFixed(1) : null;
+        const delSign = r.avgDelay !== null ? (r.avgDelay >= 0 ? "+" : "-") : "";
+        const delColor = r.avgDelay !== null ? delayColor(r.avgDelay) : "rgba(255,255,255,0.15)";
+        const dimRow = r.vehicles === 0;
 
         return (
-          <div class="s-table-row">
+          <div class={`s-table-row${dimRow ? " s-dim" : ""}`}>
             <span class="s-td s-td-route">{name}</span>
             <span class="s-td s-td-num">{r.vehicles}</span>
             <span class="s-td s-td-num">{r.tripsScheduled || "—"}</span>
             <span class="s-td s-td-num" style={`color:${adhColor}`}>{adhPct !== null ? `${adhPct}%` : "—"}</span>
-            <span class="s-td s-td-num" style={`color:${delColor}`}>{r.avgDelay !== null ? `${r.avgDelay > 0 ? "+" : ""}${delayMin}m` : "—"}</span>
+            <span class="s-td s-td-num" style={`color:${delColor}`}>{delayMin !== null ? `${delSign}${delayMin}m` : "—"}</span>
           </div>
         );
       })}
@@ -364,6 +373,7 @@ function statsCSS(): string {
     .s-table-head{display:flex;gap:.5rem;padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.35);font-size:.8rem;font-weight:600}
     .s-table-row{display:flex;gap:.5rem;padding:.6rem 0;border-bottom:1px solid rgba(255,255,255,.04)}
     .s-table-row:last-child{border-bottom:none}
+    .s-table-row.s-dim{opacity:.4}
     .s-th,.s-td{min-width:0}
     .s-th-route,.s-td-route{width:4rem;flex-shrink:0;font-weight:600}
     .s-th-num,.s-td-num{flex:1;text-align:right}

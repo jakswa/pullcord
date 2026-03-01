@@ -15,6 +15,9 @@ const RETENTION_DAYS = 60;
 const MAX_DELAY_SEC = 1800; // 30 min — beyond this, assume data error
 const STALE_VEHICLE_SEC = 300; // 5 min — GPS older than this = ghost
 
+// MARTA rail route IDs in GTFS — exclude from bus metrics
+const RAIL_ROUTE_IDS = new Set(["27448", "27449", "27450", "27451"]);
+
 let metricsDb: Database | null = null;
 let lastSampleTs = 0;
 
@@ -141,6 +144,7 @@ function getScheduledTripsPerRoute(db: Database): Map<string, number> {
 
   const counts = new Map<string, number>();
   for (const [, span] of spans) {
+    if (RAIL_ROUTE_IDS.has(span.routeId)) continue; // rail tracked separately
     if (!serviceIds.has(span.serviceId)) continue;
     if (span.firstSec > nowSec || span.lastSec < nowSec) continue;
     counts.set(span.routeId, (counts.get(span.routeId) || 0) + 1);
@@ -549,7 +553,8 @@ export function getLatestRailSnapshots(): RailLineSnapshot[] {
   return db.prepare(
     `SELECT route_id as line, vehicles as trains, avg_delay_sec as avgWait,
             trips_active as realtime, trips_scheduled as scheduled
-     FROM metrics WHERE kind = 'rail' AND ts = ? ORDER BY route_id`
+     FROM metrics WHERE kind = 'rail' AND ts = ?
+     GROUP BY route_id ORDER BY route_id`
   ).all(latest.ts) as RailLineSnapshot[];
 }
 
