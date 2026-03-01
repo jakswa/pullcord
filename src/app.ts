@@ -77,7 +77,16 @@ app.use("*", async (c, next) => {
   c.header("Referrer-Policy", "strict-origin-when-cross-origin");
 });
 
-// Static file serving
+// Static file serving — cache JS/CSS for 1 hour, icons for 1 day
+app.use("/public/*", async (c, next) => {
+  await next();
+  const path = c.req.path;
+  if (path.endsWith(".js") || path.endsWith(".css")) {
+    c.header("Cache-Control", "public, max-age=3600");
+  } else if (path.endsWith(".png") || path.endsWith(".svg") || path.endsWith(".webp")) {
+    c.header("Cache-Control", "public, max-age=86400");
+  }
+});
 app.use("/public/*", serveStatic({ root: "./" }));
 
 // API routes

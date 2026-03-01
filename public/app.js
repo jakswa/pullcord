@@ -23,7 +23,7 @@ class PullcordApp {
     this.countdownTimer = null;
 
     // Rail transfer state
-    this.railEnabled = false;
+    this.railEnabled = localStorage.getItem('rail-on') === '1';
     this.railArrivals = [];
     this.railStation = null;
 
@@ -603,8 +603,14 @@ class PullcordApp {
     if (!btn) return;
     this.railStation = btn.dataset.station;
 
+    if (this.railEnabled) {
+      btn.classList.add('d-rail-active');
+      this.fetchRailArrivals();
+    }
+
     btn.addEventListener('click', () => {
       this.railEnabled = !this.railEnabled;
+      localStorage.setItem('rail-on', this.railEnabled ? '1' : '0');
       btn.classList.toggle('d-rail-active', this.railEnabled);
       if (this.railEnabled && this.railArrivals.length === 0) {
         this.fetchRailArrivals();
@@ -1124,6 +1130,7 @@ class PullcordApp {
     const timePrefix = isScheduled ? '~' : '';
     const href = pred.trainId ? `/rail/train/${pred.trainId}` : '#';
 
+    const timeText = minutes < 1 ? 'NOW' : `${timePrefix}${minutes} min`;
     return `
       <a class="d-upcoming-row d-rail-row" style="--row-color:${color};${opacity}" href="${href}">
         <div class="d-upcoming-info">
@@ -1132,11 +1139,9 @@ class PullcordApp {
             <span class="d-rail-line" style="background:${color}">${pred.line.toLowerCase()}</span>
             ${this.esc(pred.headsign || '')}
           </div>
-          <div class="d-upcoming-meta"><span class="dot-live"></span> 🚇 Rail transfer</div>
         </div>
         <div class="d-upcoming-time">
-          <div class="d-upcoming-minutes">${minutes < 1 ? 'NOW' : timePrefix + minutes}</div>
-          <div class="d-upcoming-label">${minutes < 1 ? '' : 'min'}</div>
+          <div class="d-upcoming-minutes">${timeText}</div>
         </div>
       </a>
     `;

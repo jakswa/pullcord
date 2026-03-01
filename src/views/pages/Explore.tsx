@@ -2,7 +2,7 @@ export const ExplorePage = () => (
   <div class="explore-shell">
     {/* Header bar with integrated search */}
     <div class="explore-header">
-      <a href="/" class="explore-back" aria-label="Back to home">
+      <a href="/" class="explore-back" aria-label="Back to home" onclick="if(history.length>1){history.back();return false}">
         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
