@@ -18,20 +18,7 @@ function getDb(): Database {
   if (!metricsDb) {
     metricsDb = new Database(DB_PATH);
     metricsDb.exec("PRAGMA journal_mode=WAL");
-    metricsDb.exec(`
-      CREATE TABLE IF NOT EXISTS metrics (
-        ts INTEGER NOT NULL,
-        kind TEXT NOT NULL,
-        route_id TEXT,
-        vehicles INTEGER,
-        ghost_count INTEGER,
-        avg_delay_sec REAL,
-        trips_active INTEGER,
-        trips_scheduled INTEGER
-      )
-    `);
-    metricsDb.exec(`CREATE INDEX IF NOT EXISTS idx_metrics_ts ON metrics(ts)`);
-    metricsDb.exec(`CREATE INDEX IF NOT EXISTS idx_metrics_kind_route ON metrics(kind, route_id)`);
+    // Table created by migration v2 in migrate.ts
   }
   return metricsDb;
 }

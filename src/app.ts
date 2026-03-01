@@ -114,12 +114,23 @@ app.get("/push-sw.js", async (c) => {
   });
 });
 
-// Health check endpoint
+// Health check endpoint — verifies DB is queryable
+// Fly.io hits this to decide if the machine is healthy
+import { verifyDatabase } from "./data/migrate.js";
+
 app.get("/health", (c) => {
+  const dbCheck = verifyDatabase();
+  if (!dbCheck.ok) {
+    return c.json({
+      status: "unhealthy",
+      timestamp: new Date().toISOString(),
+      db: dbCheck,
+    }, 503);
+  }
   return c.json({
     status: "healthy",
     timestamp: new Date().toISOString(),
-    version: "1.0.0",
+    db: { version: dbCheck.version, tables: dbCheck.tables },
   });
 });
 
