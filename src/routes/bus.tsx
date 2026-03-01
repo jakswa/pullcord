@@ -5,6 +5,9 @@ import { getRoute, getStop, getRouteDetail, getRoutesForStop } from "../data/db.
 
 const app = new Hono();
 
+const ROUTE_ID_RE = /^[a-zA-Z0-9_-]{1,20}$/;
+const STOP_ID_RE = /^[a-zA-Z0-9]{1,20}$/;
+
 // GET /bus?stop=204230 — multi-route stop view
 // GET /bus?route=39&stop=204230 — single-route tracker
 app.get("/bus", async (c) => {
@@ -12,6 +15,14 @@ app.get("/bus", async (c) => {
   const stopId = c.req.query("stop");
 
   if (!stopId) {
+    return c.redirect("/");
+  }
+
+  // Validate params before hitting the DB
+  if (!STOP_ID_RE.test(stopId)) {
+    return c.redirect("/");
+  }
+  if (routeId && !ROUTE_ID_RE.test(routeId)) {
     return c.redirect("/");
   }
 
