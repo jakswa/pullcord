@@ -10,7 +10,8 @@
     "start": "bun run build:css && bun run src/index.ts"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "playwright": "^1.58.2"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -20,7 +21,6 @@
     "croner": "^10.0.1",
     "csv-parse": "^6.1.0",
     "hono": "^4.11.9",
-    "playwright": "^1.58.2",
     "protobufjs": "^8.0.0",
     "tailwindcss": "^4.1.18",
     "web-push": "^3.6.7"

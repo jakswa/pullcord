@@ -102,7 +102,7 @@ export function registerCord(
   directionId: number | null,
   thresholdMinutes: number = 2,
 ): string {
-  const id = Math.random().toString(36).slice(2, 10);
+  const id = crypto.randomUUID();
   const now = Date.now();
 
   // Remove any existing cord for this subscription endpoint
