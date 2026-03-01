@@ -248,6 +248,39 @@ class MARTADatabase {
     return routes.filter(r => !RAIL_ROUTES.has(r.route_short_name));
   }
 
+  // Batch: get routes for multiple stops at once (eliminates N+1 in search/nearby).
+  // Returns Map<stop_id, Route[]> keyed by the input stop IDs.
+  // Resolves paired stops via group_id, excludes rail routes.
+  getRoutesForStops(stopIds: string[]): Map<string, Route[]> {
+    if (stopIds.length === 0) return new Map();
+    const placeholders = stopIds.map(() => '?').join(',');
+    const rows = this.db.prepare(`
+      SELECT DISTINCT s_input.stop_id as input_stop_id,
+        r.route_id, r.route_short_name, r.route_long_name, r.route_color, r.route_text_color
+      FROM stops s_input
+      JOIN stops s_group ON s_group.group_id = s_input.group_id
+      JOIN route_stops rs ON rs.stop_id = s_group.stop_id
+      JOIN routes r ON r.route_id = rs.route_id
+      WHERE s_input.stop_id IN (${placeholders})
+      ORDER BY s_input.stop_id, CAST(r.route_short_name AS INTEGER), r.route_short_name
+    `).all(...stopIds) as Array<{ input_stop_id: string } & Route>;
+
+    const result = new Map<string, Route[]>();
+    for (const row of rows) {
+      if (RAIL_ROUTES.has(row.route_short_name)) continue;
+      let list = result.get(row.input_stop_id);
+      if (!list) { list = []; result.set(row.input_stop_id, list); }
+      list.push({
+        route_id: row.route_id,
+        route_short_name: row.route_short_name,
+        route_long_name: row.route_long_name,
+        route_color: row.route_color,
+        route_text_color: row.route_text_color,
+      });
+    }
+    return result;
+  }
+
   // Get route detail with shapes and stops
   getRouteDetail(routeId: string): RouteDetail | null {
     const route = this.getRoute(routeId);
@@ -440,6 +473,10 @@ export function getStop(stopId: string): Stop | null {
 
 export function getRoutesForStop(stopId: string): Route[] {
   return db.getRoutesForStop(stopId);
+}
+
+export function getRoutesForStops(stopIds: string[]): Map<string, Route[]> {
+  return db.getRoutesForStops(stopIds);
 }
 
 export function getStopIdsByName(stopId: string): string[] {
