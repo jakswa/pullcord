@@ -76,7 +76,7 @@ app.use("*", async (c, next) => {
   c.header("Referrer-Policy", "strict-origin-when-cross-origin");
   c.header(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com 'unsafe-inline'; connect-src 'self' https://developerservices.itsmarta.com:*; img-src 'self' https://*.tile.openstreetmap.org data: blob:; font-src 'self'; worker-src 'self'; manifest-src 'self'"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' https://unpkg.com 'unsafe-inline'; connect-src 'self' https://developerservices.itsmarta.com:*; img-src 'self' https://*.tile.openstreetmap.org data: blob:; font-src 'self'; worker-src 'self'; manifest-src 'self'"
   );
 });
 
