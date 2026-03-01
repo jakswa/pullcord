@@ -5,7 +5,7 @@
 import { Database } from "bun:sqlite";
 import path from "path";
 import { getTripLookup, getRoutes } from "./db";
-import { getAllVehicles, type VehiclePosition } from "./realtime";
+import { getAllVehicles, isVehicleCacheWarm, type VehiclePosition } from "./realtime";
 import { fetchArrivals as fetchRailArrivals } from "../rail/api";
 import { parseTimeToSec, type TripStop } from "./eta";
 
@@ -352,6 +352,12 @@ async function sampleRailMetrics(): Promise<RailSample[]> {
 export async function collectMetrics(): Promise<void> {
   const now = Date.now();
   if (now - lastSampleTs < SAMPLE_INTERVAL) return;
+
+  // Only sample when users are active — if the vehicle cache is cold,
+  // no one's using the app and we'd be making unnecessary API calls.
+  // Gaps in the time series double as anonymous usage signal.
+  if (!isVehicleCacheWarm()) return;
+
   lastSampleTs = now;
 
   const ts = Math.floor(now / 1000);
