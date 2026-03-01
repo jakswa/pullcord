@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRouteHeadsigns, getAllStopsWithRoutes, getTripStopSequences } from "../data/db.js";
+import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRoutesForStops, getRouteHeadsigns, getAllStopsWithRoutes, getTripStopSequences } from "../data/db.js";
 import { getVehicles, findArrivals, getStopArrivals } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
 import { getVapidPublicKey, registerCord, cancelCord, cordExists, getActiveCordCount, testFireAll } from "../data/push.js";
@@ -37,10 +37,10 @@ app.get("/stops", (c) => {
         if (route) {
           routeMatch = route;
           const stops = getStopsForRoute(route.route_id, 60);
-          routeStops = stops.map(stop => {
-            const routes = getRoutesForStop(stop.stop_id);
-            return { ...stop, routes: routes.map(r => r.route_short_name) };
-          }).filter(stop => stop.routes.length > 0);
+          const routeMap = getRoutesForStops(stops.map(s => s.stop_id));
+          routeStops = stops.map(stop => ({
+            ...stop, routes: (routeMap.get(stop.stop_id) || []).map(r => r.route_short_name),
+          })).filter(stop => stop.routes.length > 0);
         }
       }
 
@@ -48,10 +48,10 @@ app.get("/stops", (c) => {
       const stops = searchStops(query, limit);
       
       // Enrich with bus routes, filter out rail-only stops
-      const enrichedStops = stops.map(stop => {
-        const routes = getRoutesForStop(stop.stop_id);
-        return { ...stop, routes: routes.map(r => r.route_short_name) };
-      }).filter(stop => stop.routes.length > 0);
+      const searchRouteMap = getRoutesForStops(stops.map(s => s.stop_id));
+      const enrichedStops = stops.map(stop => ({
+        ...stop, routes: (searchRouteMap.get(stop.stop_id) || []).map(r => r.route_short_name),
+      })).filter(stop => stop.routes.length > 0);
 
       // Combine: route stops first (deduplicated), then name matches
       if (routeStops.length > 0) {
@@ -74,10 +74,10 @@ app.get("/stops", (c) => {
       const stops = getNearbyStops(latitude, longitude, radius, limit);
       
       // Enrich with bus routes, filter out rail-only stops
-      const enrichedStops = stops.map(stop => {
-        const routes = getRoutesForStop(stop.stop_id);
-        return { ...stop, routes: routes.map(r => r.route_short_name) };
-      }).filter(stop => stop.routes.length > 0);
+      const nearbyRouteMap = getRoutesForStops(stops.map(s => s.stop_id));
+      const enrichedStops = stops.map(stop => ({
+        ...stop, routes: (nearbyRouteMap.get(stop.stop_id) || []).map(r => r.route_short_name),
+      })).filter(stop => stop.routes.length > 0);
       
       return c.json(enrichedStops);
       
