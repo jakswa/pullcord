@@ -6,6 +6,37 @@ import { getVapidPublicKey, registerCord, cancelCord, cordExists, getActiveCordC
 
 const app = new Hono();
 
+// ── Input validation helpers ──
+
+const ROUTE_ID_RE = /^[a-zA-Z0-9_-]{1,20}$/;
+const STOP_ID_RE = /^[a-zA-Z0-9]{1,20}$/;
+
+function validRouteId(id: string): boolean {
+  return ROUTE_ID_RE.test(id);
+}
+
+function validStopId(id: string): boolean {
+  return STOP_ID_RE.test(id);
+}
+
+function sanitizeQuery(q: string): string {
+  return q.trim().slice(0, 200);
+}
+
+function clampLimit(raw: string | undefined, fallback = 20): number {
+  const n = parseInt(raw || String(fallback));
+  if (isNaN(n)) return fallback;
+  return Math.max(1, Math.min(50, n));
+}
+
+function validLat(n: number): boolean {
+  return !isNaN(n) && n >= -90 && n <= 90;
+}
+
+function validLon(n: number): boolean {
+  return !isNaN(n) && n >= -180 && n <= 180;
+}
+
 // GET /api/routes - All bus routes
 app.get("/routes", (c) => {
   try {
@@ -21,19 +52,23 @@ app.get("/routes", (c) => {
 // GET /api/stops?lat=33.81&lon=-84.36&radius=500 - Search stops by location
 app.get("/stops", (c) => {
   try {
-    const query = c.req.query("q");
+    const rawQuery = c.req.query("q");
     const lat = c.req.query("lat");
     const lon = c.req.query("lon");
     const radius = parseInt(c.req.query("radius") || "500");
-    const limit = parseInt(c.req.query("limit") || "20");
+    const limit = clampLimit(c.req.query("limit"));
 
-    if (query) {
+    if (rawQuery) {
+      const query = sanitizeQuery(rawQuery);
+      if (query.length === 0) {
+        return c.json({ error: "Query must not be empty" }, 400);
+      }
       let routeMatch: { route_short_name: string; route_color: string } | null = null;
       let routeStops: any[] = [];
 
       // If query looks like a route number, try matching a route
-      if (/^\d+$/.test(query.trim())) {
-        const route = getRoute(query.trim());
+      if (/^\d+$/.test(query)) {
+        const route = getRoute(query);
         if (route) {
           routeMatch = route;
           const stops = getStopsForRoute(route.route_id, 60);
@@ -67,7 +102,7 @@ app.get("/stops", (c) => {
       const latitude = parseFloat(lat);
       const longitude = parseFloat(lon);
       
-      if (isNaN(latitude) || isNaN(longitude)) {
+      if (!validLat(latitude) || !validLon(longitude)) {
         return c.json({ error: "Invalid lat/lon parameters" }, 400);
       }
       
@@ -108,6 +143,9 @@ app.get("/stops/all", (c) => {
 app.get("/route/:routeId", (c) => {
   try {
     const routeId = c.req.param("routeId");
+    if (!validRouteId(routeId)) {
+      return c.json({ error: "Invalid routeId" }, 400);
+    }
     const routeDetail = getRouteDetail(routeId);
     
     if (!routeDetail) {
@@ -126,6 +164,9 @@ app.get("/route/:routeId", (c) => {
 app.get("/realtime/:routeId", async (c) => {
   try {
     const routeId = c.req.param("routeId");
+    if (!validRouteId(routeId)) {
+      return c.json({ error: "Invalid routeId" }, 400);
+    }
     
     // Verify route exists
     const route = getRoute(routeId);
@@ -164,6 +205,8 @@ app.get("/predictions/:routeId/:stopId", async (c) => {
   try {
     const routeId = c.req.param("routeId");
     const stopId = c.req.param("stopId");
+    if (!validRouteId(routeId)) return c.json({ error: "Invalid routeId" }, 400);
+    if (!validStopId(stopId)) return c.json({ error: "Invalid stopId" }, 400);
     
     const route = getRoute(routeId);
     const stop = getStop(stopId);
@@ -216,6 +259,7 @@ app.get("/predictions/:routeId/:stopId", async (c) => {
 app.get("/stops/:stopId/arrivals", async (c) => {
   try {
     const stopId = c.req.param("stopId");
+    if (!validStopId(stopId)) return c.json({ error: "Invalid stopId" }, 400);
     const stop = getStop(stopId);
     if (!stop) return c.json({ error: "Stop not found" }, 404);
 
@@ -295,6 +339,8 @@ app.post("/push/cord", async (c) => {
     if (!routeId || !stopId) {
       return c.json({ error: "routeId and stopId required" }, 400);
     }
+    if (!validRouteId(routeId)) return c.json({ error: "Invalid routeId" }, 400);
+    if (!validStopId(stopId)) return c.json({ error: "Invalid stopId" }, 400);
 
     const threshold = Math.max(1, Math.min(30, thresholdMinutes || 2));
     const cordId = registerCord(subscription, routeId, stopId, vehicleId || null, tripId || null, directionId ?? null, threshold);
