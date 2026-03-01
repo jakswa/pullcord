@@ -54,11 +54,19 @@ app.get("/manifest.json", async (c, next) => {
           src: "/public/icons/rail-192.png",
           sizes: "192x192",
           type: "image/png",
+          purpose: "any",
         },
         {
           src: "/public/icons/rail-512.png",
           sizes: "512x512",
           type: "image/png",
+          purpose: "any",
+        },
+        {
+          src: "/public/icons/rail-192.png",
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "maskable",
         },
       ],
     });

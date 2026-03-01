@@ -450,10 +450,25 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <title>{title}</title>
         <meta name="description" content="Real-time MARTA rail arrivals for all 38 stations." />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content="Real-time MARTA rail arrivals for all 38 stations." />
+        <meta property="og:image" content="https://beta.marta.io/public/icons/og-rail.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        {standalone && <meta property="og:url" content="https://beta.marta.io/" />}
+        <meta property="og:site_name" content="MARTA Rail" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content="Real-time MARTA rail arrivals for all 38 stations." />
+        <meta name="twitter:image" content="https://beta.marta.io/public/icons/og-rail.png" />
         {standalone && <link rel="manifest" href="/manifest.json" />}
         {standalone && <meta name="apple-mobile-web-app-capable" content="yes" />}
         {standalone && <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />}
-        {standalone && <meta name="theme-color" content="#1a1a2e" />}
+        <meta name="apple-mobile-web-app-title" content="MARTA Rail" />
+        <link rel="apple-touch-icon" href="/public/icons/rail-192.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/rail-favicon.png" />
+        <meta name="theme-color" content="#1a1a2e" />
         <style>{railStyles()}</style>
       </head>
       <body class="rail-body">
@@ -505,8 +520,15 @@ export function RailStationPage({
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <title>{title}</title>
+        <meta name="description" content={`Real-time arrivals at ${displayName} station.`} />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={`Real-time arrivals at ${displayName} station.`} />
+        <meta property="og:image" content="https://beta.marta.io/public/icons/og-rail.png" />
+        <meta name="twitter:card" content="summary_large_image" />
         {standalone && <link rel="manifest" href="/manifest.json" />}
-        {standalone && <meta name="theme-color" content="#1a1a2e" />}
+        <link rel="apple-touch-icon" href="/public/icons/rail-192.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/rail-favicon.png" />
+        <meta name="theme-color" content="#1a1a2e" />
         <style>{railStyles()}</style>
       </head>
       <body class="rail-body">
@@ -610,8 +632,15 @@ export function RailTrainPage({
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <title>{title}</title>
+        <meta name="description" content={`Live tracking for MARTA train ${trainId} to ${destination}.`} />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={`Live tracking for MARTA train ${trainId} to ${destination}.`} />
+        <meta property="og:image" content="https://beta.marta.io/public/icons/og-rail.png" />
+        <meta name="twitter:card" content="summary_large_image" />
         {standalone && <link rel="manifest" href="/manifest.json" />}
-        {standalone && <meta name="theme-color" content="#1a1a2e" />}
+        <link rel="apple-touch-icon" href="/public/icons/rail-192.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/rail-favicon.png" />
+        <meta name="theme-color" content="#1a1a2e" />
         <style>{railStyles()}</style>
         <style>{trainTimelineStyles(color)}</style>
       </head>
