@@ -69,6 +69,13 @@ const migrations: Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_metrics_kind_route ON metrics(kind, route_id)`);
     },
   },
+  {
+    version: 3,
+    name: "on_time_count",
+    up(db) {
+      db.exec(`ALTER TABLE metrics ADD COLUMN on_time_count INTEGER`);
+    },
+  },
 ];
 
 // ──────────────────────────────────────────

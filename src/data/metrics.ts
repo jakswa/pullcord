@@ -233,12 +233,15 @@ function computeVehicleDelay(vehicle: VehiclePosition, tripStops: TripStop[], no
 
 // ─── Bus sampling ───
 
+const ON_TIME_THRESHOLD_SEC = 300; // ±5 min = on-time
+
 interface RouteSample {
   routeId: string;
   vehicles: number;
   ghostCount: number;
   totalDelaySec: number;
   delayCount: number;
+  onTimeCount: number;
   tripsActive: number;
   tripsScheduled: number;
 }
@@ -281,6 +284,7 @@ async function sampleBusMetrics(): Promise<RouteSample[]> {
 
     let totalDelay = 0;
     let delayCount = 0;
+    let onTimeCount = 0;
     let ghostCount = 0;
 
     for (const v of vehicles) {
@@ -293,6 +297,7 @@ async function sampleBusMetrics(): Promise<RouteSample[]> {
       if (delay !== null) {
         totalDelay += delay;
         delayCount++;
+        if (Math.abs(delay) <= ON_TIME_THRESHOLD_SEC) onTimeCount++;
       }
     }
 
@@ -302,6 +307,7 @@ async function sampleBusMetrics(): Promise<RouteSample[]> {
       ghostCount,
       totalDelaySec: totalDelay,
       delayCount,
+      onTimeCount,
       tripsActive: vehicles.length - ghostCount,
       tripsScheduled: scheduled,
     });
@@ -374,8 +380,8 @@ export async function collectMetrics(): Promise<void> {
     const railSamples: RailSample[] = [];
 
     const insert = db.prepare(
-      `INSERT INTO metrics (ts, kind, route_id, vehicles, ghost_count, avg_delay_sec, trips_active, trips_scheduled)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO metrics (ts, kind, route_id, vehicles, ghost_count, avg_delay_sec, trips_active, trips_scheduled, on_time_count)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
 
     const tx = db.transaction(() => {
@@ -383,33 +389,35 @@ export async function collectMetrics(): Promise<void> {
       let totalGhosts = 0;
       let totalActive = 0;
       let totalScheduled = 0;
+      let totalOnTime = 0;
       let systemDelay = 0;
       let systemDelayCount = 0;
 
       for (const s of busSamples) {
         const avgDelay = s.delayCount > 0 ? s.totalDelaySec / s.delayCount : null;
         insert.run(ts, "route", s.routeId, s.vehicles, s.ghostCount,
-          avgDelay, s.tripsActive, s.tripsScheduled || null);
+          avgDelay, s.tripsActive, s.tripsScheduled || null, s.onTimeCount || null);
 
         totalVehicles += s.vehicles;
         totalGhosts += s.ghostCount;
         totalActive += s.tripsActive;
         totalScheduled += s.tripsScheduled;
+        totalOnTime += s.onTimeCount;
         if (s.delayCount > 0) {
           systemDelay += s.totalDelaySec;
           systemDelayCount += s.delayCount;
         }
       }
 
-      // System summary — now includes scheduled count and avg delay
+      // System summary
       const sysAvgDelay = systemDelayCount > 0 ? systemDelay / systemDelayCount : null;
-      insert.run(ts, "system", null, totalVehicles, totalGhosts, sysAvgDelay, totalActive, totalScheduled);
+      insert.run(ts, "system", null, totalVehicles, totalGhosts, sysAvgDelay, totalActive, totalScheduled, totalOnTime || null);
 
       // Rail
       let totalTrains = 0;
       for (const s of railSamples) {
         insert.run(ts, "rail", s.line, s.trains, null,
-          s.avgDelaySec, s.realtimeCount, s.scheduledCount);
+          s.avgDelaySec, s.realtimeCount, s.scheduledCount, null);
         totalTrains += s.trains;
       }
 
@@ -417,22 +425,24 @@ export async function collectMetrics(): Promise<void> {
         const avgWait = railSamples.reduce((sum, s) => sum + s.avgDelaySec, 0) / railSamples.length;
         const totalRealtime = railSamples.reduce((sum, s) => sum + s.realtimeCount, 0);
         const totalScheduledRail = railSamples.reduce((sum, s) => sum + s.scheduledCount, 0);
-        insert.run(ts, "rail-system", null, totalTrains, null, avgWait, totalRealtime, totalScheduledRail);
+        insert.run(ts, "rail-system", null, totalTrains, null, avgWait, totalRealtime, totalScheduledRail, null);
       }
     });
 
     tx();
 
-    // Log with adherence %
+    // Log with on-time % and coverage
     const busVehicles = busSamples.reduce((s, r) => s + r.vehicles, 0);
     const busScheduled = busSamples.reduce((s, r) => s + r.tripsScheduled, 0);
-    const adherence = busScheduled > 0 ? ((busVehicles / busScheduled) * 100).toFixed(0) : "?";
-    const avgDelay = busSamples.reduce((s, r) => s + r.totalDelaySec, 0);
+    const busOnTime = busSamples.reduce((s, r) => s + r.onTimeCount, 0);
     const delayN = busSamples.reduce((s, r) => s + r.delayCount, 0);
-    const delayStr = delayN > 0 ? `${(avgDelay / delayN / 60).toFixed(1)}min avg delay` : "no delay data";
+    const onTimePct = delayN > 0 ? ((busOnTime / delayN) * 100).toFixed(0) : "?";
+    const coverage = busScheduled > 0 ? ((busVehicles / busScheduled) * 100).toFixed(0) : "?";
+    const avgDelay = busSamples.reduce((s, r) => s + r.totalDelaySec, 0);
+    const delayStr = delayN > 0 ? `${(avgDelay / delayN / 60).toFixed(1)}min avg` : "no delay data";
     const trains = railSamples.reduce((s, r) => s + r.trains, 0);
 
-    console.log(`📊 Metrics: ${busVehicles}/${busScheduled} buses (${adherence}% adherence, ${delayStr}), ${trains} trains`);
+    console.log(`📊 Metrics: ${busOnTime}/${delayN} on-time (${onTimePct}%), ${busVehicles}/${busScheduled} coverage (${coverage}%), ${delayStr}, ${trains} trains`);
   } catch (err) {
     console.error("📊 Metrics collection failed:", err);
   }
@@ -459,7 +469,10 @@ export interface SystemSnapshot {
   busGhosts: number;
   busRoutes: number;
   busScheduled: number;
-  busAdherence: number | null;
+  busCoverage: number | null;    // vehicles / scheduled
+  busOnTime: number | null;      // on-time count / delay count (±5min)
+  busOnTimeCount: number;
+  busDelayCount: number;
   busAvgDelay: number | null;
   railTrains: number;
   railAvgWait: number | null;
@@ -468,7 +481,7 @@ export interface SystemSnapshot {
 export function getLatestSnapshot(): SystemSnapshot | null {
   const db = getDb();
   const bus = db.prepare(
-    `SELECT ts, vehicles, ghost_count, trips_active, trips_scheduled, avg_delay_sec
+    `SELECT ts, vehicles, ghost_count, trips_active, trips_scheduled, avg_delay_sec, on_time_count
      FROM metrics WHERE kind = 'system' ORDER BY ts DESC LIMIT 1`
   ).get() as any;
   const rail = db.prepare(
@@ -478,13 +491,21 @@ export function getLatestSnapshot(): SystemSnapshot | null {
   if (!bus) return null;
 
   const scheduled = bus.trips_scheduled || 0;
+  const vehicles = bus.vehicles || 0;
+  const ghosts = bus.ghost_count || 0;
+  const onTimeCount = bus.on_time_count || 0;
+  // delayCount ≈ non-ghost vehicles (those we could compute delay for)
+  const delayCount = vehicles - ghosts;
   return {
     ts: bus.ts,
-    busVehicles: bus.vehicles || 0,
-    busGhosts: bus.ghost_count || 0,
+    busVehicles: vehicles,
+    busGhosts: ghosts,
     busRoutes: bus.trips_active || 0,
     busScheduled: scheduled,
-    busAdherence: scheduled > 0 ? bus.vehicles / scheduled : null,
+    busCoverage: scheduled > 0 ? vehicles / scheduled : null,
+    busOnTime: delayCount > 0 ? onTimeCount / delayCount : null,
+    busOnTimeCount: onTimeCount,
+    busDelayCount: delayCount,
     busAvgDelay: bus.avg_delay_sec ?? null,
     railTrains: rail?.vehicles || 0,
     railAvgWait: rail?.avg_delay_sec ?? null,
@@ -496,6 +517,7 @@ export interface TimeSeriesPoint {
   vehicles: number;
   ghosts: number;
   scheduled: number;
+  onTimeCount: number;
   avgDelay: number | null;
 }
 
@@ -503,7 +525,8 @@ export function getSystemTimeSeries(hours: number = 24): TimeSeriesPoint[] {
   const db = getDb();
   const cutoff = Math.floor(Date.now() / 1000) - hours * 3600;
   return db.prepare(
-    `SELECT ts, vehicles, ghost_count as ghosts, trips_scheduled as scheduled, avg_delay_sec as avgDelay
+    `SELECT ts, vehicles, ghost_count as ghosts, trips_scheduled as scheduled, 
+            COALESCE(on_time_count, 0) as onTimeCount, avg_delay_sec as avgDelay
      FROM metrics WHERE kind = 'system' AND ts > ? ORDER BY ts`
   ).all(cutoff) as TimeSeriesPoint[];
 }
@@ -514,7 +537,9 @@ export interface RouteSnapshot {
   ghostCount: number;
   avgDelay: number | null;
   tripsScheduled: number;
-  adherence: number | null;
+  onTimeCount: number;
+  coverage: number | null;    // vehicles / scheduled
+  onTime: number | null;      // on-time / (vehicles - ghosts)
 }
 
 export function getLatestRouteSnapshots(): RouteSnapshot[] {
@@ -526,13 +551,19 @@ export function getLatestRouteSnapshots(): RouteSnapshot[] {
 
   return db.prepare(
     `SELECT route_id as routeId, vehicles, ghost_count as ghostCount, avg_delay_sec as avgDelay,
-            trips_scheduled as tripsScheduled
+            trips_scheduled as tripsScheduled, COALESCE(on_time_count, 0) as onTimeCount
      FROM metrics WHERE kind = 'route' AND ts = ? ORDER BY vehicles DESC`
-  ).all(latest.ts).map((r: any) => ({
-    ...r,
-    tripsScheduled: r.tripsScheduled || 0,
-    adherence: r.tripsScheduled > 0 ? r.vehicles / r.tripsScheduled : null,
-  })) as RouteSnapshot[];
+  ).all(latest.ts).map((r: any) => {
+    const sched = r.tripsScheduled || 0;
+    const nonGhost = r.vehicles - (r.ghostCount || 0);
+    return {
+      ...r,
+      tripsScheduled: sched,
+      onTimeCount: r.onTimeCount || 0,
+      coverage: sched > 0 ? r.vehicles / sched : null,
+      onTime: nonGhost > 0 && r.onTimeCount != null ? r.onTimeCount / nonGhost : null,
+    };
+  }) as RouteSnapshot[];
 }
 
 export interface RailLineSnapshot {
@@ -562,7 +593,8 @@ export function getRouteTimeSeries(routeId: string, hours: number = 24): TimeSer
   const db = getDb();
   const cutoff = Math.floor(Date.now() / 1000) - hours * 3600;
   return db.prepare(
-    `SELECT ts, vehicles, ghost_count as ghosts, trips_scheduled as scheduled, avg_delay_sec as avgDelay
+    `SELECT ts, vehicles, ghost_count as ghosts, trips_scheduled as scheduled,
+            COALESCE(on_time_count, 0) as onTimeCount, avg_delay_sec as avgDelay
      FROM metrics WHERE kind = 'route' AND route_id = ? AND ts > ? ORDER BY ts`
   ).all(routeId, cutoff) as TimeSeriesPoint[];
 }
