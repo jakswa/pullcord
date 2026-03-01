@@ -6,6 +6,7 @@ import aboutRoutes from "./routes/about.js";
 import exploreRoutes from "./routes/explore.js";
 import rideRoutes from "./routes/ride.js";
 import railRoutes from "./routes/rail.js";
+import statsRoutes from "./routes/stats.js";
 import apiRoutes from "./routes/api.js";
 
 const RAIL_HOST = process.env.RAIL_HOST || ""; // e.g. "train.home.jake.town"
@@ -110,6 +111,7 @@ app.route("/", aboutRoutes);
 app.route("/", exploreRoutes);
 app.route("/", rideRoutes);
 app.route("/", railRoutes);
+app.route("/", statsRoutes);
 
 // Serve push SW from root scope (SW scope = path of the file)
 app.get("/push-sw.js", async (c) => {
