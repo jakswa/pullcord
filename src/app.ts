@@ -75,6 +75,10 @@ app.use("*", async (c, next) => {
   c.header("X-Frame-Options", "DENY");
   c.header("X-XSS-Protection", "1; mode=block");
   c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  c.header(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com 'unsafe-inline'; connect-src 'self' https://developerservices.itsmarta.com:*; img-src 'self' https://*.tile.openstreetmap.org data: blob:; font-src 'self'; worker-src 'self'; manifest-src 'self'"
+  );
 });
 
 // Static file serving — cache JS/CSS for 1 hour, icons for 1 day
