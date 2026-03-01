@@ -126,7 +126,7 @@ class RealtimeDataService {
       this.fetchProtobufData(VEHICLE_POSITIONS_URL).then(entities => {
         this.vehicleCache = { data: entities, timestamp: Date.now() };
         this.vehicleFetching = false;
-      }).catch(() => { this.vehicleFetching = false; });
+      }).catch((err) => { console.error('Vehicle fetch failed:', err); this.vehicleFetching = false; });
       return this.vehicleCache!.data;
     }
 
@@ -146,7 +146,7 @@ class RealtimeDataService {
       this.fetchProtobufData(TRIP_UPDATES_URL).then(entities => {
         this.tripUpdatesCache = { data: entities, timestamp: Date.now() };
         this.tripUpdatesFetching = false;
-      }).catch(() => { this.tripUpdatesFetching = false; });
+      }).catch((err) => { console.error('Trip updates fetch failed:', err); this.tripUpdatesFetching = false; });
       return this.tripUpdatesCache!.data;
     }
 
