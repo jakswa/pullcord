@@ -1,12 +1,8 @@
 // Stats dashboard — MARTA operational health
 // Hero: schedule adherence. Secondary: delay, ghosts. SVG sparklines.
 
-import { getLatestSnapshot, getSystemTimeSeries, getLatestRouteSnapshots, getLatestRailSnapshots, type SystemSnapshot, type TimeSeriesPoint, type RouteSnapshot, type RailLineSnapshot } from "../../data/metrics.js";
+import { getLatestSnapshot, getSystemTimeSeries, getLatestRouteSnapshots, type SystemSnapshot, type TimeSeriesPoint, type RouteSnapshot } from "../../data/metrics.js";
 import { getRoutes } from "../../data/db.js";
-
-const LINE_COLORS: Record<string, string> = {
-  RED: "#E05555", GOLD: "#D4A020", BLUE: "#4A9FE5", GREEN: "#3BAA6E",
-};
 
 function routeNameMap(): Map<string, string> {
   const routes = getRoutes();
@@ -124,32 +120,11 @@ function RouteTable({ routes, nameMap }: { routes: RouteSnapshot[]; nameMap: Map
   );
 }
 
-// ── Rail cards ──
-function RailCards({ lines }: { lines: RailLineSnapshot[] }) {
-  return (
-    <div class="s-rail-grid">
-      {lines.map(l => {
-        const color = LINE_COLORS[l.line] || "#666";
-        const avgMin = l.avgWait > 0 ? (l.avgWait / 60).toFixed(0) : "—";
-        return (
-          <div class="s-rail-card" style={`border-color:${color}`}>
-            <div class="s-rail-line" style={`color:${color}`}>{l.line}</div>
-            <div class="s-rail-trains">{l.trains}</div>
-            <div class="s-rail-sub">trains</div>
-            <div class="s-rail-wait">{avgMin}m avg wait</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ── Main page ──
 export function StatsPage() {
   const snapshot = getLatestSnapshot();
   const timeSeries = getSystemTimeSeries(6);
   const routeSnapshots = getLatestRouteSnapshots();
-  const railSnapshots = getLatestRailSnapshots();
   const nameMap = routeNameMap();
 
   const firstTs = timeSeries.length > 0 ? timeSeries[0].ts : 0;
@@ -182,7 +157,6 @@ export function StatsPage() {
               snapshot={snapshot}
               timeSeries={timeSeries}
               routeSnapshots={routeSnapshots}
-              railSnapshots={railSnapshots}
               nameMap={nameMap}
               hoursOfData={hoursOfData}
             />
@@ -199,14 +173,12 @@ export function StatsContent({
   snapshot,
   timeSeries,
   routeSnapshots,
-  railSnapshots,
   nameMap,
   hoursOfData,
 }: {
   snapshot: SystemSnapshot | null;
   timeSeries: TimeSeriesPoint[];
   routeSnapshots: RouteSnapshot[];
-  railSnapshots: RailLineSnapshot[];
   nameMap: Map<string, string>;
   hoursOfData: string;
 }) {
@@ -249,21 +221,21 @@ export function StatsContent({
       <section class="s-cards">
         <div class="s-card">
           <div class="s-card-val" style={delayMin ? `color:${delayColor(snapshot.busAvgDelay!)}` : ""}>
-            {delayMin !== null ? `+${delayMin}m` : "—"}
+            {delayMin !== null ? `${snapshot.busAvgDelay! >= 0 ? "+" : ""}${delayMin}m` : "—"}
           </div>
           <div class="s-card-label">avg delay</div>
         </div>
         <div class="s-card">
+          <div class="s-card-val">{snapshot.busVehicles}</div>
+          <div class="s-card-label">buses tracked</div>
+        </div>
+        <div class="s-card">
+          <div class="s-card-val">{snapshot.busScheduled}</div>
+          <div class="s-card-label">scheduled</div>
+        </div>
+        <div class="s-card">
           <div class="s-card-val">{snapshot.busGhosts}</div>
-          <div class="s-card-label">ghost buses</div>
-        </div>
-        <div class="s-card">
-          <div class="s-card-val">{snapshot.busRoutes}</div>
-          <div class="s-card-label">routes active</div>
-        </div>
-        <div class="s-card">
-          <div class="s-card-val">{railSnapshots.reduce((s, l) => s + l.trains, 0)}</div>
-          <div class="s-card-label">trains</div>
+          <div class="s-card-label">ghosts</div>
         </div>
       </section>
 
@@ -282,12 +254,6 @@ export function StatsContent({
           <Sparkline points={delayPoints} color="#D4A020" label="delay" unit="min" yMin={0} />
         </section>
       )}
-
-      {/* ── Rail lines ── */}
-      <section class="s-section">
-        <h2 class="s-h2">Rail</h2>
-        <RailCards lines={railSnapshots} />
-      </section>
 
       {/* ── Route breakdown ── */}
       <section class="s-section">
@@ -376,15 +342,6 @@ function statsCSS(): string {
     .s-th-route,.s-td-route{width:4rem;flex-shrink:0;font-weight:600}
     .s-th-num,.s-td-num{flex:1;text-align:right}
     .s-td-route{color:rgba(255,255,255,.7)}
-
-    /* Rail cards */
-    .s-rail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
-    @media(min-width:640px){.s-rail-grid{grid-template-columns:repeat(4,1fr)}}
-    .s-rail-card{background:rgba(255,255,255,.04);border-radius:12px;padding:1rem;text-align:center;border-left:4px solid}
-    .s-rail-line{font-size:.85rem;font-weight:700;letter-spacing:1px;margin-bottom:.25rem}
-    .s-rail-trains{font-size:2rem;font-weight:700;font-variant-numeric:tabular-nums}
-    .s-rail-sub{font-size:.75rem;color:rgba(255,255,255,.4)}
-    .s-rail-wait{font-size:.8rem;color:rgba(255,255,255,.4);margin-top:.5rem;font-variant-numeric:tabular-nums}
 
     .s-meta{font-size:.8rem;color:rgba(255,255,255,.2);text-align:center;padding:1rem 0}
 
