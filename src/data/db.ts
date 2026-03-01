@@ -54,37 +54,9 @@ class MARTADatabase {
   private tripLookupCache: Map<string, Trip> | null = null;
 
   constructor() {
-    // Run all migrations with a single writable connection, then open readonly
-    this.runMigrations();
+    // Migrations run separately in index.ts before server start.
+    // By the time this constructor runs, schema is guaranteed current.
     this.db = new Database(DB_PATH, { readonly: true });
-  }
-
-  private runMigrations() {
-    const db = new Database(DB_PATH);
-
-    // Transfer columns (added later, may be missing on older DBs)
-    try { db.run('ALTER TABLE stops ADD COLUMN nearest_rail_station TEXT'); } catch {}
-    try { db.run('ALTER TABLE stops ADD COLUMN nearest_rail_distance_m INTEGER'); } catch {}
-
-    // Group ID column for paired stop resolution
-    const cols = db.prepare("PRAGMA table_info(stops)").all() as Array<{ name: string }>;
-    const hasGroupId = cols.some(c => c.name === 'group_id');
-    if (!hasGroupId) {
-      db.exec(`ALTER TABLE stops ADD COLUMN group_id TEXT`);
-      db.exec(`
-        UPDATE stops SET group_id = (
-          SELECT MIN(s2.stop_id) FROM stops s2 WHERE s2.stop_name = stops.stop_name
-        )
-      `);
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_stops_group ON stops(group_id)`);
-      const count = db.prepare('SELECT COUNT(*) as c FROM stops WHERE group_id IS NOT NULL').get() as any;
-      console.log(`📦 Added stops.group_id (${count.c} stops)`);
-    }
-
-    // Drop legacy stop_groups table if it exists
-    db.exec(`DROP TABLE IF EXISTS stop_groups`);
-
-    db.close();
   }
 
   // Get all routes
