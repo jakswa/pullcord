@@ -43,9 +43,10 @@ interface ArrivalPrediction {
   staleSeconds: number;
   tier?: string;
   adherenceSec?: number | null;
-  etaSource?: 'marta' | 'computed'; // 'computed' = vehicle position + schedule deltas
+  etaSource?: 'marta' | 'computed' | 'scheduled'; // 'computed' = GPS interpolation, 'scheduled' = GTFS static (terminal vehicles)
   martaEtaSeconds?: number; // original MARTA ETA before computed override (for comparison)
   rescued?: boolean; // true = ghost vehicle rescue (no valid MARTA trip update existed)
+  atTerminal?: boolean; // true = vehicle at first stop, waiting to depart
   // Route enrichment — present when routeInfo provided
   routeId?: string;
   routeShortName?: string;
@@ -415,14 +416,18 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
         arrivalSec: parseTimeToSec(s.arrival_time),
       }));
 
-      const eta = computeETA(veh.lat, veh.lon, tripStops, allStopIds, veh.staleSeconds);
-      if (eta === null) continue;
+      const result = computeETA(veh.lat, veh.lon, tripStops, allStopIds, veh.staleSeconds);
+      if (result === null) continue;
+
+      const { eta, atTerminal } = result;
+      const source = atTerminal ? 'scheduled' : 'computed';
 
       if (existing && existing.tier === 'active') {
-        // Override existing MARTA prediction with computed ETA
+        // Override existing MARTA prediction with computed/scheduled ETA
         existing.martaEtaSeconds = existing.etaSeconds;
         existing.etaSeconds = eta;
-        existing.etaSource = 'computed';
+        existing.etaSource = source;
+        if (atTerminal) existing.atTerminal = true;
       } else if (!existing) {
         // Ghost vehicle rescue — synthesize prediction
         const trip = tripLookup.get(veh.tripId);
@@ -437,8 +442,9 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
           etaSeconds: eta,
           staleSeconds: veh.staleSeconds,
           tier: 'active',
-          etaSource: 'computed',
+          etaSource: source,
           rescued: true,
+          atTerminal,
         };
 
         if (routeInfo) {

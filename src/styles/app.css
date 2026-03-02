@@ -811,6 +811,7 @@
 
   .dot-live { background: var(--live-green); animation: d-blink 2s ease-in-out infinite; }
   .dot-rescued { background: #f59e0b; animation: d-blink 2s ease-in-out infinite; }
+  .dot-terminal { background: #8b5cf6; animation: d-blink 3s ease-in-out infinite; }
   .dot-delayed { background: var(--live-delayed); animation: d-blink 2s ease-in-out infinite; }
   .dot-stale { background: var(--dot-stale); }
   .dot-lost { background: var(--dot-lost); }
