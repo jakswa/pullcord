@@ -784,7 +784,10 @@ class PullcordApp {
 
     // Tier label
     const tierEl = document.getElementById('hero-tier');
-    if (tier === 'active') {
+    if (tier === 'active' && this.heroPrediction.atTerminal) {
+      tierEl.innerHTML = '<span class="dot-terminal"></span> At terminal';
+      tierEl.className = 'd-hero-tier tier-active';
+    } else if (tier === 'active') {
       const stale = this.staleTier(this.heroPrediction.staleSeconds);
       tierEl.innerHTML = this.heroPrediction.rescued ? stale.html.replace('dot-live', 'dot-rescued').replace('dot-delayed', 'dot-rescued') : stale.html;
       tierEl.className = 'd-hero-tier tier-active';
@@ -1074,7 +1077,9 @@ class PullcordApp {
 
     // Status
     let statusHtml;
-    if (tier === 'active') {
+    if (tier === 'active' && pred.atTerminal) {
+      statusHtml = '<span class="dot-terminal"></span> At terminal';
+    } else if (tier === 'active') {
       const st = this.staleTier(pred.staleSeconds);
       statusHtml = pred.rescued ? st.html.replace('dot-live', 'dot-rescued').replace('dot-delayed', 'dot-rescued') : st.html;
     } else if (tier === 'next') {

@@ -26,12 +26,20 @@ function distSq(lat1: number, lon1: number, lat2: number, lon2: number): number 
   return dLat * dLat + dLon * dLon;
 }
 
+export interface ETAResult {
+  eta: number;          // seconds until arrival
+  atTerminal: boolean;  // true = vehicle at terminal, ETA is from schedule not GPS
+}
+
 /**
  * Compute ETA from a vehicle's current position to a target stop,
  * using scheduled inter-stop deltas from a representative trip.
  *
- * Returns seconds until arrival, or null if we can't compute
+ * Returns ETAResult, or null if we can't compute
  * (bus past stop, stop not on trip, etc).
+ *
+ * When a vehicle is at its terminal (first stop, waiting to depart),
+ * returns the GTFS scheduled arrival time instead of interpolated GPS ETA.
  */
 export function computeETA(
   vehicleLat: number,
@@ -39,7 +47,7 @@ export function computeETA(
   tripStops: TripStop[],
   targetStopIds: Set<string>, // grouped stop IDs (paired directions)
   staleSeconds: number = 0, // vehicle position age — subtracted from result
-): number | null {
+): ETAResult | null {
   if (tripStops.length < 2) return null;
 
   // Find the target stop index
@@ -61,9 +69,16 @@ export function computeETA(
   if (nearestIdx > targetIdx) return null;
 
   // Bus is at/near the first stop (terminal) — likely waiting to depart.
-  // Schedule deltas don't account for layover time, so fall back to MARTA's ETA
-  // which includes the actual departure time.
-  if (nearestIdx <= 1 && targetIdx > 3) return null;
+  // We can't interpolate GPS (layover time is unknowable), but we know the
+  // scheduled travel time from terminal to target stop. Use that as the ETA —
+  // it represents the minimum time once the bus departs.
+  if (nearestIdx <= 1 && targetIdx > 3) {
+    const travelDelta = tripStops[targetIdx].arrivalSec - tripStops[0].arrivalSec;
+    if (travelDelta > 0 && travelDelta <= 7200) {
+      return { eta: travelDelta, atTerminal: true };
+    }
+    return null;
+  }
 
   // Scheduled delta between nearest stop and target stop
   const deltaSec = tripStops[targetIdx].arrivalSec - tripStops[nearestIdx].arrivalSec;
@@ -96,5 +111,5 @@ export function computeETA(
   // Subtract position staleness — the bus has been moving since the GPS reading
   eta -= staleSeconds;
 
-  return Math.max(0, Math.round(eta));
+  return { eta: Math.max(0, Math.round(eta)), atTerminal: false };
 }
