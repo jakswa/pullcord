@@ -763,6 +763,9 @@ class PullcordApp {
       // Show seconds countdown for last minute
       numEl.textContent = seconds < 30 ? 'NOW' : `<1`;
       unitEl.textContent = seconds < 30 ? '' : 'min';
+    } else if (this.heroPrediction.atTerminal) {
+      numEl.textContent = `${minutes}+`;
+      unitEl.textContent = 'min';
     } else {
       numEl.textContent = minutes;
       unitEl.textContent = 'min';
@@ -818,8 +821,11 @@ class PullcordApp {
     }
 
     // Meta (arrival time + adherence)
+    // Skip for terminal buses — ETA is a floor estimate, not a real arrival time
     const metaEl = document.getElementById('hero-meta');
-    if (minutes >= 2) {
+    if (this.heroPrediction.atTerminal) {
+      metaEl.innerHTML = 'bus at starting terminal';
+    } else if (minutes >= 2) {
       const arrival = new Date(Date.now() + seconds * 1000);
       const timeStr = arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
       const adherenceHtml = this.formatAdherence(this.heroPrediction.adherenceSec);
@@ -831,10 +837,11 @@ class PullcordApp {
   }
 
   // Countdown timer — ticks every second between polls
+  // Skip countdown for terminal buses — their ETA is a constant floor, not a countdown
   startCountdown() {
     this.stopCountdown();
     this.countdownTimer = setInterval(() => {
-      if (this.heroEtaSeconds !== null && this.heroEtaSeconds > 0) {
+      if (this.heroEtaSeconds !== null && this.heroEtaSeconds > 0 && !this.heroPrediction?.atTerminal) {
         this.heroEtaSeconds--;
         this.renderHeroDisplay();
       }
@@ -1119,7 +1126,7 @@ class PullcordApp {
           <div class="d-upcoming-meta">${statusHtml}${arrivalStr}</div>
         </div>
         <div class="d-upcoming-time">
-          <div class="d-upcoming-minutes${tier !== 'active' ? ` tier-${tier}` : ''}">${tier !== 'active' && minutes < 1 ? '—' : minutes < 1 ? 'NOW' : minutes}</div>
+          <div class="d-upcoming-minutes${tier !== 'active' ? ` tier-${tier}` : ''}">${tier !== 'active' && minutes < 1 ? '—' : minutes < 1 ? 'NOW' : pred.atTerminal ? minutes + '+' : minutes}</div>
           <div class="d-upcoming-label">${tier !== 'active' && minutes < 1 ? '' : minutes < 1 ? '' : 'min'}</div>
         </div>
       </div>
