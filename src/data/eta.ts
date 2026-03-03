@@ -69,19 +69,14 @@ export function computeETA(
   if (nearestIdx > targetIdx) return null;
 
   // Bus is at/near the first stop (terminal) — likely waiting to depart.
-  // Use scheduled arrival time at the target stop minus current time of day.
-  // This counts down as the departure approaches, and represents
-  // the scheduled ETA once the bus is underway.
+  // We know the minimum travel time from terminal to target stop, but NOT
+  // when the bus will actually depart (could be on time, could be late).
+  // Return the travel delta as a floor estimate. UI should show "X+ min"
+  // to indicate this is a minimum, not a countdown.
   if (nearestIdx <= 1 && targetIdx > 3) {
-    const scheduledArrival = tripStops[targetIdx].arrivalSec;
-    // Current time of day in seconds since midnight (local timezone)
-    const now = new Date();
-    const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-    const eta = scheduledArrival - nowSec;
-    // Clamp: never show less than the minimum travel time (bus can't teleport)
     const travelDelta = tripStops[targetIdx].arrivalSec - tripStops[0].arrivalSec;
-    if (travelDelta > 0 && travelDelta <= 7200 && eta > 0) {
-      return { eta: Math.round(eta), atTerminal: true };
+    if (travelDelta > 0 && travelDelta <= 7200) {
+      return { eta: travelDelta, atTerminal: true };
     }
     return null;
   }
