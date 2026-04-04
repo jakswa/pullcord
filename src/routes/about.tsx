@@ -1,10 +1,17 @@
 import { Hono } from "hono";
 import { Layout } from "../views/Layout.js";
 import { AboutPage } from "../views/pages/About.js";
+import { aboutView as railAboutView } from "../rail/views.js";
 
 const app = new Hono();
 
 app.get("/about", (c) => {
+  const isRailHost = (c.get as any)("isRailHost") || false;
+
+  if (isRailHost) {
+    return c.html(railAboutView());
+  }
+
   return c.html(
     <Layout
       title="About — Pullcord"

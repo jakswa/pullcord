@@ -300,3 +300,121 @@ export async function trainView(trainId: string, partial = false): Promise<strin
   html += `</div>`;
   return shell(`Train ${trainId}`, html, "/rail", partial);
 }
+
+// About section CSS — appended inside a <style> tag on the about page
+const ABOUT_CSS = `.about-section{padding:1rem;border-bottom:1px solid var(--border)}
+.about-section:last-child{border-bottom:none}
+.about-section h2{font-size:0.85rem;font-weight:600;color:var(--coral);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.6rem}
+.about-section p,.about-section li{font-size:0.88rem;color:var(--text);line-height:1.6;margin-bottom:0.5rem}
+.about-section ul{padding-left:1.2rem}
+.about-section li{margin-bottom:0.3rem}
+.about-section strong{color:var(--text)}
+.about-section a{color:var(--coral);border-bottom:1px solid transparent}
+.about-section a:hover{border-color:var(--coral)}
+.about-tag{display:inline-block;font-size:0.65rem;font-weight:700;padding:0.2rem 0.45rem;border-radius:3px;margin:0.15rem;background:#222;color:var(--dim);letter-spacing:0.04em}
+.about-muted{font-size:0.8rem;color:var(--dim);margin-top:0.5rem}
+.about-stat-row{display:flex;gap:1rem;flex-wrap:wrap;margin:0.5rem 0}
+.about-stat{text-align:center;flex:1;min-width:4rem}
+.about-stat .n{font-size:1.1rem;font-weight:700;color:var(--coral)}
+.about-stat .l{font-size:0.7rem;color:var(--dim)}
+.about-links .card{display:flex;align-items:center;gap:0.6rem;padding:0.6rem;border-radius:6px;background:var(--card);margin-bottom:0.4rem}
+.about-links .card .ico{font-size:1.1rem}
+.about-links .card .t{font-size:0.88rem;font-weight:600}
+.about-links .card .d{font-size:0.75rem;color:var(--dim)}`;
+
+// ── View: About ──
+export function aboutView(): string {
+  let html = "";
+
+  // Inject about-specific styles via a <style> block in the body
+  html += `<style>${ABOUT_CSS}</style>`;
+
+  // What is this
+  html += `<div class="about-section">
+    <h2>What is this?</h2>
+    <p>A real-time MARTA rail tracker — all 38 stations, live arrivals, train positions, and ETA predictions. Tap any station to see what's coming, tap a train to watch its run.</p>
+    <p>Designed for the way people actually ride the train — see what's coming, plan your walk, get on.</p>
+  </div>`;
+
+  // How it was made
+  html += `<div class="about-section">
+    <h2>How it was made</h2>
+    <p>This app was written almost entirely by an AI agent. The architecture, data pipeline, UI design, and nearly every line of code was authored by <strong>Clatis</strong>, an AI running on <a href="https://openclaw.ai" target="_blank" rel="noopener">OpenClaw</a> (Claude under the hood).</p>
+    <p>The human half is <strong>Jake</strong>, a web developer in Atlanta who's been maintaining <a href="https://marta.io" target="_blank" rel="noopener">marta.io</a> for over a decade. Jake directed the product — what to build, how it should feel, when something was wrong — and did QA on his phone while riding actual trains. Clatis did the rest.</p>
+  </div>`;
+
+  // Stats
+  html += `<div class="about-section">
+    <h2>By the numbers</h2>
+    <div class="about-stat-row">
+      <div class="about-stat"><div class="n">38</div><div class="l">stations</div></div>
+      <div class="about-stat"><div class="n">4</div><div class="l">lines</div></div>
+      <div class="about-stat"><div class="n">~45</div><div class="l">trains</div></div>
+      <div class="about-stat"><div class="n">&lt;1</div><div class="l">dependencies</div></div>
+    </div>
+  </div>`;
+
+  // Updates
+  html += `<div class="about-section">
+    <h2>Updates</h2>
+    <div style="margin-bottom:0.5rem">
+      <div style="font-size:0.75rem;color:var(--dim)">Apr 4</div>
+      <div style="font-size:0.88rem;color:var(--text);line-height:1.5"><strong>API downtime handling.</strong> MARTA's rail real-time API occasionally goes unreachable. Previously this would crash the rail page with a 500 error. Now the page degrades gracefully — showing the last known data or a friendly message when the feed is entirely unavailable. No more blank screens.</div>
+    </div>
+    <div style="margin-bottom:0.5rem">
+      <div style="font-size:0.75rem;color:var(--dim)">Feb 21</div>
+      <div style="font-size:0.88rem;color:var(--text);line-height:1.5"><strong>Rail tracker launched.</strong> Real-time arrivals across all 38 MARTA rail stations. Tap a station to see directions and trains, tap a train to see its stop-by-stop timeline. Dark mode, 10-second auto-polling, zero dependencies.</div>
+    </div>
+  </div>`;
+
+  // Stack
+  html += `<div class="about-section">
+    <h2>Stack</h2>
+    <div>
+      <span class="about-tag">Hono</span>
+      <span class="about-tag">Bun</span>
+      <span class="about-tag">SQLite</span>
+      <span class="about-tag">JSX (no React)</span>
+      <span class="about-tag">Fly.io</span>
+    </div>
+    <p class="about-muted">No bundler, no frontend framework, no build step — the client is inline HTML with vanilla JS polling. The server renders JSX to HTML strings via Hono on Bun. Deployed on Fly.io.</p>
+  </div>`;
+
+  // Privacy
+  html += `<div class="about-section">
+    <h2>Privacy</h2>
+    <p>We don't track you. No cookies, no analytics, no third-party scripts, no data collection. The only thing stored is MARTA's public transit data.</p>
+  </div>`;
+
+  // Data
+  html += `<div class="about-section">
+    <h2>Data</h2>
+    <p>Real-time train positions and predictions come from <a href="https://www.itsmarta.com/MARTA-Developer-resources.aspx" target="_blank" rel="noopener">MARTA's public rail API</a>, which serves live data on train locations, destinations, and arrival estimates.</p>
+    <p>MARTA's API is known to be unreliable — it occasionally goes down or returns stale data. When this happens, the page will show the last successfully fetched data or a friendly error message. We're not responsible for MARTA's feed quality.</p>
+  </div>`;
+
+  // Links
+  html += `<div class="about-section">
+    <h2>Links</h2>
+    <div class="about-links">
+      <a class="card" href="https://codeberg.org/clatis/pullcord" target="_blank" rel="noopener">
+        <span class="ico">📦</span>
+        <div><div class="t">Source Code</div><div class="d">codeberg.org/clatis/pullcord</div></div>
+      </a>
+      <a class="card" href="https://codeberg.org/clatis/pullcord/issues" target="_blank" rel="noopener">
+        <span class="ico">💬</span>
+        <div><div class="t">Issues &amp; Feedback</div><div class="d">Bug reports and feature requests</div></div>
+      </a>
+      <a class="card" href="https://bus.marta.io" target="_blank" rel="noopener">
+        <span class="ico">🚌</span>
+        <div><div class="t">Bus Tracker</div><div class="d">Real-time MARTA bus arrivals at bus.marta.io</div></div>
+      </a>
+      <a class="card" href="https://www.itsmarta.com/MARTA-Developer-resources.aspx" target="_blank" rel="noopener">
+        <span class="ico">🚇</span>
+        <div><div class="t">MARTA Developer Resources</div><div class="d">GTFS feeds and API documentation</div></div>
+      </a>
+    </div>
+  </div>`;
+
+  return shell("About", html, "/rail");
+}
