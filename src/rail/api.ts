@@ -38,6 +38,7 @@ const API_KEY = process.env.MARTA_API_KEY || "";
 let cache: { data: RailArrival[]; ts: number } | null = null;
 const CACHE_TTL = 20_000; // 20s — longer than poll interval, taps always hit cache
 let refreshing = false;
+let lastError: string | null = null;
 
 export async function fetchArrivals(): Promise<RailArrival[]> {
   const now = Date.now();
@@ -49,16 +50,29 @@ export async function fetchArrivals(): Promise<RailArrival[]> {
     _refresh().finally(() => { refreshing = false; });
     return cache.data;
   }
-  // No cache at all — must wait
-  return _refresh();
+  // No cache at all — must attempt fetch (with graceful fallback)
+  return _refresh().catch(() => []);
 }
 
 async function _refresh(): Promise<RailArrival[]> {
-  const resp = await fetch(`${API_URL}?apiKey=${API_KEY}`, {
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!resp.ok) throw new Error(`Rail API ${resp.status}`);
+  let resp: Response;
+  try {
+    resp = await fetch(`${API_URL}?apiKey=${API_KEY}`, {
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (e) {
+    // Network error, DNS failure, timeout — serve stale cache or rethrow if no cache
+    lastError = e instanceof Error ? e.message : String(e);
+    if (cache) return cache.data;
+    throw e;
+  }
+  if (!resp.ok) {
+    lastError = `Rail API ${resp.status}`;
+    if (cache) return cache.data;
+    throw new Error(`Rail API ${resp.status}`);
+  }
   const raw: RawArrival[] = await resp.json();
+  lastError = null;
 
   const data = raw.map((r) => ({
     station: r.STATION,
@@ -83,6 +97,11 @@ async function _refresh(): Promise<RailArrival[]> {
 // True if rail data was recently fetched by a user request.
 export function isRailCacheWarm(): boolean {
   return cache !== null && Date.now() - cache.ts < 5 * 60 * 1000;
+}
+
+// Most recent fetch error, or null if last fetch succeeded.
+export function getRailApiError(): string | null {
+  return lastError;
 }
 
 export function stationSlug(name: string): string {
