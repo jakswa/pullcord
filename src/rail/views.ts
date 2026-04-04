@@ -173,7 +173,7 @@ ${backLink}
 <main id="rail-body">
 ${body}
 </main>
-<footer class="foot">MARTA Rail · <a href="https://bus.marta.io">Bus Tracker</a> · <a href="https://home.jake.town">home.jake.town</a></footer>
+<footer class="foot">MARTA Rail · <a href="https://bus.marta.io">Bus Tracker</a> · <a href="/about">About</a></footer>
 </div>
 ${POLL_JS}
 </body>

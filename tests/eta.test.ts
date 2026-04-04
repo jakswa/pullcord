@@ -30,6 +30,11 @@ function makeStops(count: number, opts?: {
   }));
 }
 
+// Extract .eta from ETAResult for convenience
+function etaOrNull(result: ReturnType<typeof computeETA>): number | null {
+  return result?.eta ?? null;
+}
+
 // Five stops, 3 min apart, heading north from Five Points
 const STOPS = makeStops(5);
 // STOP_0: 33.749, arrival 28800 (08:00)
@@ -72,30 +77,30 @@ describe('computeETA', () => {
       const vLon = STOPS[2].lon;
       const target = new Set(['STOP_4']);
 
-      const eta = computeETA(vLat, vLon, STOPS, target);
-      expect(eta).not.toBeNull();
+      const result = computeETA(vLat, vLon, STOPS, target);
+      expect(result).not.toBeNull();
 
       // Full scheduled delta STOP_2→STOP_4 = 360s (6 min)
       // Minus ~half of segment STOP_2→STOP_3 time (180s * ~0.5 ≈ 90s)
       // Expected ≈ 270s
-      expect(eta!).toBeGreaterThan(230);
-      expect(eta!).toBeLessThan(310);
+      expect(result!.eta).toBeGreaterThan(230);
+      expect(result!.eta).toBeLessThan(310);
     });
 
     test('vehicle exactly at a stop returns full scheduled delta', () => {
       // Vehicle at STOP_2, target is STOP_4
       const target = new Set(['STOP_4']);
-      const eta = computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, target);
-      expect(eta).not.toBeNull();
+      const result = computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, target);
+      expect(result).not.toBeNull();
       // Delta STOP_2→STOP_4 = 360s. Vehicle at stop, fraction ~0, so eta ≈ 360
-      expect(eta!).toBe(360);
+      expect(result!.eta).toBe(360);
     });
 
     test('vehicle at target stop returns 0', () => {
       const target = new Set(['STOP_3']);
-      const eta = computeETA(STOPS[3].lat, STOPS[3].lon, STOPS, target);
+      const result = computeETA(STOPS[3].lat, STOPS[3].lon, STOPS, target);
       // nearestIdx == targetIdx == 3, deltaSec = 0
-      expect(eta).toBe(0);
+      expect(result!.eta).toBe(0);
     });
   });
 
@@ -129,36 +134,40 @@ describe('computeETA', () => {
     test('vehicle at first stop with nearby target returns ETA', () => {
       // nearestIdx=0, targetIdx=2 — within the <=1 && >3 guard
       const target = new Set(['STOP_2']);
-      const eta = computeETA(STOPS[0].lat, STOPS[0].lon, STOPS, target);
-      expect(eta).not.toBeNull();
+      const result = computeETA(STOPS[0].lat, STOPS[0].lon, STOPS, target);
+      expect(result).not.toBeNull();
       // Delta STOP_0→STOP_2 = 360s
-      expect(eta!).toBe(360);
+      expect(result!.eta).toBe(360);
     });
 
-    test('returns null when vehicle at terminal and target is far (layover guard)', () => {
-      // nearestIdx=0, targetIdx=4 → 0 <= 1 && 4 > 3 → null
+    test('returns terminal estimate when vehicle at terminal and target is far', () => {
+      // nearestIdx=0, targetIdx=4 → 0 <= 1 && 4 > 3 → terminal path
       const target = new Set(['STOP_4']);
-      const eta = computeETA(STOPS[0].lat, STOPS[0].lon, STOPS, target);
-      expect(eta).toBeNull();
+      const result = computeETA(STOPS[0].lat, STOPS[0].lon, STOPS, target);
+      expect(result).not.toBeNull();
+      expect(result!.atTerminal).toBe(true);
+      expect(result!.eta).toBe(720); // full delta STOP_0→STOP_4
     });
 
-    test('returns null when vehicle at stop 1 and target is far', () => {
-      // nearestIdx=1, targetIdx=4 → 1 <= 1 && 4 > 3 → null
+    test('returns terminal estimate when vehicle at stop 1 and target is far', () => {
+      // nearestIdx=1, targetIdx=4 → 1 <= 1 && 4 > 3 → terminal path
       const target = new Set(['STOP_4']);
-      const eta = computeETA(STOPS[1].lat, STOPS[1].lon, STOPS, target);
-      expect(eta).toBeNull();
+      const result = computeETA(STOPS[1].lat, STOPS[1].lon, STOPS, target);
+      expect(result).not.toBeNull();
+      expect(result!.atTerminal).toBe(true);
+      expect(result!.eta).toBe(720); // full delta STOP_0→STOP_4
     });
 
     test('vehicle before first stop snaps to nearest (stop 0)', () => {
       // Vehicle south of STOP_0
       const vLat = STOPS[0].lat - 0.001;
       const target = new Set(['STOP_2']);
-      const eta = computeETA(vLat, STOPS[0].lon, STOPS, target);
-      expect(eta).not.toBeNull();
+      const result = computeETA(vLat, STOPS[0].lon, STOPS, target);
+      expect(result).not.toBeNull();
       // nearestIdx=0, targetIdx=2 → delta = 360s, plus some interpolation credit
       // fraction of segment 0→1 will be small (vehicle behind stop 0)
-      expect(eta!).toBeGreaterThanOrEqual(300);
-      expect(eta!).toBeLessThanOrEqual(360);
+      expect(result!.eta).toBeGreaterThanOrEqual(300);
+      expect(result!.eta).toBeLessThanOrEqual(360);
     });
   });
 
@@ -198,16 +207,16 @@ describe('computeETA', () => {
     test('subtracts staleSeconds from result', () => {
       const target = new Set(['STOP_4']);
       // Use stop 2 position, target stop 4 → base delta 360s
-      const fresh = computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, target, 0)!;
-      const stale = computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, target, 60)!;
+      const fresh = etaOrNull(computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, target, 0))!;
+      const stale = etaOrNull(computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, target, 60))!;
       expect(fresh - stale).toBe(60);
     });
 
     test('clamps to zero when staleness exceeds delta', () => {
       const target = new Set(['STOP_3']);
       // Vehicle at STOP_2, delta = 180s, stale = 300s
-      const eta = computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, target, 300);
-      expect(eta).toBe(0);
+      const result = computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, target, 300);
+      expect(result!.eta).toBe(0);
     });
   });
 
@@ -254,18 +263,18 @@ describe('computeETA', () => {
     test('matches any stop ID in the set', () => {
       // Target set contains both a real stop and a fake one
       const target = new Set(['FAKE', 'STOP_3']);
-      const eta = computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, target);
-      expect(eta).not.toBeNull();
-      expect(eta!).toBe(180); // delta STOP_2 → STOP_3
+      const result = computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, target);
+      expect(result).not.toBeNull();
+      expect(result!.eta).toBe(180); // delta STOP_2 → STOP_3
     });
 
     test('finds first matching stop in sequence', () => {
       // Both STOP_2 and STOP_4 in target set — should use first (STOP_2)
       const target = new Set(['STOP_2', 'STOP_4']);
-      const eta = computeETA(STOPS[0].lat, STOPS[0].lon, STOPS, target);
-      expect(eta).not.toBeNull();
+      const result = computeETA(STOPS[0].lat, STOPS[0].lon, STOPS, target);
+      expect(result).not.toBeNull();
       // Should match STOP_2 (idx 2), delta from STOP_0 = 360s
-      expect(eta!).toBe(360);
+      expect(result!.eta).toBe(360);
     });
   });
 
@@ -278,11 +287,11 @@ describe('computeETA', () => {
       // Vehicle clearly closest to STOP_2
       const target = new Set(['STOP_4']);
       // Put vehicle right at STOP_2's lat but offset lon slightly
-      const eta = computeETA(STOPS[2].lat, STOPS[2].lon + 0.0001, STOPS, target);
-      expect(eta).not.toBeNull();
+      const result = computeETA(STOPS[2].lat, STOPS[2].lon + 0.0001, STOPS, target);
+      expect(result).not.toBeNull();
       // Should snap to STOP_2, delta = 360s
-      expect(eta!).toBeGreaterThan(350);
-      expect(eta!).toBeLessThanOrEqual(360);
+      expect(result!.eta).toBeGreaterThan(350);
+      expect(result!.eta).toBeLessThanOrEqual(360);
     });
 
     test('cos(lat) correction affects east-west distance differently at different latitudes', () => {
@@ -299,8 +308,8 @@ describe('computeETA', () => {
 
       const target = new Set(['S2']);
       // Vehicle at lon midpoint between S0 and S1, offset 0.005° in lat
-      const etaEquator = computeETA(0.005, 0.01, makeEW(0), target);
-      const etaArctic = computeETA(60.005, 0.01, makeEW(60), target);
+      const etaEquator = etaOrNull(computeETA(0.005, 0.01, makeEW(0), target));
+      const etaArctic = etaOrNull(computeETA(60.005, 0.01, makeEW(60), target));
 
       expect(etaEquator).not.toBeNull();
       expect(etaArctic).not.toBeNull();
@@ -312,9 +321,9 @@ describe('computeETA', () => {
     test('identical coordinates yields zero interpolation offset', () => {
       // Vehicle exactly at STOP_2
       const target = new Set(['STOP_3']);
-      const eta = computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, target);
+      const result = computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, target);
       // distSq from STOP_2 to vehicle = 0, fraction = 0, no subtraction
-      expect(eta).toBe(180);
+      expect(result!.eta).toBe(180);
     });
   });
 
@@ -326,19 +335,19 @@ describe('computeETA', () => {
     test('vehicle at first stop returns full delta', () => {
       const twoStops = makeStops(2);
       const target = new Set(['STOP_1']);
-      const eta = computeETA(twoStops[0].lat, twoStops[0].lon, twoStops, target);
-      expect(eta).toBe(180);
+      const result = computeETA(twoStops[0].lat, twoStops[0].lon, twoStops, target);
+      expect(result!.eta).toBe(180);
     });
 
     test('vehicle midway interpolates correctly', () => {
       const twoStops = makeStops(2);
       const midLat = (twoStops[0].lat + twoStops[1].lat) / 2;
       const target = new Set(['STOP_1']);
-      const eta = computeETA(midLat, twoStops[0].lon, twoStops, target);
-      expect(eta).not.toBeNull();
+      const result = computeETA(midLat, twoStops[0].lon, twoStops, target);
+      expect(result).not.toBeNull();
       // ~half of 180s = ~90s
-      expect(eta!).toBeGreaterThan(70);
-      expect(eta!).toBeLessThan(110);
+      expect(result!.eta).toBeGreaterThan(70);
+      expect(result!.eta).toBeLessThan(110);
     });
   });
 });
