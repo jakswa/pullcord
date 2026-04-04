@@ -14,9 +14,8 @@ COPY . .
 # Build CSS
 RUN bun run build:css
 
-# Bake marta.db into image for volume seeding
+# Seed db for fresh volumes (optional — marta.db only exists on deployed volume)
 RUN mkdir -p /app/seed
-COPY data/marta.db /app/seed/marta.db
 
 # Data directory (mount point for Fly volume)
 RUN mkdir -p /data
