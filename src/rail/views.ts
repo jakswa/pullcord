@@ -185,6 +185,12 @@ export async function landingView(partial = false): Promise<string> {
   const arrivals = await fetchArrivals();
   const grouped = byStation(arrivals);
   
+  // If no arrivals and no cached data, show an error state
+  if (!arrivals.length && grouped.size === 0) {
+    let html = `<div class="empty">Unable to reach MARTA's real-time API. Data will appear automatically once connectivity is restored.</div>`;
+    return shell("Stations", html, undefined, partial);
+  }
+
   // Build station list with next arrival time and serving lines
   const stations = [...grouped.entries()]
     .map(([name, arrs]) => {
@@ -215,6 +221,7 @@ export async function landingView(partial = false): Promise<string> {
 // ── View: Station Detail ──
 export async function stationView(slug: string, partial = false): Promise<string | null> {
   const arrivals = await fetchArrivals();
+  if (!arrivals.length) return null;
   const grouped = byStation(arrivals);
 
   // Find matching station
