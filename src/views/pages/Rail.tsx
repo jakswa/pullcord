@@ -494,7 +494,7 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
           </main>
           <footer class="rail-footer">
             Real-time MARTA data via public API. Not affiliated with or endorsed by MARTA.
-            {!standalone && <span> · <a href="/about">About Pullcord</a></span>}
+            <span> · <a href="/about">About marta.io</a></span>
           </footer>
         </div>
         <script dangerouslySetInnerHTML={{ __html: `window.__COORDS=${JSON.stringify(STATION_COORDS)};` }} />
