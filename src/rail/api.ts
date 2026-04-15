@@ -35,44 +35,74 @@ interface RawArrival {
 const API_URL = "https://developerservices.itsmarta.com:18096/itsmarta/railrealtimearrivals/traindata";
 const API_KEY = process.env.MARTA_API_KEY || "";
 
-let cache: { data: RailArrival[]; ts: number } | null = null;
-const CACHE_TTL = 20_000; // 20s — longer than poll interval, taps always hit cache
-let refreshing = false;
-let lastError: string | null = null;
+// Single cache entry holds either a successful response OR the most recent
+// failure. Both kinds honor the same TTL, so an API outage doesn't get
+// hammered every request — we back off and show a stable error until TTL
+// expires. The "serve stale data on failure" approach was removed because
+// cached waitSeconds go stale fast (countdowns into the past = misleading UX).
+type CacheEntry =
+  | { kind: "ok"; data: RailArrival[]; ts: number }
+  | { kind: "err"; error: string; ts: number };
+
+let cache: CacheEntry | null = null;
+// TTL sits just under the client's 10s poll interval so each poll actually
+// triggers a refresh (via stale-while-revalidate) instead of redundantly
+// re-serving the same cached bytes. 9s leaves slack for small clock skew.
+const CACHE_TTL = 9_000;
+// Shared in-flight promise: if a refresh is already running, any caller that
+// needs one piggybacks on it instead of firing its own fetch. This prevents a
+// thundering herd on cold start (100 concurrent /rail loads = 1 MARTA fetch,
+// not 100) and also dedupes stale-while-revalidate background refreshes.
+let inflight: Promise<RailArrival[]> | null = null;
+
+function refresh(): Promise<RailArrival[]> {
+  if (inflight) return inflight;
+  inflight = _refresh().finally(() => {
+    inflight = null;
+  });
+  return inflight;
+}
 
 export async function fetchArrivals(): Promise<RailArrival[]> {
   const now = Date.now();
-  // Serve cached data if fresh enough
-  if (cache && now - cache.ts < CACHE_TTL) return cache.data;
-  // Stale-while-revalidate: serve stale data, refresh in background
-  if (cache && !refreshing) {
-    refreshing = true;
-    _refresh().finally(() => { refreshing = false; });
-    return cache.data;
+  // Within TTL, serve the cached result — including cached errors.
+  if (cache && now - cache.ts < CACHE_TTL) {
+    return cache.kind === "ok" ? cache.data : [];
   }
-  // No cache at all — must attempt fetch (with graceful fallback)
-  return _refresh().catch(() => []);
+  // Stale cache: kick off (or piggyback on) a background refresh, keep serving
+  // the current cached value (empty array if we previously errored).
+  if (cache) {
+    refresh().catch(() => {});
+    return cache.kind === "ok" ? cache.data : [];
+  }
+  // Cold start: wait for the shared refresh. On failure return [].
+  try {
+    return await refresh();
+  } catch {
+    return [];
+  }
 }
 
 async function _refresh(): Promise<RailArrival[]> {
+  const ts = Date.now();
   let resp: Response;
   try {
     resp = await fetch(`${API_URL}?apiKey=${API_KEY}`, {
-      signal: AbortSignal.timeout(8000),
+      // 4s: short enough that a cold-start user doesn't stare at nothing if
+      // MARTA is hanging, and short enough to fail, cache the error, and let
+      // the next 10s poll recover cleanly.
+      signal: AbortSignal.timeout(4000),
     });
   } catch (e) {
-    // Network error, DNS failure, timeout — serve stale cache or rethrow if no cache
-    lastError = e instanceof Error ? e.message : String(e);
-    if (cache) return cache.data;
+    const msg = e instanceof Error ? e.message : String(e);
+    cache = { kind: "err", error: `Unable to reach MARTA rail API (${msg})`, ts };
     throw e;
   }
   if (!resp.ok) {
-    lastError = `Rail API ${resp.status}`;
-    if (cache) return cache.data;
+    cache = { kind: "err", error: `MARTA rail API returned HTTP ${resp.status}`, ts };
     throw new Error(`Rail API ${resp.status}`);
   }
   const raw: RawArrival[] = await resp.json();
-  lastError = null;
 
   const data = raw.map((r) => ({
     station: r.STATION,
@@ -90,18 +120,19 @@ async function _refresh(): Promise<RailArrival[]> {
     eventTime: r.EVENT_TIME,
   }));
 
-  cache = { data, ts: Date.now() };
+  cache = { kind: "ok", data, ts };
   return data;
 }
 
-// True if rail data was recently fetched by a user request.
+// True if rail data was recently fetched successfully.
 export function isRailCacheWarm(): boolean {
-  return cache !== null && Date.now() - cache.ts < 5 * 60 * 1000;
+  return cache?.kind === "ok" && Date.now() - cache.ts < 5 * 60 * 1000;
 }
 
-// Most recent fetch error, or null if last fetch succeeded.
+// Current cached error message, or null if the last cached result was a success
+// (or there's no cache yet).
 export function getRailApiError(): string | null {
-  return lastError;
+  return cache?.kind === "err" ? cache.error : null;
 }
 
 export function stationSlug(name: string): string {

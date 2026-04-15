@@ -5,7 +5,6 @@ data/marta.db
 .env.fly
 dist/
 public/styles.css
-*.proto
 timestamp-raw-data.json
 investigate-*.ts
 screenshot-*.png
