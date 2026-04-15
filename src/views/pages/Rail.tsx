@@ -872,11 +872,11 @@ function railStyles(): string {
       padding: 1.5rem 1rem 2rem;
       text-align: center;
       font-size: 0.9rem;
-      color: rgba(255,255,255,0.3);
+      color: var(--text-muted);
       line-height: 1.5;
     }
-    .rail-footer a { color: rgba(255,255,255,0.4); text-decoration: none; }
-    .rail-footer a:hover { color: rgba(255,255,255,0.6); }
+    .rail-footer a { color: var(--text-muted); text-decoration: none; }
+    .rail-footer a:hover { color: var(--text-body); }
 
     *, *::before, *::after {
       box-sizing: border-box;
