@@ -1,5 +1,18 @@
 import type { RailArrival } from "../../rail/api.js";
-import { stationSlug, stationDisplayName } from "../../rail/api.js";
+import { stationSlug, stationDisplayName, getRailApiError } from "../../rail/api.js";
+
+// Banner shown at the top of any rail page when the MARTA rail API is
+// unreachable. Kept dead simple — no icons, no dismiss, just a clear
+// explanation so empty station lists aren't mistaken for "no trains running".
+function RailApiBanner() {
+  if (!getRailApiError()) return null;
+  return (
+    <div class="rail-api-banner" role="status" aria-live="polite">
+      MARTA's real-time rail API is currently unreachable. Live arrival times
+      will return automatically once it recovers.
+    </div>
+  );
+}
 
 // ── Accessible line colors ──
 const LINE_COLORS = {
@@ -487,6 +500,7 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
               <span class="rail-freshness" id="freshness">—</span>
             </div>
           </header>
+          <RailApiBanner />
           <main class="rail-main">
             <div id="rail-data">
               <RailStationList arrivals={arrivals} />
@@ -549,6 +563,7 @@ export function RailStationPage({
               <span class="rail-freshness" id="freshness">—</span>
             </div>
           </header>
+          <RailApiBanner />
           <main class="rail-main rail-station-detail">
             <div id="rail-data">
               <RailStationDetail stationName={stationName} arrivals={arrivals} />
@@ -604,7 +619,7 @@ export function RailStationDetail({
           </Tag>
         );
       })}
-      {sorted.length === 0 && (
+      {sorted.length === 0 && !getRailApiError() && (
         <div class="rail-empty">No arrivals currently available for this station.</div>
       )}
     </div>
@@ -672,6 +687,7 @@ export function RailTrainPage({
               <div class="rail-train-dest">→ {destination.toLowerCase()}</div>
             )}
           </header>
+          <RailApiBanner />
           <main class="rail-main rail-train-main">
             <div id="rail-data">
               <RailTrainTimeline trainId={trainId} arrivals={arrivals} />
@@ -717,6 +733,11 @@ export function RailTrainTimeline({
   const trainArrivals = arrivals.filter((a) => a.trainId === trainId);
 
   if (trainArrivals.length === 0) {
+    if (getRailApiError()) {
+      // Banner already explains the outage — don't also tell the user the
+      // train "may have completed its trip", which would be wrong and confusing.
+      return <div class="rail-empty">Live tracking unavailable while MARTA's API is offline.</div>;
+    }
     return (
       <div class="rail-empty">
         No data for train {trainId}. It may have completed its trip.
@@ -833,7 +854,7 @@ function railStyles(): string {
     .rail-body {
       margin: 0;
       font-family: var(--font-sans);
-      font-size: 16px;
+      font-size: 17px;
       -webkit-font-smoothing: antialiased;
       background: var(--bg-primary);
       color: var(--text-primary);
@@ -850,7 +871,7 @@ function railStyles(): string {
     .rail-footer {
       padding: 1.5rem 1rem 2rem;
       text-align: center;
-      font-size: 0.8rem;
+      font-size: 0.9rem;
       color: rgba(255,255,255,0.3);
       line-height: 1.5;
     }
@@ -891,7 +912,7 @@ function railStyles(): string {
     .rail-back:active { color: var(--brand); }
 
     .rail-title {
-      font-size: 1.2rem;
+      font-size: 1.35rem;
       font-weight: 700;
       margin: 0;
       flex: 1;
@@ -903,12 +924,32 @@ function railStyles(): string {
 
     .rail-freshness {
       font-family: var(--font-mono);
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       font-variant-numeric: tabular-nums;
       color: var(--text-muted);
       flex-shrink: 0;
       min-width: 3rem;
       text-align: right;
+    }
+
+    /* ── API-down banner ── */
+    .rail-api-banner {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 0.85rem 1rem;
+      background: #7a4010;
+      color: #ffe2c8;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      border-bottom: 1px solid #a35515;
+      text-align: center;
+    }
+    @media (prefers-color-scheme: light) {
+      .rail-api-banner {
+        background: #fbe4c8;
+        color: #6a3808;
+        border-bottom-color: #e5b070;
+      }
     }
 
     /* ── Train header extras ── */
@@ -921,7 +962,7 @@ function railStyles(): string {
     }
 
     .rail-train-id {
-      font-size: 1.2rem;
+      font-size: 1.35rem;
       font-weight: 700;
       font-family: var(--font-mono);
       font-variant-numeric: tabular-nums;
@@ -933,7 +974,7 @@ function railStyles(): string {
       justify-content: center;
       padding: 0.15rem 0.5rem;
       border-radius: 0.25rem;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       font-weight: 800;
       color: #fff;
       letter-spacing: 0.04em;
@@ -944,7 +985,7 @@ function railStyles(): string {
       max-width: 600px;
       margin: 0.15rem auto 0;
       padding-left: 2rem;
-      font-size: 1rem;
+      font-size: 1.15rem;
       color: var(--text-muted);
     }
 
@@ -981,7 +1022,7 @@ function railStyles(): string {
     .rail-station-name {
       flex: 1;
       min-width: 0;
-      font-size: 1.15rem;
+      font-size: 1.3rem;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1006,11 +1047,11 @@ function railStyles(): string {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 66px;
-      height: 1.9rem;
+      width: 74px;
+      height: 2.05rem;
       border-radius: 0.3rem;
       font-family: var(--font-mono);
-      font-size: 1rem;
+      font-size: 1.1rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
       color: #fff;
@@ -1026,7 +1067,7 @@ function railStyles(): string {
     .rail-pill-empty {
       background: var(--border-color);
       color: #555;
-      width: 66px;
+      width: 74px;
     }
 
     @media (prefers-color-scheme: light) {
@@ -1038,15 +1079,15 @@ function railStyles(): string {
     /* ── Four-direction grid (Five Points) ── */
     .rail-pills-grid {
       display: grid;
-      grid-template-columns: 66px 66px;
+      grid-template-columns: 74px 74px;
       gap: 0.2rem;
     }
 
     /* ── No data ── */
     .rail-no-data {
       color: #555;
-      font-size: 1rem;
-      min-width: 66px;
+      font-size: 1.1rem;
+      min-width: 74px;
       text-align: center;
     }
 
@@ -1070,7 +1111,7 @@ function railStyles(): string {
       display: flex;
       align-items: center;
       gap: 0.35rem;
-      font-size: 0.95rem;
+      font-size: 1.05rem;
       font-weight: 600;
       letter-spacing: 0.04em;
       color: var(--text-muted);
@@ -1169,10 +1210,10 @@ function railStyles(): string {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 1.6rem;
-      height: 1.6rem;
+      width: 1.75rem;
+      height: 1.75rem;
       border-radius: 0.2rem;
-      font-size: 1.05rem;
+      font-size: 1.2rem;
       font-weight: 800;
       color: var(--text-primary);
       background: var(--border-color);
@@ -1185,7 +1226,7 @@ function railStyles(): string {
       justify-content: center;
       padding: 0.1rem 0.35rem;
       border-radius: 0.2rem;
-      font-size: 0.95rem;
+      font-size: 1.05rem;
       font-weight: 700;
       color: #fff;
       flex-shrink: 0;
@@ -1194,7 +1235,7 @@ function railStyles(): string {
 
     .rail-arrival-dest {
       flex: 1;
-      font-size: 1.15rem;
+      font-size: 1.3rem;
       min-width: 0;
       white-space: nowrap;
       overflow: hidden;
@@ -1203,7 +1244,7 @@ function railStyles(): string {
 
     .rail-arrival-time {
       font-family: var(--font-mono);
-      font-size: 1.2rem;
+      font-size: 1.4rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
       flex-shrink: 0;
@@ -1243,7 +1284,7 @@ function railStyles(): string {
       text-align: center;
       padding: 2rem 1rem;
       color: var(--text-muted);
-      font-size: 1rem;
+      font-size: 1.15rem;
     }
 
     /* ── Train timeline ── */
@@ -1310,7 +1351,7 @@ function railStyles(): string {
     }
 
     .rail-tl-name {
-      font-size: 1.15rem;
+      font-size: 1.3rem;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1319,7 +1360,7 @@ function railStyles(): string {
 
     .rail-tl-time {
       font-family: var(--font-mono);
-      font-size: 1.2rem;
+      font-size: 1.4rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
       flex-shrink: 0;
