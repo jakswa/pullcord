@@ -273,7 +273,22 @@ class PullcordApp {
     }
 
     if (stops.length === 0) {
-      resultsList.innerHTML = '<div class="home-status">No stops found</div>';
+      const searchVal = document.getElementById('stop-search')?.value?.trim() || '';
+      const exploreHref = searchVal
+        ? `/explore?q=${encodeURIComponent(searchVal)}`
+        : '/explore';
+      resultsList.innerHTML = `
+        <div class="home-empty-state">
+          <div class="home-empty-text">No stops found</div>
+          <a href="${exploreHref}" class="home-empty-map-link">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            </svg>
+            Browse all stops on the map
+          </a>
+        </div>
+      `;
       return;
     }
 

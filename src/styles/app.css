@@ -144,6 +144,7 @@
       --bus-marker-default: #0f172a;
 
       --home-bg: #090e1a;
+      --surface-raised: var(--bg-surface);
     }
   }
 
@@ -973,7 +974,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.02em;
-    color: var(--text-secondary);
+    color: var(--text-body);
     border-radius: 0.5rem;
     transition: background 0.15s, color 0.15s;
     white-space: nowrap;
@@ -981,7 +982,7 @@
 
   .d-action-btn:active {
     background: var(--hover-bg);
-    color: var(--text-secondary);
+    color: var(--text-primary);
   }
 
 
@@ -1308,6 +1309,37 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
+  }
+
+  .home-empty-state {
+    text-align: center;
+    padding: 2rem 1rem;
+  }
+  .home-empty-text {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+  }
+  .home-empty-map-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 999px;
+    background: var(--coral);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: opacity 0.15s;
+  }
+  .home-empty-map-link:hover {
+    opacity: 0.85;
+  }
+  .home-empty-map-link:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+    opacity: 0.85;
   }
 
   .home-results-header {
