@@ -7,7 +7,8 @@
     "build:css": "bun x @tailwindcss/cli -i src/styles/app.css -o public/styles.css --minify",
     "dev:css": "bun x @tailwindcss/cli -i src/styles/app.css -o public/styles.css --watch",
     "dev": "bun run build:css && bun run --hot src/index.ts",
-    "start": "bun run build:css && bun run src/index.ts"
+    "start": "bun run build:css && bun run src/index.ts",
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/bun": "latest",
