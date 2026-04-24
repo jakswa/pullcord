@@ -11,7 +11,7 @@ Build a competitive MARTA Rail real-time tracker that **beats marta.io** in usab
 - **Candidates:** `pullcord/src/rail/candidates/rail_views_{A-G}.ts`
 - **Spec:** `pullcord/src/rail/candidates/SPEC_V2.md` (detailed requirements)
 - **Dev server:** `bun run src/index.ts` on port 4200, Caddy at `pullcord.home.jake.town`
-- **MARTA_API_KEY:** in `.env` — `REDACTED_MARTA_API_KEY`
+- **MARTA_API_KEY:** in `.env` — local secret, not committed
 
 ## Design Constraints
 - **Min font sizes:** 1rem station names, 0.95rem times, nothing below 0.88rem
