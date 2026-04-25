@@ -3,14 +3,26 @@ name: Fly Deploy
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: fly-deploy
-  cancel-in-progress: false
+  group: fly-deploy-${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun test
+
   deploy:
+    if: github.event_name != 'pull_request'
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
