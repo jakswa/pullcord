@@ -127,7 +127,7 @@ app.get("/push-sw.js", async (c) => {
 // Health check endpoint — verifies DB is queryable
 // Fly.io hits this to decide if the machine is healthy
 import { verifyDatabase } from "./data/migrate.js";
-import { getMatchRate } from "./data/realtime.js";
+import { getMatchRate, isVehicleCacheWarm } from "./data/realtime.js";
 import { getTripLookup } from "./data/db.js";
 
 app.get("/health", async (c) => {
@@ -140,14 +140,16 @@ app.get("/health", async (c) => {
     }, 503);
   }
 
-  // GTFS staleness check — compare realtime trip IDs against DB
+  // GTFS staleness check — only when vehicle cache is already warm (no network call)
   let gtfs: { matchRate: number; matched: number; total: number; stale: boolean } | undefined;
-  try {
-    const tripLookup = getTripLookup();
-    const { matched, total, rate } = await getMatchRate(tripLookup);
-    gtfs = { matchRate: rate, matched, total, stale: rate < 0.5 };
-  } catch {
-    // Don't fail health check if realtime API is unreachable
+  if (isVehicleCacheWarm()) {
+    try {
+      const tripLookup = getTripLookup();
+      const { matched, total, rate } = await getMatchRate(tripLookup);
+      gtfs = { matchRate: rate, matched, total, stale: rate < 0.5 };
+    } catch {
+      // Don't fail health check if realtime data unavailable
+    }
   }
 
   return c.json({

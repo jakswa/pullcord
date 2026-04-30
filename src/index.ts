@@ -11,8 +11,10 @@ runMigrations(); // throws on failure → process crashes → no server bind →
 // ── Safe to import DB-dependent modules now ──
 import app from "./app.js";
 import { Cron } from "croner";
-import { refreshGTFS } from "./data/gtfs-import.js";
+import { refreshGTFS, isRefreshing } from "./data/gtfs-import.js";
 import { collectMetrics, cleanOldMetrics } from "./data/metrics.js";
+import { getMatchRate, isVehicleCacheWarm } from "./data/realtime.js";
+import { getTripLookup, invalidateCaches } from "./data/db.js";
 
 const port = parseInt(process.env.PORT || "4200");
 
@@ -23,6 +25,7 @@ console.log(`🌐 Server: http://localhost:${port}`);
 const gtfsCron = new Cron("0 3 * * *", { timezone: "America/New_York" }, async () => {
   console.log("⏰ Daily GTFS refresh triggered");
   await refreshGTFS();
+  invalidateCaches();
   cleanOldMetrics(); // prune old metrics during daily maintenance
 });
 console.log(`📅 GTFS refresh scheduled: next run ${gtfsCron.nextRun()?.toISOString() ?? "unknown"}`);
@@ -59,6 +62,7 @@ const gtfsCheckCron = new Cron("0 * * * *", { timezone: "America/New_York" }, as
       lastGtfsLastModified = lastModified;
       lastGtfsContentLength = contentLength;
       await refreshGTFS();
+      invalidateCaches();
     }
   } catch (err) {
     console.error("❌ GTFS HEAD check error:", err);
@@ -69,6 +73,19 @@ console.log(`🔍 GTFS change check: hourly (next ${gtfsCheckCron.nextRun()?.toI
 // Metrics collection: every 5 minutes during operation
 const metricsCron = new Cron("*/5 * * * *", { timezone: "America/New_York" }, async () => {
   await collectMetrics();
+
+  // Check GTFS staleness when vehicle cache is warm (users are active)
+  if (isVehicleCacheWarm() && !isRefreshing()) {
+    try {
+      const tripLookup = getTripLookup();
+      const { matched, total, rate } = await getMatchRate(tripLookup);
+      if (rate < 0.5 && total > 0) {
+        console.warn(`⚠️ GTFS match rate critically low: ${matched}/${total} (${(rate * 100).toFixed(1)}%) — triggering auto-refresh`);
+        await refreshGTFS();
+        invalidateCaches();
+      }
+    } catch {}
+  }
 });
 console.log(`📊 Metrics collection: every 5 min (next ${metricsCron.nextRun()?.toISOString() ?? "unknown"})`);
 

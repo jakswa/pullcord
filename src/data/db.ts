@@ -388,6 +388,11 @@ class MARTADatabase {
     return result;
   }
 
+  invalidateCaches() {
+    this.tripLookupCache = null;
+    this._allStopsCache = null;
+  }
+
   close() {
     this.db.close();
     }
@@ -490,6 +495,10 @@ export function getTripStopSequences(tripIds: string[]) {
 
 export function getAllStopsWithRoutes() {
   return db.getAllStopsWithRoutes();
+}
+
+export function invalidateCaches() {
+  db.invalidateCaches();
 }
 
 export type { Route, Stop, Trip, RouteStop, RouteDetail };
