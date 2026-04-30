@@ -586,7 +586,18 @@ async function main() {
   }
 }
 
+let refreshing = false;
+
+export function isRefreshing(): boolean {
+  return refreshing;
+}
+
 export async function refreshGTFS() {
+  if (refreshing) {
+    console.log("🔄 GTFS refresh already in progress, skipping");
+    return;
+  }
+  refreshing = true;
   console.log("🔄 GTFS refresh starting...");
 
   // Use DB directory for temp files (persistent volume on Fly.io)
@@ -641,6 +652,7 @@ export async function refreshGTFS() {
     console.error("❌ GTFS refresh failed:", error);
   } finally {
     importer.close();
+    refreshing = false;
   }
 }
 
