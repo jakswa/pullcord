@@ -2,6 +2,7 @@ import { load } from "protobufjs";
 import path from "path";
 import { getScheduledArrivals, getStopIdsByName, getTripStopSequences, type Trip } from "./db";
 import { computeETA, parseTimeToSec, type TripStop } from "./eta";
+import { refreshGTFS } from "./gtfs-import.js";
 
 const VEHICLE_POSITIONS_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb";
 const TRIP_UPDATES_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb";
@@ -117,7 +118,7 @@ class RealtimeDataService {
   private vehicleFetching = false;
   private tripUpdatesFetching = false;
 
-  private async getVehiclePositions(): Promise<any[]> {
+  async getVehiclePositions(): Promise<any[]> {
     if (this.isCacheValid(this.vehicleCache)) {
       return this.vehicleCache!.data;
     }
@@ -540,6 +541,41 @@ export async function getAllVehicles(tripLookup: Map<string, Trip>): Promise<Veh
 // Metrics uses this to avoid API calls when the app is idle.
 export function isVehicleCacheWarm(): boolean {
   return realtimeService.isCacheWarm();
+}
+
+// ─────────────────────────────────────
+// GTFS STALENESS DETECTION
+// ─────────────────────────────────────
+
+let gtfsRefreshing = false;
+
+export async function getMatchRate(tripLookup: Map<string, Trip>): Promise<{matched: number, total: number, rate: number}> {
+  const entities = await realtimeService.getVehiclePositions();
+  let matched = 0;
+  let total = 0;
+
+  for (const entity of entities) {
+    const tripId = entity.vehicle?.trip?.tripId;
+    if (!tripId) continue;
+    total++;
+    if (tripLookup.has(tripId)) {
+      matched++;
+    }
+  }
+
+  const rate = total === 0 ? 1 : matched / total;
+
+  // Auto-refresh when match rate drops below 50%
+  if (rate < 0.5 && total > 0 && !gtfsRefreshing) {
+    gtfsRefreshing = true;
+    console.warn(`⚠️ GTFS match rate critically low: ${matched}/${total} (${(rate * 100).toFixed(1)}%) — triggering auto-refresh`);
+    refreshGTFS()
+      .then(() => console.log("✅ Auto GTFS refresh complete"))
+      .catch((err) => console.error("❌ Auto GTFS refresh failed:", err))
+      .finally(() => { gtfsRefreshing = false; });
+  }
+
+  return { matched, total, rate };
 }
 
 export type { VehiclePosition, PredictionUpdate, ArrivalPrediction };
