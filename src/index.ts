@@ -89,6 +89,31 @@ const metricsCron = new Cron("*/5 * * * *", { timezone: "America/New_York" }, as
 });
 console.log(`📊 Metrics collection: every 5 min (next ${metricsCron.nextRun()?.toISOString() ?? "unknown"})`);
 
+// Startup GTFS staleness check — catches stale data after deploys/restarts
+// without waiting for cron cycles (daily refresh, hourly check, or 5-min metrics)
+(async () => {
+  try {
+    const tripLookup = getTripLookup();
+    if (tripLookup.size === 0) {
+      console.log("📭 No trips in database — triggering initial GTFS import");
+      await refreshGTFS();
+      invalidateCaches();
+      return;
+    }
+
+    const { matched, total, rate } = await getMatchRate(tripLookup);
+    console.log(`📊 Startup match rate: ${matched}/${total} (${(rate * 100).toFixed(1)}%)`);
+
+    if (rate < 0.5 && total > 0) {
+      console.log("⚠️ GTFS data stale at startup — refreshing now");
+      await refreshGTFS();
+      invalidateCaches();
+    }
+  } catch (err) {
+    console.error("❌ Startup GTFS check failed:", err);
+  }
+})();
+
 export default {
   port,
   hostname: "0.0.0.0",
