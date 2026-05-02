@@ -91,7 +91,7 @@ class RealtimeDataService {
     const response = await fetch(`${url}?apiKey=${this.apiKey}`);
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch ${url}: ${response.status}`);
+      throw new Error(`HTTP ${response.status} ${response.statusText} from ${url.split('?')[0]}`);
     }
 
     const buffer = await response.arrayBuffer();
@@ -127,7 +127,7 @@ class RealtimeDataService {
       this.fetchProtobufData(VEHICLE_POSITIONS_URL).then(entities => {
         this.vehicleCache = { data: entities, timestamp: Date.now() };
         this.vehicleFetching = false;
-      }).catch((err) => { console.error('Vehicle fetch failed:', err); this.vehicleFetching = false; });
+      }).catch((err) => { console.error('❌ Vehicle position fetch failed:', err.message || err); this.vehicleFetching = false; });
       return this.vehicleCache!.data;
     }
 
@@ -147,7 +147,7 @@ class RealtimeDataService {
       this.fetchProtobufData(TRIP_UPDATES_URL).then(entities => {
         this.tripUpdatesCache = { data: entities, timestamp: Date.now() };
         this.tripUpdatesFetching = false;
-      }).catch((err) => { console.error('Trip updates fetch failed:', err); this.tripUpdatesFetching = false; });
+      }).catch((err) => { console.error('❌ Trip updates fetch failed:', err.message || err); this.tripUpdatesFetching = false; });
       return this.tripUpdatesCache!.data;
     }
 
@@ -160,13 +160,15 @@ class RealtimeDataService {
     const entities = await this.getVehiclePositions();
     const timestamp = Date.now();
 
-    return entities
-      .filter(entity => {
-        if (!entity.vehicle?.trip?.tripId || !entity.vehicle?.position) return false;
-        const trip = tripLookup.get(entity.vehicle.trip.tripId);
-        return trip?.route_id === routeId;
-      })
-      .map(entity => {
+    const withData = entities.filter(e => e.vehicle?.trip?.tripId && e.vehicle?.position);
+    const matched = withData.filter(e => tripLookup.get(e.vehicle.trip.tripId)?.route_id === routeId);
+
+    if (matched.length === 0 && entities.length > 0) {
+      const dbHits = withData.filter(e => tripLookup.has(e.vehicle.trip.tripId)).length;
+      console.warn(`🔍 getVehicles(${routeId}): ${entities.length} raw entities, ${withData.length} with trip+position, ${dbHits} matched any DB trip, 0 matched this route`);
+    }
+
+    return matched.map(entity => {
         const vehicle = entity.vehicle;
         const trip = tripLookup.get(vehicle.trip.tripId);
         
@@ -226,12 +228,14 @@ class RealtimeDataService {
     const entities = await this.getVehiclePositions();
     const timestamp = Date.now();
 
-    return entities
-      .filter(entity => {
-        if (!entity.vehicle?.trip?.tripId || !entity.vehicle?.position) return false;
-        return tripLookup.has(entity.vehicle.trip.tripId);
-      })
-      .map(entity => {
+    const withData = entities.filter(e => e.vehicle?.trip?.tripId && e.vehicle?.position);
+    const matched = withData.filter(e => tripLookup.has(e.vehicle.trip.tripId));
+
+    if (matched.length === 0 && entities.length > 0) {
+      console.warn(`🔍 getAllVehicles: ${entities.length} raw entities, ${withData.length} with trip+position, 0 matched any DB trip (${tripLookup.size} trips in DB)`);
+    }
+
+    return matched.map(entity => {
         const vehicle = entity.vehicle;
         const trip = tripLookup.get(vehicle.trip.tripId)!;
         const vehicleTimestamp = vehicle.timestamp ? parseInt(vehicle.timestamp) * 1000 : timestamp;
