@@ -129,6 +129,7 @@ app.get("/push-sw.js", async (c) => {
 import { verifyDatabase } from "./data/migrate.js";
 import { getMatchRate, isVehicleCacheWarm } from "./data/realtime.js";
 import { getTripLookup } from "./data/db.js";
+import { isRefreshing } from "./data/gtfs-import.js";
 
 app.get("/health", async (c) => {
   const dbCheck = verifyDatabase();
@@ -158,6 +159,76 @@ app.get("/health", async (c) => {
     db: { version: dbCheck.version, tables: dbCheck.tables },
     ...(gtfs && { gtfs }),
   });
+});
+
+// Diagnostic endpoint — actively probes MARTA realtime API and reports detailed status
+app.get("/health/diag", async (c) => {
+  const VEHICLE_POSITIONS_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb";
+  const apiKey = process.env.MARTA_API_KEY || "";
+
+  const diag: Record<string, unknown> = {
+    timestamp: new Date().toISOString(),
+    apiKeyPresent: apiKey.length > 0,
+    refreshLocked: isRefreshing(),
+  };
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    const url = `${VEHICLE_POSITIONS_URL}?apiKey=${apiKey}`;
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    diag.apiReachable = true;
+    diag.httpStatus = response.status;
+
+    if (!response.ok) {
+      diag.error = `HTTP ${response.status} ${response.statusText}`;
+      return c.json(diag);
+    }
+
+    // Decode protobuf
+    const { load } = await import("protobufjs");
+    const path = await import("path");
+    const protoPath = path.join(process.cwd(), "gtfs-realtime.proto");
+    const protoRoot = await load(protoPath);
+    const FeedMessage = protoRoot.lookupType("transit_realtime.FeedMessage");
+
+    const buffer = await response.arrayBuffer();
+    const message = FeedMessage.decode(new Uint8Array(buffer));
+    const entities: any[] = message.entity || [];
+
+    diag.rawEntities = entities.length;
+
+    // Count entities with valid trip + position
+    const withTripAndPosition = entities.filter(
+      (e: any) => e.vehicle?.trip?.tripId && e.vehicle?.position
+    );
+    diag.withTripAndPosition = withTripAndPosition.length;
+
+    // Compare against trip lookup
+    const tripLookup = getTripLookup();
+    diag.dbTripCount = tripLookup.size;
+
+    let matched = 0;
+    for (const e of withTripAndPosition) {
+      if (tripLookup.has(e.vehicle.trip.tripId)) {
+        matched++;
+      }
+    }
+    diag.matched = matched;
+    diag.matchRate = withTripAndPosition.length === 0
+      ? 0
+      : Math.round((matched / withTripAndPosition.length) * 1000) / 1000;
+  } catch (err: any) {
+    diag.apiReachable = false;
+    diag.error = err?.name === "AbortError"
+      ? "Request timed out after 5000ms"
+      : (err?.message || String(err));
+  }
+
+  return c.json(diag);
 });
 
 // Error handling

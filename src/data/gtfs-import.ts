@@ -598,60 +598,67 @@ export async function refreshGTFS() {
     return;
   }
   refreshing = true;
-  console.log("🔄 GTFS refresh starting...");
-
-  // Use DB directory for temp files (persistent volume on Fly.io)
-  const dataDir = path.dirname(DB_PATH);
-
-  // Download zip with timeout
-  const GTFS_URL = "https://itsmarta.com/google_transit_feed/google_transit.zip";
-  const zipPath = path.join(dataDir, "gtfs.zip");
-  console.log(`📥 Downloading GTFS from ${GTFS_URL}...`);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
   try {
-    const resp = await fetch(GTFS_URL, { signal: controller.signal });
-    if (!resp.ok) throw new Error(`GTFS download failed: ${resp.status}`);
-    const buf = await resp.arrayBuffer();
-    await Bun.write(zipPath, buf);
-    console.log(`✓ Downloaded ${(buf.byteLength / 1024 / 1024).toFixed(1)}MB`);
+    console.log("🔄 GTFS refresh starting...");
+
+    // Use DB directory for temp files (persistent volume on Fly.io)
+    const dataDir = path.dirname(DB_PATH);
+
+    // Download zip with timeout
+    const GTFS_URL = "https://itsmarta.com/google_transit_feed/google_transit.zip";
+    const zipPath = path.join(dataDir, "gtfs.zip");
+    console.log(`📥 Downloading GTFS from ${GTFS_URL}...`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+    try {
+      const resp = await fetch(GTFS_URL, { signal: controller.signal });
+      if (!resp.ok) throw new Error(`GTFS download failed: ${resp.status}`);
+      const buf = await resp.arrayBuffer();
+      await Bun.write(zipPath, buf);
+      console.log(`✓ Downloaded ${(buf.byteLength / 1024 / 1024).toFixed(1)}MB`);
+    } catch (error) {
+      console.error("❌ GTFS download failed:", error);
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    // Extract zip — try unzip (Docker/Alpine), fall back to python3 (dev)
+    const gtfsDir = path.join(dataDir, "gtfs");
+    await fs.promises.mkdir(gtfsDir, { recursive: true });
+    try {
+      const proc = Bun.spawn(["unzip", "-o", zipPath, "-d", gtfsDir]);
+      const code = await proc.exited;
+      if (code !== 0) throw new Error(`unzip exited ${code}`);
+    } catch (error) {
+      console.error("❌ GTFS extraction failed, trying python3 fallback:", error);
+      const proc = Bun.spawn(["python3", "-c", `import zipfile; zipfile.ZipFile("${zipPath}").extractall("${gtfsDir}")`]);
+      const code = await proc.exited;
+      if (code !== 0) throw new Error("Both unzip and python3 extraction failed");
+    }
+    await fs.promises.unlink(zipPath);
+
+    // Run import
+    const importer = new GTFSImporter();
+    try {
+      await importer.importRoutes();
+      await importer.importStops(); // includes atomic group_id assignment
+      await importer.importCalendar();
+      await importer.importCalendarDates();
+      await importer.importTrips();
+      await importer.importShapes();
+      await importer.importStopTimes();
+      importer.buildRouteStops();
+      importer.cleanExpiredServices();
+      importer.buildTransferLookup();
+      importer.printStats();
+      console.log("✅ GTFS refresh complete!");
+    } catch (error) {
+      console.error("❌ GTFS refresh failed:", error);
+    } finally {
+      importer.close();
+    }
   } finally {
-    clearTimeout(timeout);
-  }
-
-  // Extract zip — try unzip (Docker/Alpine), fall back to python3 (dev)
-  const gtfsDir = path.join(dataDir, "gtfs");
-  await fs.promises.mkdir(gtfsDir, { recursive: true });
-  try {
-    const proc = Bun.spawn(["unzip", "-o", zipPath, "-d", gtfsDir]);
-    const code = await proc.exited;
-    if (code !== 0) throw new Error(`unzip exited ${code}`);
-  } catch {
-    const proc = Bun.spawn(["python3", "-c", `import zipfile; zipfile.ZipFile("${zipPath}").extractall("${gtfsDir}")`]);
-    const code = await proc.exited;
-    if (code !== 0) throw new Error("Both unzip and python3 extraction failed");
-  }
-  await fs.promises.unlink(zipPath);
-
-  // Run import
-  const importer = new GTFSImporter();
-  try {
-    await importer.importRoutes();
-    await importer.importStops(); // includes atomic group_id assignment
-    await importer.importCalendar();
-    await importer.importCalendarDates();
-    await importer.importTrips();
-    await importer.importShapes();
-    await importer.importStopTimes();
-    importer.buildRouteStops();
-    importer.cleanExpiredServices();
-    importer.buildTransferLookup();
-    importer.printStats();
-    console.log("✅ GTFS refresh complete!");
-  } catch (error) {
-    console.error("❌ GTFS refresh failed:", error);
-  } finally {
-    importer.close();
     refreshing = false;
   }
 }
