@@ -3,9 +3,11 @@
 // If any migration fails, the process exits non-zero → Fly health check fails → deploy halts.
 
 import { Database } from "bun:sqlite";
-import path from "path";
+import { resolveScheduleDbPath } from "./schedules.js";
 
-const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "data", "marta.db");
+function getDBPath(): string {
+  return resolveScheduleDbPath();
+}
 
 interface Migration {
   version: number;
@@ -98,7 +100,7 @@ function getCurrentVersion(db: Database): number {
 }
 
 export function runMigrations(): void {
-  const db = new Database(DB_PATH);
+  const db = new Database(getDBPath());
   db.exec("PRAGMA journal_mode = WAL");
 
   try {
@@ -142,7 +144,7 @@ export function runMigrations(): void {
 // Verify the database is queryable — used by /health endpoint
 export function verifyDatabase(): { ok: boolean; version: number; tables: number; error?: string } {
   try {
-    const db = new Database(DB_PATH, { readonly: true });
+    const db = new Database(getDBPath(), { readonly: true });
     const version = getCurrentVersion(db);
     const tables = (db.prepare(
       "SELECT COUNT(*) as c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"

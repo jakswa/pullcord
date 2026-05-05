@@ -8,7 +8,7 @@ primary_region = "iad"
 
 [env]
   PORT = "4200"
-  DATABASE_URL = "/data/marta.db"
+  PULLCORD_DATA_DIR = "/data"
   CORDS_DATABASE_URL = "/data/cords.db"
 
 [http_service]
@@ -23,7 +23,7 @@ primary_region = "iad"
   [[http_service.checks]]
     interval = "10s"
     timeout = "5s"
-    grace_period = "10s"
+    grace_period = "180s"
     method = "GET"
     path = "/health"
 

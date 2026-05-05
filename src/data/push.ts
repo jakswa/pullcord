@@ -112,7 +112,7 @@ export function registerCord(
     id,
     subscription.endpoint,
     JSON.stringify(subscription),
-    routeId,
+    getRoute(routeId)?.route_id || routeId,
     stopId,
     vehicleId,
     tripId,
@@ -228,7 +228,7 @@ async function checkCords(
             title: `🚌 Bus arriving in ~${mins} min!`,
             body: `Route ${getRoute(cord.route_id)?.route_short_name || cord.route_id}${headsign} — head to your stop.`,
             tag: `cord-${cord.id}`,
-            url: `/bus?route=${cord.route_id}&stop=${cord.stop_id}&cordFired=${cord.id}`,
+            url: `/bus?route=${getRoute(cord.route_id)?.route_short_name || cord.route_id}&stop=${cord.stop_id}&cordFired=${cord.id}`,
           }),
           {
             TTL: 300, // 5 min — stale bus alerts are useless
@@ -287,9 +287,14 @@ async function pollForCords() {
 
   for (const { route_id, stop_id } of groups) {
     try {
-      const tripLookup = getTripLookup(route_id);
+      const route = getRoute(route_id);
+      if (!route) {
+        console.warn(`Cord poll skipping unknown route ${route_id}/${stop_id}`);
+        continue;
+      }
+      const tripLookup = getTripLookup(route.route_id);
       // getPredictions handles paired stops internally via getStopIdsByName()
-      const preds = await getPredictions(route_id, stop_id, tripLookup);
+      const preds = await getPredictions(route.route_id, stop_id, tripLookup);
       await checkCords(route_id, stop_id, preds);
     } catch (err) {
       console.error(`Cord poll error for ${route_id}/${stop_id}:`, err);

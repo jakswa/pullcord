@@ -343,8 +343,13 @@ app.post("/push/cord", async (c) => {
     if (!validRouteId(routeId)) return c.json({ error: "Invalid routeId" }, 400);
     if (!validStopId(stopId)) return c.json({ error: "Invalid stopId" }, 400);
 
+    const route = getRoute(routeId);
+    const stop = getStop(stopId);
+    if (!route) return c.json({ error: "Route not found" }, 404);
+    if (!stop) return c.json({ error: "Stop not found" }, 404);
+
     const threshold = Math.max(1, Math.min(30, thresholdMinutes || 2));
-    const cordId = registerCord(subscription, routeId, stopId, vehicleId || null, tripId || null, directionId ?? null, threshold);
+    const cordId = registerCord(subscription, route.route_id, stop.stop_id, vehicleId || null, tripId || null, directionId ?? null, threshold);
     return c.json({ cordId, status: "watching" });
   } catch (error) {
     console.error("Error registering cord:", error);

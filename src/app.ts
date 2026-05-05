@@ -130,6 +130,7 @@ import { verifyDatabase } from "./data/migrate.js";
 import { getMatchRate, isVehicleCacheWarm } from "./data/realtime.js";
 import { getTripLookup } from "./data/db.js";
 import { isRefreshing } from "./data/gtfs-import.js";
+import { getScheduleStatus } from "./data/schedules.js";
 
 app.get("/health", async (c) => {
   const dbCheck = verifyDatabase();
@@ -157,6 +158,7 @@ app.get("/health", async (c) => {
     status: "healthy",
     timestamp: new Date().toISOString(),
     db: { version: dbCheck.version, tables: dbCheck.tables },
+    schedule: getScheduleStatus(),
     ...(gtfs && { gtfs }),
   });
 });

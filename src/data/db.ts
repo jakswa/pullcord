@@ -1,7 +1,9 @@
 import { Database } from "bun:sqlite";
-import path from "path";
+import { resolveScheduleDbPath } from "./schedules.js";
 
-const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "data", "marta.db");
+function getDBPath(): string {
+  return resolveScheduleDbPath();
+}
 
 interface Route {
   route_id: string;
@@ -49,14 +51,14 @@ interface RouteDetail {
 // MARTA rail route short names — not part of the bus tracker
 const RAIL_ROUTES = new Set(['BLUE', 'GREEN', 'RED', 'GOLD']);
 
-class MARTADatabase {
+export class MARTADatabase {
   public db: Database;
   private tripLookupCache: Map<string, Trip> | null = null;
 
-  constructor() {
+  constructor(dbPath = getDBPath()) {
     // Migrations run separately in index.ts before server start.
     // By the time this constructor runs, schema is guaranteed current.
-    this.db = new Database(DB_PATH, { readonly: true });
+    this.db = new Database(dbPath, { readonly: true });
   }
 
   // Get all routes
@@ -263,7 +265,7 @@ class MARTADatabase {
       SELECT DISTINCT shape_id, direction_id
       FROM trips 
       WHERE route_id = ? AND shape_id != ''
-    `).all(routeId) as Array<{ shape_id: string; direction_id: number }>;
+    `).all(route.route_id) as Array<{ shape_id: string; direction_id: number }>;
 
     const shapes: Record<string, Array<[number, number]>> = {};
     
@@ -284,7 +286,7 @@ class MARTADatabase {
       SELECT direction_id, trip_id FROM trips
       WHERE route_id = ?
       GROUP BY direction_id
-    `).all(routeId) as Array<{ direction_id: number; trip_id: string }>;
+    `).all(route.route_id) as Array<{ direction_id: number; trip_id: string }>;
 
     let stops: RouteStop[] = [];
     for (const { direction_id, trip_id } of repTrips) {
@@ -302,7 +304,7 @@ class MARTADatabase {
         JOIN stops s ON st.stop_id = s.stop_id
         WHERE st.trip_id = ?
         ORDER BY st.stop_sequence
-      `).all(routeId, direction_id, trip_id) as RouteStop[];
+      `).all(route.route_id, direction_id, trip_id) as RouteStop[];
       stops = stops.concat(dirStops);
     }
 
@@ -420,56 +422,62 @@ class MARTADatabase {
   }
 }
 
-// Singleton instance
-const db = new MARTADatabase();
+// Lazy singleton. Importing this module should not open data/marta.db; tests and
+// startup promotion need to be able to import types/classes before a DB exists.
+let singleton: MARTADatabase | null = null;
+
+function getDatabase(): MARTADatabase {
+  if (!singleton) singleton = new MARTADatabase();
+  return singleton;
+}
 
 // Export convenience functions
 export function getRoutes(): Route[] {
-  return db.getRoutes();
+  return getDatabase().getRoutes();
 }
 
 export function getRoute(routeIdentifier: string): Route | null {
-  return db.getRoute(routeIdentifier);
+  return getDatabase().getRoute(routeIdentifier);
 }
 
 export function searchStops(query: string, limit?: number): Stop[] {
-  return db.searchStops(query, limit);
+  return getDatabase().searchStops(query, limit);
 }
 
 export function getStopsForRoute(routeId: string, limit?: number): Stop[] {
-  return db.getStopsForRoute(routeId, limit);
+  return getDatabase().getStopsForRoute(routeId, limit);
 }
 
 export function getNearbyStops(lat: number, lon: number, radiusMeters?: number, limit?: number): Stop[] {
-  return db.getNearbyStops(lat, lon, radiusMeters, limit);
+  return getDatabase().getNearbyStops(lat, lon, radiusMeters, limit);
 }
 
 export function getStop(stopId: string): Stop | null {
-  return db.getStop(stopId);
+  return getDatabase().getStop(stopId);
 }
 
 export function getRoutesForStop(stopId: string): Route[] {
-  return db.getRoutesForStop(stopId);
+  return getDatabase().getRoutesForStop(stopId);
 }
 
 export function getRoutesForStops(stopIds: string[]): Map<string, Route[]> {
-  return db.getRoutesForStops(stopIds);
+  return getDatabase().getRoutesForStops(stopIds);
 }
 
 export function getStopIdsByName(stopId: string): string[] {
-  return db.getStopIdsByName(stopId);
+  return getDatabase().getStopIdsByName(stopId);
 }
 
 export function getRouteDetail(routeId: string): RouteDetail | null {
-  return db.getRouteDetail(routeId);
+  return getDatabase().getRouteDetail(routeId);
 }
 
 export function getTripLookup(routeId?: string): Map<string, Trip> {
-  return db.getTripLookup(routeId);
+  return getDatabase().getTripLookup(routeId);
 }
 
 export function getRouteHeadsigns(routeId: string): Record<number, string> {
-  const rows = db.db.prepare(`
+  const rows = getDatabase().db.prepare(`
     SELECT DISTINCT direction_id, trip_headsign 
     FROM trips WHERE route_id = ? AND trip_headsign != ''
     ORDER BY direction_id
@@ -486,19 +494,19 @@ export function getRouteHeadsigns(routeId: string): Record<number, string> {
 }
 
 export function getScheduledArrivals(stopId: string, tripIds: string[]): Map<string, string> {
-  return db.getScheduledArrivals(stopId, tripIds);
+  return getDatabase().getScheduledArrivals(stopId, tripIds);
 }
 
 export function getTripStopSequences(tripIds: string[]) {
-  return db.getTripStopSequences(tripIds);
+  return getDatabase().getTripStopSequences(tripIds);
 }
 
 export function getAllStopsWithRoutes() {
-  return db.getAllStopsWithRoutes();
+  return getDatabase().getAllStopsWithRoutes();
 }
 
 export function invalidateCaches() {
-  db.invalidateCaches();
+  getDatabase().invalidateCaches();
 }
 
 export type { Route, Stop, Trip, RouteStop, RouteDetail };

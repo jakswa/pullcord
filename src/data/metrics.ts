@@ -3,14 +3,14 @@
 // Computes schedule adherence: vehicles observed vs trips scheduled, per-vehicle delay
 
 import { Database } from "bun:sqlite";
-import path from "path";
 import { getTripLookup, getRoutes } from "./db";
+import { resolveScheduleDbPath } from "./schedules";
 import { getAllVehicles, isVehicleCacheWarm, type VehiclePosition } from "./realtime";
 // Rail sampling paused — no good KPI yet
 // import { fetchArrivals as fetchRailArrivals, isRailCacheWarm } from "../rail/api";
 import { parseTimeToSec, type TripStop } from "./eta";
 
-const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "data", "marta.db");
+function getDBPath(): string { return resolveScheduleDbPath(); }
 const SAMPLE_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const RETENTION_DAYS = 60;
 const MAX_DELAY_SEC = 1800; // 30 min — beyond this, assume data error
@@ -24,7 +24,7 @@ let lastSampleTs = 0;
 
 function getDb(): Database {
   if (!metricsDb) {
-    metricsDb = new Database(DB_PATH);
+    metricsDb = new Database(getDBPath());
     metricsDb.exec("PRAGMA journal_mode=WAL");
   }
   return metricsDb;

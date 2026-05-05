@@ -4,15 +4,35 @@ import { parse } from "csv-parse";
 import { createReadStream } from "fs";
 import fs from "fs";
 import path from "path";
+import {
+  buildSnapshotPath,
+  fetchMartaEffectiveDate,
+  MARTA_GTFS_PAGE_URL,
+  MARTA_GTFS_ZIP_URL,
+  maybePromoteSchedule,
+  resolveScheduleDbPath,
+  validateGTFSDatabase,
+  getDataDir,
+} from "./schedules.js";
 
-const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "data", "marta.db");
+const DB_PATH = resolveScheduleDbPath();
 const GTFS_DIR = path.join(path.dirname(DB_PATH), "gtfs");
 
-class GTFSImporter {
+export class GTFSImporter {
   private db: Database;
+  public readonly dbPath: string;
+  private gtfsDir: string;
 
-  constructor() {
-    this.db = new Database(DB_PATH);
+  constructor(dbPath = DB_PATH, gtfsDir = path.join(path.dirname(dbPath), "gtfs"), fresh = false) {
+    this.dbPath = dbPath;
+    this.gtfsDir = gtfsDir;
+    if (fresh) {
+      fs.rmSync(dbPath, { force: true });
+      fs.rmSync(`${dbPath}-wal`, { force: true });
+      fs.rmSync(`${dbPath}-shm`, { force: true });
+    }
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    this.db = new Database(dbPath);
     this.db.exec('PRAGMA journal_mode = WAL');
     this.ensureTables();
   }
@@ -215,7 +235,7 @@ class GTFSImporter {
   async importRoutes() {
     console.log("Importing routes...");
     const records = await this.loadCSV(
-      path.join(GTFS_DIR, 'routes.txt'),
+      path.join(this.gtfsDir, 'routes.txt'),
       (r) => ({
         route_id: r.route_id,
         route_short_name: r.route_short_name,
@@ -232,7 +252,7 @@ class GTFSImporter {
   async importStops() {
     console.log("Importing stops...");
     const records = await this.loadCSV(
-      path.join(GTFS_DIR, 'stops.txt'),
+      path.join(this.gtfsDir, 'stops.txt'),
       (r) => ({
         stop_id: r.stop_id,
         stop_name: r.stop_name,
@@ -270,7 +290,7 @@ class GTFSImporter {
   async importTrips() {
     console.log("Importing trips...");
     const records = await this.loadCSV(
-      path.join(GTFS_DIR, 'trips.txt'),
+      path.join(this.gtfsDir, 'trips.txt'),
       (r) => ({
         trip_id: r.trip_id,
         route_id: r.route_id,
@@ -288,7 +308,7 @@ class GTFSImporter {
   async importCalendar() {
     console.log("Importing calendar...");
     const records = await this.loadCSV(
-      path.join(GTFS_DIR, 'calendar.txt'),
+      path.join(this.gtfsDir, 'calendar.txt'),
       (r) => ({
         service_id: r.service_id,
         monday: parseInt(r.monday) || 0,
@@ -310,7 +330,7 @@ class GTFSImporter {
   async importCalendarDates() {
     console.log("Importing calendar_dates...");
     const records = await this.loadCSV(
-      path.join(GTFS_DIR, 'calendar_dates.txt'),
+      path.join(this.gtfsDir, 'calendar_dates.txt'),
       (r) => ({
         service_id: r.service_id,
         date: r.date,
@@ -326,7 +346,7 @@ class GTFSImporter {
     console.log("Importing shapes...");
     const count = await this.streamImport(
       'shapes',
-      path.join(GTFS_DIR, 'shapes.txt'),
+      path.join(this.gtfsDir, 'shapes.txt'),
       (r) => ({
         shape_id: r.shape_id,
         shape_pt_lat: parseFloat(r.shape_pt_lat),
@@ -343,7 +363,7 @@ class GTFSImporter {
     console.log("Importing stop times (this may take a moment)...");
     const count = await this.streamImport(
       'stop_times',
-      path.join(GTFS_DIR, 'stop_times.txt'),
+      path.join(this.gtfsDir, 'stop_times.txt'),
       (r) => ({
         trip_id: r.trip_id,
         stop_id: r.stop_id,
@@ -553,36 +573,18 @@ class GTFSImporter {
   }
 
   close() {
+    try { this.db.exec("PRAGMA wal_checkpoint(FULL)"); } catch {}
     this.db.close();
   }
 }
 
 async function main() {
-  console.log("🚌 MARTA GTFS Import Starting...\n");
-
-  const importer = new GTFSImporter();
-
+  console.log("🚌 MARTA GTFS Snapshot Import Starting...\n");
   try {
-    await importer.importRoutes();
-    await importer.importStops(); // includes atomic group_id assignment
-    await importer.importCalendar();
-    await importer.importCalendarDates();
-    await importer.importTrips();
-    await importer.importShapes();
-    await importer.importStopTimes();
-    importer.buildRouteStops();
-    importer.cleanExpiredServices();
-    importer.buildTransferLookup();
-
-    importer.printStats();
-
-    console.log("\n✅ GTFS import complete!");
-    console.log(`📁 Database: ${DB_PATH}`);
+    await refreshGTFS();
   } catch (error) {
-    console.error("❌ Import failed:", error);
+    console.error("❌ Snapshot import failed:", error);
     process.exit(1);
-  } finally {
-    importer.close();
   }
 }
 
@@ -592,72 +594,234 @@ export function isRefreshing(): boolean {
   return refreshing;
 }
 
-export async function refreshGTFS() {
+export interface GTFSImportStats {
+  routeCount: number;
+  stopCount: number;
+  calendarCount: number;
+  calendarDateCount: number;
+  tripCount: number;
+  shapeCount: number;
+  stopTimeCount: number;
+  routeStopCount: number;
+}
+
+export async function buildGTFSDatabase(opts: {
+  dbPath: string;
+  gtfsDir: string;
+  effectiveDate?: string;
+}): Promise<GTFSImportStats> {
+  const importer = new GTFSImporter(opts.dbPath, opts.gtfsDir, true);
+  try {
+    const routeCount = await importer.importRoutes();
+    const stopCount = await importer.importStops();
+    const calendarCount = await importer.importCalendar();
+    const calendarDateCount = await importer.importCalendarDates();
+    const tripCount = await importer.importTrips();
+    const shapeCount = await importer.importShapes();
+    const stopTimeCount = await importer.importStopTimes();
+    const routeStopCount = importer.buildRouteStops();
+    importer.buildTransferLookup();
+    importer.printStats();
+
+    const validation = validateGTFSDatabase(opts.dbPath);
+    if (validation.duplicateRouteShortNames > 0) {
+      throw new Error(`GTFS snapshot has duplicate bus route_short_name values: ${validation.duplicateRouteShortNames}`);
+    }
+
+    return {
+      routeCount,
+      stopCount,
+      calendarCount,
+      calendarDateCount,
+      tripCount,
+      shapeCount,
+      stopTimeCount,
+      routeStopCount,
+    };
+  } finally {
+    importer.close();
+  }
+}
+
+async function extractZip(zipPath: string, gtfsDir: string) {
+  fs.rmSync(gtfsDir, { recursive: true, force: true });
+  await fs.promises.mkdir(gtfsDir, { recursive: true });
+  try {
+    const proc = Bun.spawn(["unzip", "-o", zipPath, "-d", gtfsDir]);
+    const code = await proc.exited;
+    if (code !== 0) throw new Error(`unzip exited ${code}`);
+  } catch (error) {
+    console.error("❌ GTFS extraction failed, trying python3 fallback:", error);
+    const proc = Bun.spawn(["python3", "-c", `import zipfile; zipfile.ZipFile("${zipPath}").extractall("${gtfsDir}")`]);
+    const code = await proc.exited;
+    if (code !== 0) throw new Error("Both unzip and python3 extraction failed");
+  }
+}
+
+function effectiveDateFromCalendar(gtfsDir: string): string | null {
+  const calendarPath = path.join(gtfsDir, "calendar.txt");
+  if (!fs.existsSync(calendarPath)) return null;
+  const [header, ...rows] = fs.readFileSync(calendarPath, "utf8").trim().split(/\r?\n/);
+  const columns = header.split(",");
+  const startIndex = columns.indexOf("start_date");
+  if (startIndex < 0) return null;
+  const starts = rows
+    .map(row => row.split(",")[startIndex])
+    .filter(value => /^\d{8}$/.test(value))
+    .sort();
+  return starts[0] || null;
+}
+
+function reclaimLegacyGTFSVolumeSpace(dataDir: string) {
+  // Old in-place refreshes can leave a huge WAL beside /data/marta.db. Checkpoint
+  // it before building the first snapshot so a 1GB Fly volume has room for both
+  // the legacy rollback DB and the clean active snapshot.
+  const legacyDbPath = path.join(dataDir, "marta.db");
+  if (fs.existsSync(legacyDbPath)) {
+    try {
+      const legacy = new Database(legacyDbPath);
+      legacy.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+      legacy.close();
+    } catch (error) {
+      console.warn("⚠️ Could not checkpoint legacy marta.db before snapshot bootstrap:", error);
+    }
+  }
+
+  const leftoverZip = path.join(dataDir, "gtfs.zip");
+  try {
+    const stat = fs.statSync(leftoverZip);
+    if (stat.size === 0) fs.unlinkSync(leftoverZip);
+  } catch {}
+}
+
+export async function bootstrapScheduleFromExistingGTFS(opts: { dataDir?: string } = {}): Promise<{ promoted: boolean; effectiveDate?: string; dbPath?: string; reason?: string }> {
+  const dataDir = opts.dataDir || getDataDir();
+  const activeDb = path.join(dataDir, "active-schedule", "marta.db");
+  if (fs.existsSync(activeDb)) return { promoted: false, reason: "active-schedule-exists" };
+
+  const gtfsDir = path.join(dataDir, "gtfs");
+  if (!fs.existsSync(path.join(gtfsDir, "routes.txt"))) {
+    return { promoted: false, reason: "no-existing-gtfs" };
+  }
+
+  const effectiveDate = effectiveDateFromCalendar(gtfsDir);
+  if (!effectiveDate) return { promoted: false, reason: "calendar-start-date-missing" };
+
+  const scheduleDir = buildSnapshotPath(dataDir, effectiveDate);
+  const dbPath = path.join(scheduleDir, "marta.db");
+  const manifestPath = path.join(scheduleDir, "manifest.json");
+
+  reclaimLegacyGTFSVolumeSpace(dataDir);
+
+  if (!fs.existsSync(dbPath) || !fs.existsSync(manifestPath)) {
+    console.log(`📦 Bootstrapping clean GTFS snapshot ${effectiveDate} from existing data/gtfs`);
+    try {
+      await fs.promises.mkdir(scheduleDir, { recursive: true });
+    } catch (error: any) {
+      if (error?.code === "ENOSPC") {
+        console.warn("⚠️ Not enough space to bootstrap GTFS snapshot; continuing on legacy DB");
+        return { promoted: false, effectiveDate, dbPath, reason: "no-space-for-bootstrap" };
+      }
+      throw error;
+    }
+    const tmpDbPath = path.join(scheduleDir, "marta.db.tmp");
+    const stats = await buildGTFSDatabase({ dbPath: tmpDbPath, gtfsDir, effectiveDate });
+    fs.renameSync(tmpDbPath, dbPath);
+    fs.rmSync(`${tmpDbPath}-wal`, { force: true });
+    fs.rmSync(`${tmpDbPath}-shm`, { force: true });
+    const validation = validateGTFSDatabase(dbPath);
+    await Bun.write(manifestPath, JSON.stringify({
+      effectiveDate,
+      downloadedAt: new Date().toISOString(),
+      sourceUrl: "existing data/gtfs",
+      pageUrl: "existing data/gtfs",
+      routeCount: validation.routeCount,
+      stopCount: validation.stopCount,
+      tripCount: validation.tripCount,
+      stopTimeCount: validation.stopTimeCount,
+      importStats: stats,
+    }, null, 2));
+  }
+
+  const promotion = maybePromoteSchedule({ dataDir });
+  return { promoted: promotion.promoted, effectiveDate, dbPath, reason: promotion.reason };
+}
+
+export async function refreshGTFS(): Promise<{ promoted: boolean; effectiveDate?: string; dbPath?: string }> {
   if (refreshing) {
     console.log("🔄 GTFS refresh already in progress, skipping");
-    return;
+    return { promoted: false };
   }
   refreshing = true;
   try {
-    console.log("🔄 GTFS refresh starting...");
+    console.log("🔄 GTFS snapshot refresh starting...");
 
-    // Use DB directory for temp files (persistent volume on Fly.io)
-    const dataDir = path.dirname(DB_PATH);
-
-    // Download zip with timeout
-    const GTFS_URL = "https://itsmarta.com/google_transit_feed/google_transit.zip";
-    const zipPath = path.join(dataDir, "gtfs.zip");
-    console.log(`📥 Downloading GTFS from ${GTFS_URL}...`);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60_000);
-    try {
-      const resp = await fetch(GTFS_URL, { signal: controller.signal });
-      if (!resp.ok) throw new Error(`GTFS download failed: ${resp.status}`);
-      const buf = await resp.arrayBuffer();
-      await Bun.write(zipPath, buf);
-      console.log(`✓ Downloaded ${(buf.byteLength / 1024 / 1024).toFixed(1)}MB`);
-    } catch (error) {
-      console.error("❌ GTFS download failed:", error);
-      throw error;
-    } finally {
-      clearTimeout(timeout);
+    if (process.env.DATABASE_URL) {
+      console.warn("⚠️ DATABASE_URL is set; skipping schedule snapshot refresh to avoid writing through an explicit DB override");
+      return { promoted: false };
     }
 
-    // Extract zip — try unzip (Docker/Alpine), fall back to python3 (dev)
-    const gtfsDir = path.join(dataDir, "gtfs");
-    await fs.promises.mkdir(gtfsDir, { recursive: true });
-    try {
-      const proc = Bun.spawn(["unzip", "-o", zipPath, "-d", gtfsDir]);
-      const code = await proc.exited;
-      if (code !== 0) throw new Error(`unzip exited ${code}`);
-    } catch (error) {
-      console.error("❌ GTFS extraction failed, trying python3 fallback:", error);
-      const proc = Bun.spawn(["python3", "-c", `import zipfile; zipfile.ZipFile("${zipPath}").extractall("${gtfsDir}")`]);
-      const code = await proc.exited;
-      if (code !== 0) throw new Error("Both unzip and python3 extraction failed");
-    }
-    await fs.promises.unlink(zipPath);
+    const dataDir = getDataDir();
+    const effectiveDate = await fetchMartaEffectiveDate();
+    const scheduleDir = buildSnapshotPath(dataDir, effectiveDate);
+    const dbPath = path.join(scheduleDir, "marta.db");
+    const manifestPath = path.join(scheduleDir, "manifest.json");
 
-    // Run import
-    const importer = new GTFSImporter();
-    try {
-      await importer.importRoutes();
-      await importer.importStops(); // includes atomic group_id assignment
-      await importer.importCalendar();
-      await importer.importCalendarDates();
-      await importer.importTrips();
-      await importer.importShapes();
-      await importer.importStopTimes();
-      importer.buildRouteStops();
-      importer.cleanExpiredServices();
-      importer.buildTransferLookup();
-      importer.printStats();
-      console.log("✅ GTFS refresh complete!");
-    } catch (error) {
-      console.error("❌ GTFS refresh failed:", error);
-    } finally {
-      importer.close();
+    if (fs.existsSync(dbPath) && fs.existsSync(manifestPath)) {
+      console.log(`✓ GTFS snapshot ${effectiveDate} already exists`);
+    } else {
+      await fs.promises.mkdir(scheduleDir, { recursive: true });
+      const zipPath = path.join(scheduleDir, "gtfs.zip");
+      const gtfsDir = path.join(scheduleDir, "gtfs");
+      const tmpDbPath = path.join(scheduleDir, "marta.db.tmp");
+
+      console.log(`📅 MARTA GTFS effective date: ${effectiveDate}`);
+      console.log(`📥 Downloading GTFS from ${MARTA_GTFS_ZIP_URL}...`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60_000);
+      try {
+        const resp = await fetch(MARTA_GTFS_ZIP_URL, { signal: controller.signal });
+        if (!resp.ok) throw new Error(`GTFS download failed: ${resp.status}`);
+        const buf = await resp.arrayBuffer();
+        await Bun.write(zipPath, buf);
+        console.log(`✓ Downloaded ${(buf.byteLength / 1024 / 1024).toFixed(1)}MB`);
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      await extractZip(zipPath, gtfsDir);
+      await fs.promises.unlink(zipPath).catch(() => {});
+
+      const stats = await buildGTFSDatabase({ dbPath: tmpDbPath, gtfsDir, effectiveDate });
+      fs.renameSync(tmpDbPath, dbPath);
+      fs.rmSync(`${tmpDbPath}-wal`, { force: true });
+      fs.rmSync(`${tmpDbPath}-shm`, { force: true });
+
+      const validation = validateGTFSDatabase(dbPath);
+      await Bun.write(manifestPath, JSON.stringify({
+        effectiveDate,
+        downloadedAt: new Date().toISOString(),
+        sourceUrl: MARTA_GTFS_ZIP_URL,
+        pageUrl: MARTA_GTFS_PAGE_URL,
+        routeCount: validation.routeCount,
+        stopCount: validation.stopCount,
+        tripCount: validation.tripCount,
+        stopTimeCount: validation.stopTimeCount,
+        importStats: stats,
+      }, null, 2));
+      console.log(`✅ Built GTFS snapshot ${effectiveDate}: ${dbPath}`);
     }
+
+    const promotion = maybePromoteSchedule({ dataDir });
+    if (promotion.promoted) {
+      console.log(`✅ Promoted GTFS snapshot ${promotion.active?.effectiveDate}`);
+    } else {
+      console.log(`ℹ️ GTFS snapshot not promoted: ${promotion.reason}`);
+    }
+    return { promoted: promotion.promoted, effectiveDate, dbPath };
+  } catch (error) {
+    console.error("❌ GTFS refresh failed:", error);
+    throw error;
   } finally {
     refreshing = false;
   }

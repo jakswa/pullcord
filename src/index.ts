@@ -1,36 +1,60 @@
+import { Cron } from "croner";
 import { runMigrations } from "./data/migrate.js";
+import { refreshGTFS, isRefreshing, bootstrapScheduleFromExistingGTFS } from "./data/gtfs-import.js";
+import { maybePromoteSchedule, resolveScheduleDbPath } from "./data/schedules.js";
 
-// ── Migrations run FIRST, before any imports that touch the DB ──
+// ── Schedule promotion and migrations run FIRST, before DB-dependent imports ──
 // If this throws, the process exits non-zero → Fly health check fails → deploy halts.
 console.log(`🚌 Pullcord starting...`);
-const dbPath = process.env.DATABASE_URL || "data/marta.db";
+
+let startupPromotion = maybePromoteSchedule();
+if (!startupPromotion.active && !startupPromotion.promoted) {
+  const bootstrap = await bootstrapScheduleFromExistingGTFS();
+  if (bootstrap.promoted) {
+    console.log(`📦 Bootstrapped and promoted GTFS schedule ${bootstrap.effectiveDate} before startup DB open`);
+    startupPromotion = maybePromoteSchedule();
+  }
+}
+if (startupPromotion.promoted) {
+  console.log(`📅 Promoted GTFS schedule ${startupPromotion.active?.effectiveDate} before startup DB open`);
+}
+
+const dbPath = resolveScheduleDbPath();
 console.log(`📊 Database: ${Bun.file(dbPath).exists() ? "✓ Found" : "❌ Missing"} (${dbPath})`);
 
 runMigrations(); // throws on failure → process crashes → no server bind → deploy fails
 
 // ── Safe to import DB-dependent modules now ──
-import app from "./app.js";
-import { Cron } from "croner";
-import { refreshGTFS, isRefreshing } from "./data/gtfs-import.js";
-import { collectMetrics, cleanOldMetrics } from "./data/metrics.js";
-import { getMatchRate, isVehicleCacheWarm } from "./data/realtime.js";
-import { getTripLookup, invalidateCaches } from "./data/db.js";
+const { default: app } = await import("./app.js");
+const { collectMetrics, cleanOldMetrics } = await import("./data/metrics.js");
+const { getMatchRate, isVehicleCacheWarm } = await import("./data/realtime.js");
+const { getTripLookup, invalidateCaches } = await import("./data/db.js");
 
 const port = parseInt(process.env.PORT || "4200");
 
 console.log(`🔑 API Key: ${process.env.MARTA_API_KEY ? "✓ Set" : "❌ Missing"}`);
 console.log(`🌐 Server: http://localhost:${port}`);
 
-// Daily GTFS refresh: every day at 3am ET
-const gtfsCron = new Cron("0 3 * * *", { timezone: "America/New_York" }, async () => {
-  console.log("⏰ Daily GTFS refresh triggered");
-  await refreshGTFS();
+async function refreshAndRestartIfPromoted(reason: string) {
+  console.log(reason);
+  const result = await refreshGTFS();
+  if (result.promoted) {
+    console.log("📅 Schedule promoted; exiting for clean SQLite reopen");
+    process.exit(0);
+  }
   invalidateCaches();
+}
+
+// Daily GTFS refresh: every day at 3am ET. This builds a separate snapshot and
+// only promotes it when MARTA's published Effective Date is live.
+const gtfsCron = new Cron("0 3 * * *", { timezone: "America/New_York" }, async () => {
+  await refreshAndRestartIfPromoted("⏰ Daily GTFS snapshot refresh triggered");
   cleanOldMetrics(); // prune old metrics during daily maintenance
 });
 console.log(`📅 GTFS refresh scheduled: next run ${gtfsCron.nextRun()?.toISOString() ?? "unknown"}`);
 
-// Hourly GTFS change check: HEAD request to detect upstream schedule changes
+// Hourly GTFS change check: HEAD request to detect upstream zip changes.
+// A change only builds a candidate snapshot; activation still uses Effective Date.
 let lastGtfsLastModified: string | null = null;
 let lastGtfsContentLength: string | null = null;
 const GTFS_URL = "https://itsmarta.com/google_transit_feed/google_transit.zip";
@@ -61,8 +85,7 @@ const gtfsCheckCron = new Cron("0 * * * *", { timezone: "America/New_York" }, as
       console.log(`🔔 GTFS change detected — Last-Modified: ${lastGtfsLastModified} → ${lastModified}, Content-Length: ${lastGtfsContentLength} → ${contentLength}`);
       lastGtfsLastModified = lastModified;
       lastGtfsContentLength = contentLength;
-      await refreshGTFS();
-      invalidateCaches();
+      await refreshAndRestartIfPromoted("🔄 Building changed GTFS snapshot");
     }
   } catch (err) {
     console.error("❌ GTFS HEAD check error:", err);
@@ -74,15 +97,14 @@ console.log(`🔍 GTFS change check: hourly (next ${gtfsCheckCron.nextRun()?.toI
 const metricsCron = new Cron("*/5 * * * *", { timezone: "America/New_York" }, async () => {
   await collectMetrics();
 
-  // Check GTFS staleness when vehicle cache is warm (users are active)
+  // Realtime/static mismatch is a diagnostic now, not a switching signal.
+  // Schedule promotion is driven by MARTA's published Effective Date.
   if (isVehicleCacheWarm() && !isRefreshing()) {
     try {
       const tripLookup = getTripLookup();
       const { matched, total, rate } = await getMatchRate(tripLookup);
       if (rate < 0.5 && total > 0) {
-        console.warn(`⚠️ GTFS match rate critically low: ${matched}/${total} (${(rate * 100).toFixed(1)}%) — triggering auto-refresh`);
-        await refreshGTFS();
-        invalidateCaches();
+        console.warn(`⚠️ GTFS match rate critically low: ${matched}/${total} (${(rate * 100).toFixed(1)}%) — check /health/diag and schedule status`);
       }
     } catch {}
   }
