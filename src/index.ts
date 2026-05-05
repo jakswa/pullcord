@@ -1,12 +1,12 @@
 import { Cron } from "croner";
 import { runMigrations } from "./data/migrate.js";
-import { refreshGTFS, isRefreshing, bootstrapScheduleFromExistingGTFS } from "./data/gtfs-import.js";
+import { refreshGTFS, isRefreshing } from "./data/gtfs-import.js";
 import { maybePromoteSchedule, resolveScheduleDbPath } from "./data/schedules.js";
 
 // ── Fast startup ──
 // Do NOT build/import GTFS snapshots before binding the HTTP server. On Fly this
-// app has a single volume-backed machine; blocking startup leaves zero healthy
-// instances and takes bus.marta.io/marta.io down while stop_times imports.
+// app has a single volume-backed machine; blocking or grinding on startup leaves
+// zero healthy instances and burns web capacity parsing giant CSVs.
 console.log(`🚌 Pullcord starting...`);
 
 const startupPromotion = maybePromoteSchedule();
@@ -40,35 +40,17 @@ async function refreshAndRestartIfPromoted(reason: string) {
   invalidateCaches();
 }
 
-async function bootstrapSnapshotInBackground() {
-  const promotion = maybePromoteSchedule();
-  if (promotion.active || promotion.promoted) return;
-
-  // Let Bun finish exporting/binding first. Snapshot bootstrap is intentionally
-  // best-effort: legacy DB fallback keeps production serving while this runs.
-  setTimeout(async () => {
-    try {
-      const bootstrap = await bootstrapScheduleFromExistingGTFS();
-      if (bootstrap.promoted) {
-        console.log(`📦 Bootstrapped and promoted GTFS schedule ${bootstrap.effectiveDate}; exiting for clean SQLite reopen`);
-        process.exit(0);
-      }
-    } catch (err) {
-      console.error("⚠️ Background GTFS snapshot bootstrap failed; continuing on active/legacy DB:", err);
-    }
-  }, 10_000);
-}
-
-// Daily GTFS refresh: every day at 3am ET. This builds a separate snapshot and
-// only promotes it when MARTA's published Effective Date is live.
+// Daily GTFS refresh: every day at 3am ET. This is the only in-app path that
+// does heavyweight GTFS download/extract/import work. Startup and hourly checks
+// must not parse CSVs or rebuild SQLite snapshots.
 const gtfsCron = new Cron("0 3 * * *", { timezone: "America/New_York" }, async () => {
   await refreshAndRestartIfPromoted("⏰ Daily GTFS snapshot refresh triggered");
   cleanOldMetrics(); // prune old metrics during daily maintenance
 });
 console.log(`📅 GTFS refresh scheduled: next run ${gtfsCron.nextRun()?.toISOString() ?? "unknown"}`);
 
-// Hourly GTFS change check: HEAD request to detect upstream zip changes.
-// A change only builds a candidate snapshot; activation still uses Effective Date.
+// Hourly GTFS change check: HEAD request only. Record upstream changes for logs,
+// but defer heavyweight snapshot work to the 3am maintenance window.
 let lastGtfsLastModified: string | null = null;
 let lastGtfsContentLength: string | null = null;
 const GTFS_URL = "https://itsmarta.com/google_transit_feed/google_transit.zip";
@@ -96,16 +78,15 @@ const gtfsCheckCron = new Cron("0 * * * *", { timezone: "America/New_York" }, as
       (contentLength !== null && contentLength !== lastGtfsContentLength);
 
     if (changed) {
-      console.log(`🔔 GTFS change detected — Last-Modified: ${lastGtfsLastModified} → ${lastModified}, Content-Length: ${lastGtfsContentLength} → ${contentLength}`);
+      console.log(`🔔 GTFS change detected — Last-Modified: ${lastGtfsLastModified} → ${lastModified}, Content-Length: ${lastGtfsContentLength} → ${contentLength}; deferring snapshot build to 3am maintenance window`);
       lastGtfsLastModified = lastModified;
       lastGtfsContentLength = contentLength;
-      await refreshAndRestartIfPromoted("🔄 Building changed GTFS snapshot");
     }
   } catch (err) {
     console.error("❌ GTFS HEAD check error:", err);
   }
 });
-console.log(`🔍 GTFS change check: hourly (next ${gtfsCheckCron.nextRun()?.toISOString() ?? "unknown"})`);
+console.log(`🔍 GTFS change check: hourly HEAD only (next ${gtfsCheckCron.nextRun()?.toISOString() ?? "unknown"})`);
 
 // Metrics collection: every 5 minutes during operation
 const metricsCron = new Cron("*/5 * * * *", { timezone: "America/New_York" }, async () => {
@@ -124,8 +105,6 @@ const metricsCron = new Cron("*/5 * * * *", { timezone: "America/New_York" }, as
   }
 });
 console.log(`📊 Metrics collection: every 5 min (next ${metricsCron.nextRun()?.toISOString() ?? "unknown"})`);
-
-bootstrapSnapshotInBackground();
 
 export default {
   port,
