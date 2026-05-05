@@ -174,6 +174,29 @@ describe('route short-name behavior', () => {
     expect(detail?.stops.length).toBe(2);
     expect(detail?.stops.every(stop => stop.route_id === '26956')).toBe(true);
   });
+
+  test('legacy polluted DB resolves route short name using current data/gtfs routes.txt', async () => {
+    const dir = tempDir('legacy-current-route');
+    const gtfsDir = path.join(dir, 'gtfs');
+    const dbPath = path.join(dir, 'marta.db');
+    writeTinyGtfs(gtfsDir, '26956');
+    await buildGTFSDatabase({ dbPath, gtfsDir, effectiveDate: '20260418' });
+
+    const db = new Database(dbPath);
+    db.prepare(`INSERT INTO routes VALUES (?, ?, ?, ?, ?)`).run('27386', '121', 'Old Memorial Drive', '', '');
+    db.prepare(`INSERT INTO trips VALUES (?, ?, ?, ?, ?, ?)`).run('OLD_TRIP', '27386', 'WK', 'Old', 0, 'SHAPE_1');
+    db.prepare(`INSERT INTO route_stops VALUES (?, ?, ?)`).run('27386', '500212', 0);
+    db.close();
+
+    const marta = new MARTADatabase(dbPath);
+    const routes = marta.getRoutes().filter(route => route.route_short_name === '121');
+    const detail = marta.getRouteDetail('121');
+    marta.close();
+
+    expect(routes.map(route => route.route_id)).toEqual(['26956']);
+    expect(detail?.route.route_id).toBe('26956');
+    expect(detail?.stops.every(stop => stop.route_id === '26956')).toBe(true);
+  });
 });
 
 describe('Atlanta service date', () => {

@@ -1,4 +1,6 @@
 import { Database } from "bun:sqlite";
+import fs from "fs";
+import path from "path";
 import { resolveScheduleDbPath } from "./schedules.js";
 
 function getDBPath(): string {
@@ -54,24 +56,69 @@ const RAIL_ROUTES = new Set(['BLUE', 'GREEN', 'RED', 'GOLD']);
 export class MARTADatabase {
   public db: Database;
   private tripLookupCache: Map<string, Trip> | null = null;
+  private currentRouteIdByShortName: Map<string, string> | null = null;
 
-  constructor(dbPath = getDBPath()) {
+  constructor(dbPath = getDBPath(), private gtfsDir = path.join(path.dirname(dbPath), "gtfs")) {
     // Migrations run separately in index.ts before server start.
     // By the time this constructor runs, schema is guaranteed current.
     this.db = new Database(dbPath, { readonly: true });
   }
 
+  private getCurrentRouteMap(): Map<string, string> {
+    if (this.currentRouteIdByShortName) return this.currentRouteIdByShortName;
+    const map = new Map<string, string>();
+    const routesPath = path.join(this.gtfsDir, "routes.txt");
+    try {
+      const [header, ...rows] = fs.readFileSync(routesPath, "utf8").trim().split(/\r?\n/);
+      const columns = header.split(",");
+      const routeIdIndex = columns.indexOf("route_id");
+      const shortNameIndex = columns.indexOf("route_short_name");
+      if (routeIdIndex >= 0 && shortNameIndex >= 0) {
+        for (const row of rows) {
+          // MARTA route names/IDs do not contain commas. Keep this deliberately
+          // simple and dependency-free for startup/runtime fallback use.
+          const cells = row.split(",");
+          const routeId = cells[routeIdIndex]?.trim();
+          const shortName = cells[shortNameIndex]?.trim();
+          if (routeId && shortName && !RAIL_ROUTES.has(shortName)) {
+            map.set(shortName, routeId);
+          }
+        }
+      }
+    } catch {
+      // Active snapshot DBs are already isolated. This fallback only matters when
+      // production is temporarily serving legacy data/marta.db with current
+      // data/gtfs files beside it.
+    }
+    this.currentRouteIdByShortName = map;
+    return map;
+  }
+
   // Get all routes
   getRoutes(): Route[] {
-    return this.db.prepare(`
+    const currentRouteIds = new Set(this.getCurrentRouteMap().values());
+    const routes = this.db.prepare(`
       SELECT route_id, route_short_name, route_long_name, route_color, route_text_color 
       FROM routes 
       ORDER BY CAST(route_short_name AS INTEGER), route_short_name
     `).all() as Route[];
+    return currentRouteIds.size > 0
+      ? routes.filter(route => currentRouteIds.has(route.route_id) || RAIL_ROUTES.has(route.route_short_name))
+      : routes;
   }
 
   // Get single route by ID or short name
   getRoute(routeIdentifier: string): Route | null {
+    const currentRouteId = this.getCurrentRouteMap().get(routeIdentifier);
+    if (currentRouteId) {
+      const route = this.db.prepare(`
+        SELECT route_id, route_short_name, route_long_name, route_color, route_text_color
+        FROM routes
+        WHERE route_id = ?
+      `).get(currentRouteId) as Route | null;
+      if (route) return route;
+    }
+
     const stmt = this.db.prepare(`
       SELECT route_id, route_short_name, route_long_name, route_color, route_text_color 
       FROM routes 
@@ -392,6 +439,7 @@ export class MARTADatabase {
 
   invalidateCaches() {
     this.tripLookupCache = null;
+    this.currentRouteIdByShortName = null;
     this._allStopsCache = null;
   }
 
