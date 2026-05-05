@@ -3,18 +3,13 @@ import { runMigrations } from "./data/migrate.js";
 import { refreshGTFS, isRefreshing, bootstrapScheduleFromExistingGTFS } from "./data/gtfs-import.js";
 import { maybePromoteSchedule, resolveScheduleDbPath } from "./data/schedules.js";
 
-// ── Schedule promotion and migrations run FIRST, before DB-dependent imports ──
-// If this throws, the process exits non-zero → Fly health check fails → deploy halts.
+// ── Fast startup ──
+// Do NOT build/import GTFS snapshots before binding the HTTP server. On Fly this
+// app has a single volume-backed machine; blocking startup leaves zero healthy
+// instances and takes bus.marta.io/marta.io down while stop_times imports.
 console.log(`🚌 Pullcord starting...`);
 
-let startupPromotion = maybePromoteSchedule();
-if (!startupPromotion.active && !startupPromotion.promoted) {
-  const bootstrap = await bootstrapScheduleFromExistingGTFS();
-  if (bootstrap.promoted) {
-    console.log(`📦 Bootstrapped and promoted GTFS schedule ${bootstrap.effectiveDate} before startup DB open`);
-    startupPromotion = maybePromoteSchedule();
-  }
-}
+const startupPromotion = maybePromoteSchedule();
 if (startupPromotion.promoted) {
   console.log(`📅 Promoted GTFS schedule ${startupPromotion.active?.effectiveDate} before startup DB open`);
 }
@@ -43,6 +38,25 @@ async function refreshAndRestartIfPromoted(reason: string) {
     process.exit(0);
   }
   invalidateCaches();
+}
+
+async function bootstrapSnapshotInBackground() {
+  const promotion = maybePromoteSchedule();
+  if (promotion.active || promotion.promoted) return;
+
+  // Let Bun finish exporting/binding first. Snapshot bootstrap is intentionally
+  // best-effort: legacy DB fallback keeps production serving while this runs.
+  setTimeout(async () => {
+    try {
+      const bootstrap = await bootstrapScheduleFromExistingGTFS();
+      if (bootstrap.promoted) {
+        console.log(`📦 Bootstrapped and promoted GTFS schedule ${bootstrap.effectiveDate}; exiting for clean SQLite reopen`);
+        process.exit(0);
+      }
+    } catch (err) {
+      console.error("⚠️ Background GTFS snapshot bootstrap failed; continuing on active/legacy DB:", err);
+    }
+  }, 10_000);
 }
 
 // Daily GTFS refresh: every day at 3am ET. This builds a separate snapshot and
@@ -110,6 +124,8 @@ const metricsCron = new Cron("*/5 * * * *", { timezone: "America/New_York" }, as
   }
 });
 console.log(`📊 Metrics collection: every 5 min (next ${metricsCron.nextRun()?.toISOString() ?? "unknown"})`);
+
+bootstrapSnapshotInBackground();
 
 export default {
   port,
