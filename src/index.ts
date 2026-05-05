@@ -41,52 +41,14 @@ async function refreshAndRestartIfPromoted(reason: string) {
 }
 
 // Daily GTFS refresh: every day at 3am ET. This is the only in-app path that
-// does heavyweight GTFS download/extract/import work. Startup and hourly checks
-// must not parse CSVs or rebuild SQLite snapshots.
+// does heavyweight GTFS download/extract/import work. Schedule promotion is
+// based on MARTA's published Effective Date and Atlanta service date, not on
+// realtime mismatch signals or hourly upstream polling.
 const gtfsCron = new Cron("0 3 * * *", { timezone: "America/New_York" }, async () => {
   await refreshAndRestartIfPromoted("⏰ Daily GTFS snapshot refresh triggered");
   cleanOldMetrics(); // prune old metrics during daily maintenance
 });
 console.log(`📅 GTFS refresh scheduled: next run ${gtfsCron.nextRun()?.toISOString() ?? "unknown"}`);
-
-// Hourly GTFS change check: HEAD request only. Record upstream changes for logs,
-// but defer heavyweight snapshot work to the 3am maintenance window.
-let lastGtfsLastModified: string | null = null;
-let lastGtfsContentLength: string | null = null;
-const GTFS_URL = "https://itsmarta.com/google_transit_feed/google_transit.zip";
-
-const gtfsCheckCron = new Cron("0 * * * *", { timezone: "America/New_York" }, async () => {
-  try {
-    const resp = await fetch(GTFS_URL, { method: "HEAD" });
-    if (!resp.ok) {
-      console.warn(`⚠️ GTFS HEAD check failed: ${resp.status}`);
-      return;
-    }
-    const lastModified = resp.headers.get("last-modified");
-    const contentLength = resp.headers.get("content-length");
-
-    // First run: just record values, don't trigger refresh
-    if (lastGtfsLastModified === null && lastGtfsContentLength === null) {
-      lastGtfsLastModified = lastModified;
-      lastGtfsContentLength = contentLength;
-      console.log(`📋 GTFS baseline recorded — Last-Modified: ${lastModified}, Content-Length: ${contentLength}`);
-      return;
-    }
-
-    const changed =
-      (lastModified !== null && lastModified !== lastGtfsLastModified) ||
-      (contentLength !== null && contentLength !== lastGtfsContentLength);
-
-    if (changed) {
-      console.log(`🔔 GTFS change detected — Last-Modified: ${lastGtfsLastModified} → ${lastModified}, Content-Length: ${lastGtfsContentLength} → ${contentLength}; deferring snapshot build to 3am maintenance window`);
-      lastGtfsLastModified = lastModified;
-      lastGtfsContentLength = contentLength;
-    }
-  } catch (err) {
-    console.error("❌ GTFS HEAD check error:", err);
-  }
-});
-console.log(`🔍 GTFS change check: hourly HEAD only (next ${gtfsCheckCron.nextRun()?.toISOString() ?? "unknown"})`);
 
 // Metrics collection: every 5 minutes during operation
 const metricsCron = new Cron("*/5 * * * *", { timezone: "America/New_York" }, async () => {
