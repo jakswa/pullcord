@@ -10,6 +10,7 @@ primary_region = "iad"
   PORT = "4200"
   PULLCORD_DATA_DIR = "/data"
   CORDS_DATABASE_URL = "/data/cords.db"
+  RAIL_HOST = "marta.io"
 
 [http_service]
   internal_port = 4200
