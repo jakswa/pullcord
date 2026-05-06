@@ -121,7 +121,7 @@ export class MARTADatabase {
     if (routeIds.length === 0) return 0;
     try {
       const placeholders = routeIds.map(() => '?').join(',');
-      const row = this.db.prepare(`SELECT COUNT(*) AS c FROM routes WHERE route_id IN (${placeholders})`).get(...routeIds) as { c: number };
+      const row = this.db.prepare(`SELECT COUNT(DISTINCT route_id) AS c FROM route_stops WHERE route_id IN (${placeholders})`).get(...routeIds) as { c: number };
       return row.c;
     } catch {
       return 0;
