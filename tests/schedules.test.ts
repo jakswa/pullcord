@@ -189,12 +189,18 @@ describe('route short-name behavior', () => {
     db.close();
 
     const marta = new MARTADatabase(dbPath);
+    const staleUrlRoute = marta.getRoute('27386');
+    const routesAtStop = marta.getRoutesForStop('500212').filter(route => route.route_short_name === '121');
     const routes = marta.getRoutes().filter(route => route.route_short_name === '121');
     const detail = marta.getRouteDetail('121');
+    const detailFromStaleId = marta.getRouteDetail('27386');
     marta.close();
 
+    expect(staleUrlRoute?.route_id).toBe('26956');
+    expect(routesAtStop.map(route => route.route_id)).toEqual(['26956']);
     expect(routes.map(route => route.route_id)).toEqual(['26956']);
     expect(detail?.route.route_id).toBe('26956');
+    expect(detailFromStaleId?.route.route_id).toBe('26956');
     expect(detail?.stops.every(stop => stop.route_id === '26956')).toBe(true);
   });
 });

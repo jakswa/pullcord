@@ -109,7 +109,8 @@ export class MARTADatabase {
 
   // Get single route by ID or short name
   getRoute(routeIdentifier: string): Route | null {
-    const currentRouteId = this.getCurrentRouteMap().get(routeIdentifier);
+    const currentRouteMap = this.getCurrentRouteMap();
+    const currentRouteId = currentRouteMap.get(routeIdentifier);
     if (currentRouteId) {
       const route = this.db.prepare(`
         SELECT route_id, route_short_name, route_long_name, route_color, route_text_color
@@ -119,12 +120,49 @@ export class MARTADatabase {
       if (route) return route;
     }
 
+    const routeById = this.db.prepare(`
+      SELECT route_id, route_short_name, route_long_name, route_color, route_text_color
+      FROM routes
+      WHERE route_id = ?
+    `).get(routeIdentifier) as Route | null;
+
+    // Legacy DBs may contain stale internal MARTA route_id values that still map
+    // to a durable public route_short_name. If a user opens an old URL such as
+    // /bus?route=27335, resolve it through the current routes.txt short-name map
+    // so realtime queries use today's internal ID instead of the stale one.
+    if (routeById) {
+      const currentIdForShortName = currentRouteMap.get(routeById.route_short_name);
+      if (currentIdForShortName) {
+        const currentRoute = this.db.prepare(`
+          SELECT route_id, route_short_name, route_long_name, route_color, route_text_color
+          FROM routes
+          WHERE route_id = ?
+        `).get(currentIdForShortName) as Route | null;
+        if (currentRoute) return currentRoute;
+      }
+      if (currentRouteMap.size === 0) return routeById;
+    }
+
     const stmt = this.db.prepare(`
       SELECT route_id, route_short_name, route_long_name, route_color, route_text_color 
       FROM routes 
-      WHERE route_id = ? OR route_short_name = ?
+      WHERE route_short_name = ?
     `);
-    return stmt.get(routeIdentifier, routeIdentifier) as Route | null;
+    return stmt.get(routeIdentifier) as Route | null;
+  }
+
+  private preferCurrentRoutes(routes: Route[]): Route[] {
+    const currentRouteMap = this.getCurrentRouteMap();
+    if (currentRouteMap.size === 0) return routes.filter(r => !RAIL_ROUTES.has(r.route_short_name));
+
+    const byShortName = new Map<string, Route>();
+    for (const route of routes) {
+      if (RAIL_ROUTES.has(route.route_short_name)) continue;
+      const currentRouteId = currentRouteMap.get(route.route_short_name);
+      if (currentRouteId && route.route_id !== currentRouteId) continue;
+      if (!byShortName.has(route.route_short_name)) byShortName.set(route.route_short_name, route);
+    }
+    return Array.from(byShortName.values());
   }
 
   // Search stops by name
@@ -266,7 +304,7 @@ export class MARTADatabase {
       )
       ORDER BY CAST(r.route_short_name AS INTEGER), r.route_short_name
     `).all(stopId) as Route[];
-    return routes.filter(r => !RAIL_ROUTES.has(r.route_short_name));
+    return this.preferCurrentRoutes(routes);
   }
 
   // Batch: get routes for multiple stops at once (eliminates N+1 in search/nearby).
@@ -287,8 +325,15 @@ export class MARTADatabase {
     `).all(...stopIds) as Array<{ input_stop_id: string } & Route>;
 
     const result = new Map<string, Route[]>();
+    const currentRouteMap = this.getCurrentRouteMap();
+    const seenByStopAndShortName = new Set<string>();
     for (const row of rows) {
       if (RAIL_ROUTES.has(row.route_short_name)) continue;
+      const currentRouteId = currentRouteMap.get(row.route_short_name);
+      if (currentRouteId && row.route_id !== currentRouteId) continue;
+      const dedupeKey = `${row.input_stop_id}:${row.route_short_name}`;
+      if (seenByStopAndShortName.has(dedupeKey)) continue;
+      seenByStopAndShortName.add(dedupeKey);
       let list = result.get(row.input_stop_id);
       if (!list) { list = []; result.set(row.input_stop_id, list); }
       list.push({

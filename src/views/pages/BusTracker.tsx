@@ -186,7 +186,7 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
         ? `window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};
            window.__CONFIG__ = { stopId: '${stop.stop_id}', multiRoute: true, pollInterval: 30000 };`
         : `window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};
-           window.__CONFIG__ = { routeId: '${route!.route_id}', stopId: '${stop.stop_id}', routeShortName: '${route!.route_short_name}', pollInterval: 30000 };`
+           window.__CONFIG__ = { routeId: '${route!.route_short_name}', stopId: '${stop.stop_id}', routeShortName: '${route!.route_short_name}', pollInterval: 30000 };`
       }} />
     </div>
   );

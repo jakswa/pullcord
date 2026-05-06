@@ -70,6 +70,14 @@ class PullcordApp {
     return 'unknown';
   }
 
+  publicRouteIdentifier(prediction) {
+    return prediction?.routeShortName
+      || this.config?.routeShortName
+      || prediction?.routeId
+      || this.config?.routeId
+      || '';
+  }
+
   // ═══════════════════════════════════
   // HOME PAGE (similar to production)
   // ═══════════════════════════════════
@@ -1313,7 +1321,7 @@ class PullcordApp {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subscription: sub.toJSON(),
-          routeId: this.heroPrediction.routeId || this.config.routeId,
+          routeId: this.publicRouteIdentifier(this.heroPrediction),
           stopId: this.config.stopId,
           vehicleId: this.heroPrediction.vehicleId || null,
           tripId: this.heroPrediction.tripId || null,
@@ -1333,7 +1341,7 @@ class PullcordApp {
       this.cordTripId = this.heroPrediction.tripId || null;
       this.cordVehicleId = this.heroPrediction.vehicleId || null;
       this.cordDirectionId = this.heroPrediction.directionId ?? this.selectedDirection ?? null;
-      this.cordRouteId = this.heroPrediction.routeId || this.config.routeId;
+      this.cordRouteId = this.publicRouteIdentifier(this.heroPrediction);
       this.cordStopId = this.config.stopId;
       this.cordStopName = this.data?.stop?.name || this.config.stopId;
 
@@ -1484,7 +1492,7 @@ class PullcordApp {
       if (this.focusedVehicleId && this.heroPrediction?.tier === 'active' && this.heroPrediction.tripId) {
         const tripId = this.heroPrediction.tripId;
         const stopId = this.config.stopId;
-        const routeId = this.heroPrediction.routeId || this.config.routeId;
+        const routeId = this.publicRouteIdentifier(this.heroPrediction);
         window.location.href = `/ride?trip=${encodeURIComponent(tripId)}&stop=${encodeURIComponent(stopId)}&route=${encodeURIComponent(routeId)}`;
         return;
       }

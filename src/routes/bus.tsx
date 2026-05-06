@@ -37,13 +37,13 @@ app.get("/bus", async (c) => {
 
       // Single route? Redirect to route-specific view
       if (routes.length === 1) {
-        return c.redirect(`/bus?route=${routes[0].route_id}&stop=${stopId}`);
+        return c.redirect(`/bus?route=${routes[0].route_short_name}&stop=${stopId}`);
       }
 
       const initialData = {
         multiRoute: true,
         stop: { id: stop.stop_id, name: stop.stop_name, lat: stop.stop_lat, lon: stop.stop_lon },
-        routes: routes.map(r => ({ id: r.route_id, shortName: r.route_short_name, longName: r.route_long_name, color: r.route_color })),
+        routes: routes.map(r => ({ id: r.route_short_name, internalId: r.route_id, shortName: r.route_short_name, longName: r.route_long_name, color: r.route_color })),
         timestamp: Date.now(),
       };
 
@@ -100,6 +100,12 @@ app.get("/bus", async (c) => {
       );
     }
 
+    if (routeId !== route.route_short_name) {
+      const url = new URL(c.req.url);
+      url.searchParams.set("route", route.route_short_name);
+      return c.redirect(`${url.pathname}?${url.searchParams.toString()}`);
+    }
+
     // Get route details (shapes and stops)
     const routeDetail = getRouteDetail(route.route_id);
     
@@ -110,7 +116,8 @@ app.get("/bus", async (c) => {
     // Prepare initial data for client-side JavaScript
     const initialData = {
       route: {
-        id: route.route_id,
+        id: route.route_short_name,
+        internalId: route.route_id,
         shortName: route.route_short_name,
         longName: route.route_long_name,
         color: route.route_color || "#1f2937"
@@ -136,7 +143,7 @@ app.get("/bus", async (c) => {
 
     // Render the bus tracker page
     return c.html(
-      <Layout title={`Route ${route.route_short_name} at ${stop.stop_name} — Pullcord`} ogImage="/public/icons/og-bus.png" canonicalPath={`/bus?route=${route.route_id}&stop=${stop.stop_id}`}>
+      <Layout title={`Route ${route.route_short_name} at ${stop.stop_name} — Pullcord`} ogImage="/public/icons/og-bus.png" canonicalPath={`/bus?route=${route.route_short_name}&stop=${stop.stop_id}`}>
         <BusTrackerPage
           route={route}
           stop={stop}
