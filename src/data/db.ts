@@ -84,7 +84,10 @@ export class MARTADatabase {
       }
     }
 
-    this.currentRouteIdByShortName = bestScore > 0 ? bestMap : new Map<string, string>();
+    // If the best GTFS routes.txt barely overlaps the SQLite routes table, it is
+    // from a different feed generation and would filter every bus stop out.
+    const minimumCompatibleRoutes = bestMap.size > 0 ? Math.min(50, Math.ceil(bestMap.size * 0.5)) : 1;
+    this.currentRouteIdByShortName = bestScore >= minimumCompatibleRoutes ? bestMap : new Map<string, string>();
     return this.currentRouteIdByShortName;
   }
 
