@@ -66,8 +66,30 @@ export class MARTADatabase {
 
   private getCurrentRouteMap(): Map<string, string> {
     if (this.currentRouteIdByShortName) return this.currentRouteIdByShortName;
+
+    const candidates = Array.from(new Set([
+      path.join(this.gtfsDir, "routes.txt"),
+      path.join(process.cwd(), "data", "gtfs", "routes.txt"),
+    ]));
+
+    let bestMap = new Map<string, string>();
+    let bestScore = -1;
+    for (const routesPath of candidates) {
+      const map = this.readRouteMap(routesPath);
+      if (map.size === 0) continue;
+      const score = this.countRouteMapMatchesDb(map);
+      if (score > bestScore) {
+        bestMap = map;
+        bestScore = score;
+      }
+    }
+
+    this.currentRouteIdByShortName = bestMap;
+    return bestMap;
+  }
+
+  private readRouteMap(routesPath: string): Map<string, string> {
     const map = new Map<string, string>();
-    const routesPath = path.join(this.gtfsDir, "routes.txt");
     try {
       const [header, ...rows] = fs.readFileSync(routesPath, "utf8").trim().split(/\r?\n/);
       const columns = header.split(",");
@@ -86,12 +108,21 @@ export class MARTADatabase {
         }
       }
     } catch {
-      // Active snapshot DBs are already isolated. This fallback only matters when
-      // production is temporarily serving legacy data/marta.db with current
-      // data/gtfs files beside it.
+      // Missing GTFS route maps are okay; active snapshot DBs are already isolated.
     }
-    this.currentRouteIdByShortName = map;
     return map;
+  }
+
+  private countRouteMapMatchesDb(routeMap: Map<string, string>): number {
+    const routeIds = Array.from(routeMap.values());
+    if (routeIds.length === 0) return 0;
+    try {
+      const placeholders = routeIds.map(() => '?').join(',');
+      const row = this.db.prepare(`SELECT COUNT(*) AS c FROM routes WHERE route_id IN (${placeholders})`).get(...routeIds) as { c: number };
+      return row.c;
+    } catch {
+      return 0;
+    }
   }
 
   // Get all routes

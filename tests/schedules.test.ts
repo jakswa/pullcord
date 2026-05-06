@@ -225,6 +225,27 @@ describe('route short-name behavior', () => {
     expect(batchRoutesAtStop.map(route => route.route_short_name)).toEqual(['121']);
   });
 
+  test('falls back to packaged GTFS routes when volume GTFS does not match legacy DB', async () => {
+    const dir = tempDir('legacy-volume-gtfs-mismatch');
+    const packagedGtfsDir = path.join(dir, 'data', 'gtfs');
+    const volumeGtfsDir = path.join(dir, 'volume', 'gtfs');
+    const dbPath = path.join(dir, 'volume', 'marta.db');
+    writeTinyGtfs(packagedGtfsDir, '26956');
+    writeTinyGtfs(volumeGtfsDir, '99999');
+    await buildGTFSDatabase({ dbPath, gtfsDir: packagedGtfsDir, effectiveDate: '20260418' });
+
+    const oldCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      const marta = new MARTADatabase(dbPath, volumeGtfsDir);
+      const stops = marta.getAllStopsWithRoutes();
+      marta.close();
+      expect(stops.map(stop => stop.stop_id).sort()).toEqual(['500212', '500213']);
+    } finally {
+      process.chdir(oldCwd);
+    }
+  });
+
   test('explore map stop list excludes stale stops from legacy polluted DB', async () => {
     const dir = tempDir('legacy-current-stops');
     const gtfsDir = path.join(dir, 'gtfs');
