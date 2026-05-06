@@ -256,9 +256,10 @@ export class MARTADatabase {
   getStopsForRoute(routeId: string, limit: number = 40): Stop[] {
     return this.db.prepare(`
       SELECT MIN(s.stop_id) as stop_id, s.stop_name, s.stop_lat, s.stop_lon
-      FROM route_stops rs
-      JOIN stops s ON rs.stop_id = s.stop_id
-      WHERE rs.route_id = ?
+      FROM trips t
+      JOIN stop_times st ON st.trip_id = t.trip_id
+      JOIN stops s ON st.stop_id = s.stop_id
+      WHERE t.route_id = ?
       GROUP BY s.stop_name
       ORDER BY s.stop_name
       LIMIT ?
@@ -344,8 +345,9 @@ export class MARTADatabase {
     const routes = this.db.prepare(`
       SELECT DISTINCT r.route_id, r.route_short_name, r.route_long_name, r.route_color, r.route_text_color
       FROM routes r
-      JOIN route_stops rs ON r.route_id = rs.route_id
-      WHERE rs.stop_id IN (
+      JOIN trips t ON r.route_id = t.route_id
+      JOIN stop_times st ON st.trip_id = t.trip_id
+      WHERE st.stop_id IN (
         SELECT stop_id FROM stops
         WHERE group_id = (SELECT group_id FROM stops WHERE stop_id = ?)
       )
@@ -365,8 +367,9 @@ export class MARTADatabase {
         r.route_id, r.route_short_name, r.route_long_name, r.route_color, r.route_text_color
       FROM stops s_input
       JOIN stops s_group ON s_group.group_id = s_input.group_id
-      JOIN route_stops rs ON rs.stop_id = s_group.stop_id
-      JOIN routes r ON r.route_id = rs.route_id
+      JOIN stop_times st ON st.stop_id = s_group.stop_id
+      JOIN trips t ON t.trip_id = st.trip_id
+      JOIN routes r ON r.route_id = t.route_id
       WHERE s_input.stop_id IN (${placeholders})
       ORDER BY s_input.stop_id, CAST(r.route_short_name AS INTEGER), r.route_short_name, CAST(r.route_id AS INTEGER), r.route_id
     `).all(...stopIds) as Array<{ input_stop_id: string } & Route>;
@@ -551,10 +554,11 @@ export class MARTADatabase {
     }
 
     const rows = this.db.prepare(`
-      SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon, r.route_id, r.route_short_name
+      SELECT DISTINCT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon, r.route_id, r.route_short_name
       FROM stops s
-      JOIN route_stops rs ON s.stop_id = rs.stop_id
-      JOIN routes r ON rs.route_id = r.route_id
+      JOIN stop_times st ON s.stop_id = st.stop_id
+      JOIN trips t ON t.trip_id = st.trip_id
+      JOIN routes r ON r.route_id = t.route_id
       ORDER BY s.stop_id, CAST(r.route_short_name AS INTEGER), r.route_short_name
     `).all() as Array<Stop & { route_id: string; route_short_name: string }>;
 
