@@ -61,7 +61,10 @@ export function parseEffectiveDateFromHtml(html: string): string {
     ? html.slice(Math.max(0, zipIndex - 2000), zipIndex + 4000)
     : html;
 
-  const match = searchArea.match(/Effective\s+Date\s*:\s*(\d{1,2})\s*[/-]\s*(\d{1,2})\s*[/-]\s*(\d{4})/i);
+  const text = searchArea
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;|&#160;/gi, " ");
+  const match = text.match(/Effective\s+Date\s*:\s*(\d{1,2})\s*[/-]\s*(\d{1,2})\s*[/-]\s*(\d{4})/i);
   if (!match) {
     throw new Error("MARTA GTFS Effective Date not found near google_transit.zip");
   }

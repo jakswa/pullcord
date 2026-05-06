@@ -86,6 +86,14 @@ describe('GTFS effective-date parsing', () => {
     expect(parseEffectiveDateFromHtml(html)).toBe('20260418');
   });
 
+  test('parses MARTA HTML when tags split the date', () => {
+    const html = `
+      <a href="google_transit_feed/google_transit.zip">google_transit.zip</a>
+      <em>Effective Date: 4/18<i><em><i>/2026</i></em></i></em>
+    `;
+    expect(parseEffectiveDateFromHtml(html)).toBe('20260418');
+  });
+
   test('fails closed when no effective date is present', () => {
     expect(() => parseEffectiveDateFromHtml('<a>google_transit.zip</a>')).toThrow(/Effective Date/);
   });
