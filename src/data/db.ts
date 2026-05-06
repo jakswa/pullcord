@@ -181,13 +181,26 @@ export class MARTADatabase {
       SELECT route_id, route_short_name, route_long_name, route_color, route_text_color 
       FROM routes 
       WHERE route_short_name = ?
+      ORDER BY CAST(route_id AS INTEGER), route_id
+      LIMIT 1
     `);
     return stmt.get(routeIdentifier) as Route | null;
   }
 
   private preferCurrentRoutes(routes: Route[]): Route[] {
     const currentRouteMap = this.getCurrentRouteMap();
-    if (currentRouteMap.size === 0) return routes.filter(r => !RAIL_ROUTES.has(r.route_short_name));
+    if (currentRouteMap.size === 0) {
+      const byShortName = new Map<string, Route>();
+      for (const route of [...routes].sort((a, b) => {
+        const short = a.route_short_name.localeCompare(b.route_short_name, undefined, { numeric: true });
+        if (short !== 0) return short;
+        return a.route_id.localeCompare(b.route_id, undefined, { numeric: true });
+      })) {
+        if (RAIL_ROUTES.has(route.route_short_name)) continue;
+        if (!byShortName.has(route.route_short_name)) byShortName.set(route.route_short_name, route);
+      }
+      return Array.from(byShortName.values());
+    }
 
     const byShortName = new Map<string, Route>();
     for (const route of routes) {
@@ -336,7 +349,7 @@ export class MARTADatabase {
         SELECT stop_id FROM stops
         WHERE group_id = (SELECT group_id FROM stops WHERE stop_id = ?)
       )
-      ORDER BY CAST(r.route_short_name AS INTEGER), r.route_short_name
+      ORDER BY CAST(r.route_short_name AS INTEGER), r.route_short_name, CAST(r.route_id AS INTEGER), r.route_id
     `).all(stopId) as Route[];
     return this.preferCurrentRoutes(routes);
   }
@@ -355,7 +368,7 @@ export class MARTADatabase {
       JOIN route_stops rs ON rs.stop_id = s_group.stop_id
       JOIN routes r ON r.route_id = rs.route_id
       WHERE s_input.stop_id IN (${placeholders})
-      ORDER BY s_input.stop_id, CAST(r.route_short_name AS INTEGER), r.route_short_name
+      ORDER BY s_input.stop_id, CAST(r.route_short_name AS INTEGER), r.route_short_name, CAST(r.route_id AS INTEGER), r.route_id
     `).all(...stopIds) as Array<{ input_stop_id: string } & Route>;
 
     const result = new Map<string, Route[]>();
