@@ -203,6 +203,48 @@ describe('route short-name behavior', () => {
     expect(detailFromStaleId?.route.route_id).toBe('26956');
     expect(detail?.stops.every(stop => stop.route_id === '26956')).toBe(true);
   });
+
+  test('stop route lookup excludes stale route short names missing from current GTFS', async () => {
+    const dir = tempDir('legacy-missing-route-short-name');
+    const gtfsDir = path.join(dir, 'gtfs');
+    const dbPath = path.join(dir, 'marta.db');
+    writeTinyGtfs(gtfsDir, '26956');
+    await buildGTFSDatabase({ dbPath, gtfsDir, effectiveDate: '20260418' });
+
+    const db = new Database(dbPath);
+    db.prepare(`INSERT INTO routes VALUES (?, ?, ?, ?, ?)`).run('27353', '58', 'Old Hollywood Road', '', '');
+    db.prepare(`INSERT INTO route_stops VALUES (?, ?, ?)`).run('27353', '500212', 0);
+    db.close();
+
+    const marta = new MARTADatabase(dbPath);
+    const routesAtStop = marta.getRoutesForStop('500212');
+    const batchRoutesAtStop = marta.getRoutesForStops(['500212']).get('500212') || [];
+    marta.close();
+
+    expect(routesAtStop.map(route => route.route_short_name)).toEqual(['121']);
+    expect(batchRoutesAtStop.map(route => route.route_short_name)).toEqual(['121']);
+  });
+
+  test('explore map stop list excludes stale stops from legacy polluted DB', async () => {
+    const dir = tempDir('legacy-current-stops');
+    const gtfsDir = path.join(dir, 'gtfs');
+    const dbPath = path.join(dir, 'marta.db');
+    writeTinyGtfs(gtfsDir, '26956');
+    await buildGTFSDatabase({ dbPath, gtfsDir, effectiveDate: '20260418' });
+
+    const db = new Database(dbPath);
+    db.prepare(`INSERT INTO routes VALUES (?, ?, ?, ?, ?)`).run('27386', '121', 'Old Memorial Drive', '', '');
+    db.prepare(`INSERT INTO stops(stop_id, stop_name, stop_lat, stop_lon) VALUES (?, ?, ?, ?)`).run('999999', 'STALE STOP', 33.9, -84.9);
+    db.prepare(`INSERT INTO route_stops VALUES (?, ?, ?)`).run('27386', '999999', 0);
+    db.close();
+
+    const marta = new MARTADatabase(dbPath);
+    const stops = marta.getAllStopsWithRoutes();
+    marta.close();
+
+    expect(stops.map(stop => stop.stop_id).sort()).toEqual(['500212', '500213']);
+    expect(stops.every(stop => stop.routes === '121')).toBe(true);
+  });
 });
 
 describe('Atlanta service date', () => {

@@ -159,7 +159,7 @@ export class MARTADatabase {
     for (const route of routes) {
       if (RAIL_ROUTES.has(route.route_short_name)) continue;
       const currentRouteId = currentRouteMap.get(route.route_short_name);
-      if (currentRouteId && route.route_id !== currentRouteId) continue;
+      if (!currentRouteId || route.route_id !== currentRouteId) continue;
       if (!byShortName.has(route.route_short_name)) byShortName.set(route.route_short_name, route);
     }
     return Array.from(byShortName.values());
@@ -330,7 +330,7 @@ export class MARTADatabase {
     for (const row of rows) {
       if (RAIL_ROUTES.has(row.route_short_name)) continue;
       const currentRouteId = currentRouteMap.get(row.route_short_name);
-      if (currentRouteId && row.route_id !== currentRouteId) continue;
+      if (currentRouteMap.size > 0 && (!currentRouteId || row.route_id !== currentRouteId)) continue;
       const dedupeKey = `${row.input_stop_id}:${row.route_short_name}`;
       if (seenByStopAndShortName.has(dedupeKey)) continue;
       seenByStopAndShortName.add(dedupeKey);
@@ -502,14 +502,42 @@ export class MARTADatabase {
     if (this._allStopsCache && Date.now() - this._allStopsCache.cachedAt < 3600000) {
       return this._allStopsCache.stops;
     }
-    const stops = this.db.prepare(`
-      SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon,
-        GROUP_CONCAT(DISTINCT r.route_short_name) as routes
+
+    const rows = this.db.prepare(`
+      SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon, r.route_id, r.route_short_name
       FROM stops s
       JOIN route_stops rs ON s.stop_id = rs.stop_id
       JOIN routes r ON rs.route_id = r.route_id
-      GROUP BY s.stop_id
-    `).all() as any[];
+      ORDER BY s.stop_id, CAST(r.route_short_name AS INTEGER), r.route_short_name
+    `).all() as Array<Stop & { route_id: string; route_short_name: string }>;
+
+    const currentRouteMap = this.getCurrentRouteMap();
+    const byStop = new Map<string, Stop & { routeSet: Set<string> }>();
+    for (const row of rows) {
+      if (RAIL_ROUTES.has(row.route_short_name)) continue;
+      if (currentRouteMap.size > 0) {
+        const currentRouteId = currentRouteMap.get(row.route_short_name);
+        if (!currentRouteId || row.route_id !== currentRouteId) continue;
+      }
+
+      let stop = byStop.get(row.stop_id);
+      if (!stop) {
+        stop = {
+          stop_id: row.stop_id,
+          stop_name: row.stop_name,
+          stop_lat: row.stop_lat,
+          stop_lon: row.stop_lon,
+          routeSet: new Set<string>(),
+        };
+        byStop.set(row.stop_id, stop);
+      }
+      stop.routeSet.add(row.route_short_name);
+    }
+
+    const stops = Array.from(byStop.values()).map(({ routeSet, ...stop }) => ({
+      ...stop,
+      routes: Array.from(routeSet).join(','),
+    }));
     this._allStopsCache = { stops, cachedAt: Date.now() };
     return stops;
   }
