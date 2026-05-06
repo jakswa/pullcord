@@ -84,8 +84,8 @@ export class MARTADatabase {
       }
     }
 
-    this.currentRouteIdByShortName = bestMap;
-    return bestMap;
+    this.currentRouteIdByShortName = bestScore > 0 ? bestMap : new Map<string, string>();
+    return this.currentRouteIdByShortName;
   }
 
   private readRouteMap(routesPath: string): Map<string, string> {
