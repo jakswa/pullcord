@@ -845,7 +845,7 @@ function railStyles(): string {
         --bg-surface: #ece5dc;
         --text-primary: #3B2820;
         --text-body: #5C4030;
-        --text-muted: #A89282;
+        --text-muted: #8B7462;
         --border-color: #d8cfc4;
         --border-subtle: #e0d8cf;
       }
