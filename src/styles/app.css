@@ -46,9 +46,9 @@
     --text-primary: #3B2820;
     --text-heading: #3B2820;
     --text-body: #5C4030;
-    --text-secondary: #7C6354;
-    --text-muted: #A89282;
-    --text-dim: #B8A898;
+    --text-secondary: #6B5445;
+    --text-muted: #8B7462;
+    --text-dim: #9E8E7E;
     --text-faint: #D4C4B4;
 
     /* UI chrome */
@@ -284,7 +284,7 @@
 
   .d-stop-name {
     font-weight: 600;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     line-height: 1.2;
     white-space: nowrap;
     overflow: hidden;
@@ -309,7 +309,7 @@
 
   .d-live-time {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
+    font-size: 0.875rem;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
   }
@@ -456,7 +456,7 @@
 
   .d-hero-tier {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -733,7 +733,7 @@
 
   .d-upcoming-meta {
     font-family: var(--font-mono);
-    font-size: 0.85rem;
+    font-size: 0.875rem;
     color: var(--text-secondary);
     display: flex;
     align-items: center;
@@ -769,7 +769,7 @@
 
   .d-upcoming-label {
     font-family: var(--font-mono);
-    font-size: 0.85rem;
+    font-size: 0.875rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.08em;
