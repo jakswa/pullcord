@@ -3,6 +3,7 @@
 
 import { getLatestSnapshot, getSystemTimeSeries, getLatestRouteSnapshots, type SystemSnapshot, type TimeSeriesPoint, type RouteSnapshot } from "../../data/metrics.js";
 import { getRoutes } from "../../data/db.js";
+import { html } from "hono/html";
 
 function routeNameMap(): Map<string, string> {
   const routes = getRoutes();
@@ -133,7 +134,7 @@ export function StatsPage() {
   const lastTs = timeSeries.length > 0 ? timeSeries[timeSeries.length - 1].ts : 0;
   const hoursOfData = ((lastTs - firstTs) / 3600).toFixed(1);
 
-  return (
+  return html`<!DOCTYPE html>${(
     <html lang="en">
       <head>
         <meta charset="UTF-8" />
@@ -167,7 +168,7 @@ export function StatsPage() {
         <script dangerouslySetInnerHTML={{ __html: statsJS() }} />
       </body>
     </html>
-  );
+  )}`;
 }
 
 // ── Content partial (for polling) ──

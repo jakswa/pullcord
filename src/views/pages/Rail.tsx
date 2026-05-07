@@ -1,5 +1,6 @@
 import type { RailArrival } from "../../rail/api.js";
 import { stationSlug, stationDisplayName, getRailApiError } from "../../rail/api.js";
+import { html } from "hono/html";
 
 // Banner shown at the top of any rail page when the MARTA rail API is
 // unreachable. Kept dead simple — no icons, no dismiss, just a clear
@@ -18,9 +19,9 @@ function RailApiBanner() {
 const LINE_COLORS = {
   dark: {
     RED: "#E05555",
-    GOLD: "#D4A020",
-    BLUE: "#4A9FE5",
-    GREEN: "#3BAA6E",
+    GOLD: "#B08818",
+    BLUE: "#3A8FD8",
+    GREEN: "#2D9458",
   },
   light: {
     RED: "#B33030",
@@ -457,7 +458,7 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
   const backHref = standalone ? "/rail" : "/";
   const backLabel = standalone ? "Refresh" : "Back to home";
 
-  return (
+  return html`<!DOCTYPE html>${(
     <html lang="en">
       <head>
         <meta charset="UTF-8" />
@@ -515,7 +516,7 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
         <script dangerouslySetInnerHTML={{ __html: buildInlineJS(true) }} />
       </body>
     </html>
-  );
+  )}`;
 }
 
 // ── Station detail page ──
@@ -533,7 +534,7 @@ export function RailStationPage({
     ? `${displayName} — marta.io rail`
     : `${displayName} — MARTA Rail — Pullcord`;
 
-  return (
+  return html`<!DOCTYPE html>${(
     <html lang="en">
       <head>
         <meta charset="UTF-8" />
@@ -574,7 +575,7 @@ export function RailStationPage({
         <script dangerouslySetInnerHTML={{ __html: buildInlineJS(false) }} />
       </body>
     </html>
-  );
+  )}`;
 }
 
 // Station detail inner (for partials) — flat list, soonest first
@@ -646,7 +647,7 @@ export function RailTrainPage({
     ? `Train ${trainId} — marta.io rail`
     : `Train ${trainId} — MARTA Rail — Pullcord`;
 
-  return (
+  return html`<!DOCTYPE html>${(
     <html lang="en">
       <head>
         <meta charset="UTF-8" />
@@ -719,7 +720,7 @@ export function RailTrainPage({
         ` }} />
       </body>
     </html>
-  );
+  )}`;
 }
 
 // Train timeline inner (for partials)
@@ -830,7 +831,7 @@ function railStyles(): string {
       --bg-surface: #1a1a18;
       --text-primary: #d4d0c8;
       --text-body: #b0a898;
-      --text-muted: #807870;
+      --text-muted: #9A9088;
       --border-color: #2a2a26;
       --border-subtle: #333330;
       --brand: #E85D3A;
@@ -844,7 +845,7 @@ function railStyles(): string {
         --bg-surface: #ece5dc;
         --text-primary: #3B2820;
         --text-body: #5C4030;
-        --text-muted: #A89282;
+        --text-muted: #8B7462;
         --border-color: #d8cfc4;
         --border-subtle: #e0d8cf;
       }

@@ -1,4 +1,5 @@
 import type { Child } from "hono/jsx";
+import { html } from "hono/html";
 import { createHash } from "crypto";
 import { readFileSync } from "fs";
 
@@ -28,7 +29,7 @@ export const Layout = (props: LayoutProps) => {
   const siteUrl = process.env.SITE_URL || "https://bus.marta.io";
   const canonicalUrl = `${siteUrl}${props.canonicalPath || ""}`;
 
-  return (
+  return html`<!DOCTYPE html>${(
     <html lang="en">
       <head>
         <meta charset="UTF-8" />
@@ -96,5 +97,5 @@ export const Layout = (props: LayoutProps) => {
         {/* Push SW is registered on-demand by Pull the Cord — no page-load SW */}
       </body>
     </html>
-  );
+  )}`;
 };
