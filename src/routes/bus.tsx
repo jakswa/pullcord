@@ -71,11 +71,11 @@ app.get("/bus", async (c) => {
     if (!route) {
       return c.html(
         <Layout title="Route Not Found — Pullcord">
-          <div class="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div class="text-center">
-              <h1 class="text-2xl font-bold text-gray-900 mb-4">Route Not Found</h1>
-              <p class="text-gray-600 mb-6">The route "{routeId}" could not be found.</p>
-              <a href="/" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+          <div style="min-height:100vh;background:#f9fafb;display:flex;align-items:center;justify-content:center">
+            <div style="text-align:center;max-width:400px;margin:0 auto">
+              <h1 style="font-size:1.5rem;font-weight:bold;color:#111827;margin-bottom:1rem">Route Not Found</h1>
+              <p style="color:#6b7280;margin-bottom:1.5rem">The route "{routeId}" could not be found.</p>
+              <a href="/" style="display:inline-block;background:#2563eb;color:#fff;padding:0.75rem 1.5rem;border-radius:0.5rem;text-decoration:none">
                 ← Back to Home
               </a>
             </div>
@@ -87,11 +87,11 @@ app.get("/bus", async (c) => {
     if (!stop) {
       return c.html(
         <Layout title="Stop Not Found — Pullcord">
-          <div class="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div class="text-center">
-              <h1 class="text-2xl font-bold text-gray-900 mb-4">Stop Not Found</h1>
-              <p class="text-gray-600 mb-6">The stop "{stopId}" could not be found.</p>
-              <a href="/" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+          <div style="min-height:100vh;background:#f9fafb;display:flex;align-items:center;justify-content:center">
+            <div style="text-align:center;max-width:400px;margin:0 auto">
+              <h1 style="font-size:1.5rem;font-weight:bold;color:#111827;margin-bottom:1rem">Stop Not Found</h1>
+              <p style="color:#6b7280;margin-bottom:1.5rem">The stop "{stopId}" could not be found.</p>
+              <a href="/" style="display:inline-block;background:#2563eb;color:#fff;padding:0.75rem 1.5rem;border-radius:0.5rem;text-decoration:none">
                 ← Back to Home
               </a>
             </div>
@@ -158,11 +158,11 @@ app.get("/bus", async (c) => {
     
     return c.html(
       <Layout title="Error — Pullcord">
-        <div class="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div class="text-center">
-            <h1 class="text-2xl font-bold text-gray-900 mb-4">Something went wrong</h1>
-            <p class="text-gray-600 mb-6">Unable to load the bus tracker. Please try again.</p>
-            <a href="/" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+        <div style="min-height:100vh;background:#f9fafb;display:flex;align-items:center;justify-content:center">
+          <div style="text-align:center;max-width:400px;margin:0 auto">
+            <h1 style="font-size:1.5rem;font-weight:bold;color:#111827;margin-bottom:1rem">Something went wrong</h1>
+            <p style="color:#6b7280;margin-bottom:1.5rem">Unable to load the bus tracker. Please try again.</p>
+            <a href="/" style="display:inline-block;background:#2563eb;color:#fff;padding:0.75rem 1.5rem;border-radius:0.5rem;text-decoration:none">
               ← Back to Home
             </a>
           </div>

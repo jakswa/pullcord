@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRoutesForStops, getRouteHeadsigns, getAllStopsWithRoutes, getTripStopSequences } from "../data/db.js";
 import { getVehicles, findArrivals, getStopArrivals } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
-import { getVapidPublicKey, registerCord, cancelCord, cordExists, getActiveCordCount, testFireAll } from "../data/push.js";
+import { getVapidPublicKey, registerCord, cancelCord, cordExists, getActiveCordCount } from "../data/push.js";
 import { getLatestSnapshot, getSystemTimeSeries, getLatestRouteSnapshots, getLatestRailSnapshots, getRouteTimeSeries } from "../data/metrics.js";
 
 const app = new Hono();
@@ -375,11 +375,6 @@ app.get("/push/status", (c) => {
   return c.json({ activeCords: getActiveCordCount() });
 });
 
-// POST /api/push/test — fire a test push to all active cords
-app.post("/push/test", async (c) => {
-  const sent = await testFireAll();
-  return c.json({ sent });
-});
 
 // ── Metrics ──
 
