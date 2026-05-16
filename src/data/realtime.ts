@@ -88,18 +88,24 @@ class RealtimeDataService {
   }
 
   private async fetchProtobufData(url: string): Promise<any[]> {
-    const response = await fetch(`${url}?apiKey=${this.apiKey}`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} ${response.statusText} from ${url.split('?')[0]}`);
-    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const response = await fetch(`${url}?apiKey=${this.apiKey}`, { signal: controller.signal });
 
-    const buffer = await response.arrayBuffer();
-    const protoRoot = await this.loadProtoDefinitions();
-    const FeedMessage = protoRoot.lookupType("transit_realtime.FeedMessage");
-    const message = FeedMessage.decode(new Uint8Array(buffer));
-    
-    return message.entity || [];
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} ${response.statusText} from ${url.split('?')[0]}`);
+      }
+
+      const buffer = await response.arrayBuffer();
+      const protoRoot = await this.loadProtoDefinitions();
+      const FeedMessage = protoRoot.lookupType("transit_realtime.FeedMessage");
+      const message = FeedMessage.decode(new Uint8Array(buffer));
+
+      return message.entity || [];
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private isCacheValid<T>(cache: CachedData<T> | null): boolean {
@@ -269,9 +275,11 @@ function computeAdherenceSec(rtArrivalSec: number, scheduledTimeStr: string): nu
   const [h, m, s] = [parts[0], parts[1], parts[2] || 0];
   const schedTotalSec = h * 3600 + m * 60 + s;
 
-  // Determine service midnight from the RT arrival date
+  // Determine service midnight from the RT arrival date in Eastern time
+  // (GTFS schedule times are in America/New_York; server may be UTC on Fly.io)
   const rtDate = new Date(rtArrivalSec * 1000);
-  const todayMidnightSec = new Date(rtDate.getFullYear(), rtDate.getMonth(), rtDate.getDate()).getTime() / 1000;
+  const etNow = new Date(rtDate.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const todayMidnightSec = new Date(etNow.getFullYear(), etNow.getMonth(), etNow.getDate()).getTime() / 1000;
 
   // GTFS times >= 24:00:00 mean the service day started yesterday
   const serviceMidnightSec = h >= 24 ? todayMidnightSec - 86400 : todayMidnightSec;

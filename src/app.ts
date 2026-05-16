@@ -225,9 +225,10 @@ app.get("/health/diag", async (c) => {
       : Math.round((matched / withTripAndPosition.length) * 1000) / 1000;
   } catch (err: any) {
     diag.apiReachable = false;
-    diag.error = err?.name === "AbortError"
+    const rawMsg = err?.name === "AbortError"
       ? "Request timed out after 5000ms"
       : (err?.message || String(err));
+    diag.error = rawMsg.replace(/apiKey=[^&\s]+/g, 'apiKey=***');
   }
 
   return c.json(diag);
