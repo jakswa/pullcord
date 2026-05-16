@@ -12,3 +12,4 @@ data/cords.db*
 data/marta.db-*
 public/rail.js
 app.js
+.claude/
