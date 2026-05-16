@@ -62,7 +62,7 @@
             const badge = document.getElementById('ride-route-badge');
             if (badge) {
               badge.textContent = routeShortName;
-              badge.style.display = '';
+              badge.style.display = 'inline-flex';
             }
           }
           if (rData.route?.route_color) {

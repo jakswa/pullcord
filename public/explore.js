@@ -30,8 +30,12 @@
       attributionControl: false,
     });
 
-    // Tile layer — CartoDB Positron for clean look
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    // Adaptive map tiles — dark for dark mode, light positron for light mode
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const tileUrl = prefersDark
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    L.tileLayer(tileUrl, {
       maxZoom: MAX_ZOOM,
       subdomains: 'abcd',
     }).addTo(map);
