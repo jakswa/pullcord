@@ -1,5 +1,10 @@
 import type { Route, Stop, RouteDetail } from "../../data/db.js";
 
+/** Safely serialize data for embedding in a <script> tag. Escapes '<' to prevent </script> injection. */
+function safeJsonForScript(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, '\\u003c');
+}
+
 export interface BusTrackerPageProps {
   route: Route | null;
   stop: Stop;
@@ -183,10 +188,10 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
 
       {/* Data injection */}
       <script dangerouslySetInnerHTML={{ __html: multiRoute
-        ? `window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};
-           window.__CONFIG__ = { stopId: '${stop.stop_id}', multiRoute: true, pollInterval: 30000 };`
-        : `window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};
-           window.__CONFIG__ = { routeId: '${route!.route_short_name}', stopId: '${stop.stop_id}', routeShortName: '${route!.route_short_name}', pollInterval: 30000 };`
+        ? `window.__INITIAL_DATA__ = ${safeJsonForScript(initialData)};
+           window.__CONFIG__ = ${safeJsonForScript({ stopId: stop.stop_id, multiRoute: true, pollInterval: 30000 })};`
+        : `window.__INITIAL_DATA__ = ${safeJsonForScript(initialData)};
+           window.__CONFIG__ = ${safeJsonForScript({ routeId: route!.route_short_name, stopId: stop.stop_id, routeShortName: route!.route_short_name, pollInterval: 30000 })};`
       }} />
     </div>
   );

@@ -1,3 +1,8 @@
+/** Safely serialize data for embedding in a <script> tag. Escapes '<' to prevent </script> injection. */
+function safeJsonForScript(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, '\\u003c');
+}
+
 export const RidePage = ({ tripId, stopId, routeId }: { tripId: string; stopId: string; routeId: string }) => (
   <div class="ride-shell">
     {/* Header */}
@@ -38,7 +43,7 @@ export const RidePage = ({ tripId, stopId, routeId }: { tripId: string; stopId: 
 
     {/* Config passed to JS */}
     <script dangerouslySetInnerHTML={{ __html: `
-      window.__RIDE_CONFIG__ = ${JSON.stringify({ tripId, stopId, routeId })};
+      window.__RIDE_CONFIG__ = ${safeJsonForScript({ tripId, stopId, routeId })};
     ` }} />
     <script src="/public/ride.js"></script>
   </div>
