@@ -5,11 +5,19 @@ import { getRoute } from "../data/db.js";
 
 const app = new Hono();
 
+const SAFE_PARAM = /^[a-zA-Z0-9_.\-]{1,80}$/;
+
 // GET /ride?trip=TRIPID&stop=STOPID — ride view (track your position on a trip)
 app.get("/ride", (c) => {
   const tripId = c.req.query("trip");
   const stopId = c.req.query("stop"); // destination stop
   const routeId = c.req.query("route");
+
+  // Validate query params to prevent XSS via crafted URLs
+  if (tripId && !SAFE_PARAM.test(tripId)) return c.redirect("/");
+  if (stopId && !SAFE_PARAM.test(stopId)) return c.redirect("/");
+  if (routeId && !SAFE_PARAM.test(routeId)) return c.redirect("/");
+
   const publicRouteId = routeId ? (getRoute(routeId)?.route_short_name || routeId) : "";
 
   if (!tripId) return c.redirect("/");

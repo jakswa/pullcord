@@ -167,7 +167,7 @@ class PullcordApp {
       <div class="home-fav-card">
         <a href="${favLink}" class="home-fav-link">
           <div class="home-fav-name">${this.esc(fav.stopName)}</div>
-          <div class="home-fav-routes-inline">${fav.routes.join(' · ')}</div>
+          <div class="home-fav-routes-inline">${fav.routes.map(r => this.esc(r)).join(' · ')}</div>
         </a>
         <button class="home-fav-remove" data-stop="${this.esc(fav.stopId)}" aria-label="Remove favorite">✕</button>
       </div>
@@ -309,7 +309,7 @@ class PullcordApp {
         <div class="home-stop-info">
           <div class="home-stop-name">${this.esc(stop.stop_name)}</div>
           <div class="home-stop-meta">
-            <span class="home-stop-routes-inline">${stop.routes.join(' · ')}</span>
+            <span class="home-stop-routes-inline">${stop.routes.map(r => this.esc(r)).join(' · ')}</span>
             ${stop.distance ? `<span class="home-stop-distance">${Math.round(stop.distance)}m</span>` : ''}
           </div>
         </div>
