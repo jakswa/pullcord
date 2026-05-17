@@ -128,12 +128,14 @@ class RealtimeDataService {
     }
 
     // Stale-while-revalidate: serve stale, refresh in background
-    if (this.isCacheServable(this.vehicleCache) && !this.vehicleFetching) {
-      this.vehicleFetching = true;
-      this.fetchProtobufData(VEHICLE_POSITIONS_URL).then(entities => {
-        this.vehicleCache = { data: entities, timestamp: Date.now() };
-        this.vehicleFetching = false;
-      }).catch((err) => { console.error('❌ Vehicle position fetch failed:', err.message || err); this.vehicleFetching = false; });
+    if (this.isCacheServable(this.vehicleCache)) {
+      if (!this.vehicleFetching) {
+        this.vehicleFetching = true;
+        this.fetchProtobufData(VEHICLE_POSITIONS_URL).then(entities => {
+          this.vehicleCache = { data: entities, timestamp: Date.now() };
+          this.vehicleFetching = false;
+        }).catch((err) => { console.error('❌ Vehicle position fetch failed:', err.message || err); this.vehicleFetching = false; });
+      }
       return this.vehicleCache!.data;
     }
 
@@ -148,12 +150,14 @@ class RealtimeDataService {
     }
 
     // Stale-while-revalidate: serve stale, refresh in background
-    if (this.isCacheServable(this.tripUpdatesCache) && !this.tripUpdatesFetching) {
-      this.tripUpdatesFetching = true;
-      this.fetchProtobufData(TRIP_UPDATES_URL).then(entities => {
-        this.tripUpdatesCache = { data: entities, timestamp: Date.now() };
-        this.tripUpdatesFetching = false;
-      }).catch((err) => { console.error('❌ Trip updates fetch failed:', err.message || err); this.tripUpdatesFetching = false; });
+    if (this.isCacheServable(this.tripUpdatesCache)) {
+      if (!this.tripUpdatesFetching) {
+        this.tripUpdatesFetching = true;
+        this.fetchProtobufData(TRIP_UPDATES_URL).then(entities => {
+          this.tripUpdatesCache = { data: entities, timestamp: Date.now() };
+          this.tripUpdatesFetching = false;
+        }).catch((err) => { console.error('❌ Trip updates fetch failed:', err.message || err); this.tripUpdatesFetching = false; });
+      }
       return this.tripUpdatesCache!.data;
     }
 

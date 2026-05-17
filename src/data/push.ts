@@ -236,12 +236,13 @@ async function checkCords(
           },
         );
         console.log(`🔔 Push sent for cord ${cord.id}`);
+        stmtDeleteById.run(cord.id);
       } catch (err: any) {
         console.error(`Push failed for cord ${cord.id}:`, err.statusCode || err.message);
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          stmtDeleteById.run(cord.id);
+        }
       }
-
-      // Cord served its purpose — delete immediately
-      stmtDeleteById.run(cord.id);
     }
   }
 }
