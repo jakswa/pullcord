@@ -11,6 +11,7 @@ const app = new Hono();
 
 const ROUTE_ID_RE = /^[a-zA-Z0-9_-]{1,20}$/;
 const STOP_ID_RE = /^[a-zA-Z0-9]{1,20}$/;
+const TRIP_ID_RE = /^[a-zA-Z0-9_.\-]{1,120}$/;
 
 function validRouteId(id: string): boolean {
   return ROUTE_ID_RE.test(id);
@@ -56,7 +57,8 @@ app.get("/stops", (c) => {
     const rawQuery = c.req.query("q");
     const lat = c.req.query("lat");
     const lon = c.req.query("lon");
-    const radius = parseInt(c.req.query("radius") || "500");
+    const rawRadius = parseInt(c.req.query("radius") || "500");
+    const radius = isNaN(rawRadius) ? 500 : Math.max(50, Math.min(5000, rawRadius));
     const limit = clampLimit(c.req.query("limit"));
 
     if (rawQuery) {
@@ -296,6 +298,7 @@ app.get("/stops/:stopId/arrivals", async (c) => {
 app.get("/trip/:tripId/stops", (c) => {
   try {
     const tripId = c.req.param("tripId");
+    if (!TRIP_ID_RE.test(tripId)) return c.json({ error: "Invalid tripId" }, 400);
     const sequences = getTripStopSequences([tripId]);
     const stops = sequences.get(tripId);
     if (!stops || stops.length === 0) {
@@ -331,11 +334,24 @@ app.get("/push/vapid", (c) => {
 // POST /api/push/cord — register a cord (subscribe to push for a bus)
 app.post("/push/cord", async (c) => {
   try {
-    const body = await c.req.json();
+    let body: any;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400);
+    }
     const { subscription, routeId, stopId, vehicleId, tripId, directionId, thresholdMinutes } = body;
 
     if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
       return c.json({ error: "Invalid push subscription" }, 400);
+    }
+    try {
+      const endpointUrl = new URL(subscription.endpoint);
+      if (endpointUrl.protocol !== "https:") {
+        return c.json({ error: "Push endpoint must use HTTPS" }, 400);
+      }
+    } catch {
+      return c.json({ error: "Invalid push endpoint URL" }, 400);
     }
     if (!routeId || !stopId) {
       return c.json({ error: "routeId and stopId required" }, 400);
@@ -387,7 +403,9 @@ app.get("/metrics/snapshot", (c) => {
 
 // GET /api/metrics/system?hours=24 — system-level time series
 app.get("/metrics/system", (c) => {
-  const hours = Math.min(168, Math.max(1, parseInt(c.req.query("hours") || "24")));
+  const parsed = parseInt(c.req.query("hours") || "24");
+  if (isNaN(parsed)) return c.json({ error: "Invalid 'hours' parameter" }, 400);
+  const hours = Math.min(168, Math.max(1, parsed));
   return c.json(getSystemTimeSeries(hours));
 });
 
@@ -405,7 +423,9 @@ app.get("/metrics/rail", (c) => {
 app.get("/metrics/route/:routeId", (c) => {
   const routeId = c.req.param("routeId");
   if (!ROUTE_ID_RE.test(routeId)) return c.json({ error: "Invalid routeId" }, 400);
-  const hours = Math.min(168, Math.max(1, parseInt(c.req.query("hours") || "24")));
+  const parsed = parseInt(c.req.query("hours") || "24");
+  if (isNaN(parsed)) return c.json({ error: "Invalid 'hours' parameter" }, 400);
+  const hours = Math.min(168, Math.max(1, parsed));
   return c.json(getRouteTimeSeries(routeId, hours));
 });
 
