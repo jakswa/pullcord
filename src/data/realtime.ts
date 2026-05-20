@@ -411,7 +411,7 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
       .filter(v => v.tripId && v.vehicleId)
       .map(v => v.tripId);
     const tripStopSeqs = allVehicleTripIds.length > 0
-      ? getTripStopSequences(allVehicleTripIds) : new Map();
+      ? getTripStopSequences(allVehicleTripIds) : new Map<string, Array<{ stop_id: string; lat: number; lon: number; sequence: number; arrival_time: string }>>();
 
     for (const veh of vehicles) {
       if (!veh.tripId || !veh.vehicleId) continue;

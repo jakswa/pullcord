@@ -326,37 +326,39 @@ interface RailSample {
   scheduledCount: number;
 }
 
-async function sampleRailMetrics(): Promise<RailSample[]> {
-  let arrivals;
-  try {
-    arrivals = await fetchRailArrivals();
-  } catch {
-    return [];
-  }
-
-  const byLine = new Map<string, { trains: Set<string>; totalWait: number; count: number; realtime: number; scheduled: number }>();
-
-  for (const a of arrivals) {
-    let line = byLine.get(a.line);
-    if (!line) {
-      line = { trains: new Set(), totalWait: 0, count: 0, realtime: 0, scheduled: 0 };
-      byLine.set(a.line, line);
-    }
-    line.trains.add(a.trainId);
-    line.totalWait += a.waitSeconds;
-    line.count++;
-    if (a.isRealtime) line.realtime++;
-    else line.scheduled++;
-  }
-
-  return Array.from(byLine.entries()).map(([lineName, data]) => ({
-    line: lineName,
-    trains: data.trains.size,
-    avgDelaySec: data.count > 0 ? data.totalWait / data.count : 0,
-    realtimeCount: data.realtime,
-    scheduledCount: data.scheduled,
-  }));
-}
+// Rail sampling paused — sampleRailMetrics commented out because fetchRailArrivals
+// import is disabled (no good KPI yet). Re-enable when we find one.
+// async function sampleRailMetrics(): Promise<RailSample[]> {
+//   let arrivals;
+//   try {
+//     arrivals = await fetchRailArrivals();
+//   } catch {
+//     return [];
+//   }
+//
+//   const byLine = new Map<string, { trains: Set<string>; totalWait: number; count: number; realtime: number; scheduled: number }>();
+//
+//   for (const a of arrivals) {
+//     let line = byLine.get(a.line);
+//     if (!line) {
+//       line = { trains: new Set(), totalWait: 0, count: 0, realtime: 0, scheduled: 0 };
+//       byLine.set(a.line, line);
+//     }
+//     line.trains.add(a.trainId);
+//     line.totalWait += a.waitSeconds;
+//     line.count++;
+//     if (a.isRealtime) line.realtime++;
+//     else line.scheduled++;
+//   }
+//
+//   return Array.from(byLine.entries()).map(([lineName, data]) => ({
+//     line: lineName,
+//     trains: data.trains.size,
+//     avgDelaySec: data.count > 0 ? data.totalWait / data.count : 0,
+//     realtimeCount: data.realtime,
+//     scheduledCount: data.scheduled,
+//   }));
+// }
 
 // ─── Collection orchestrator ───
 
@@ -452,7 +454,7 @@ export function cleanOldMetrics(): void {
   const cutoff = Math.floor(Date.now() / 1000) - RETENTION_DAYS * 86400;
   try {
     const db = getDb();
-    const result = db.run(`DELETE FROM metrics WHERE ts < ?`, cutoff);
+    const result = db.run(`DELETE FROM metrics WHERE ts < ?`, [cutoff]);
     if (result.changes > 0) {
       console.log(`📊 Metrics cleanup: removed ${result.changes} old rows`);
     }
