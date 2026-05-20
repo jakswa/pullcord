@@ -304,6 +304,11 @@
   // ─── Geolocation ───
 
   function locateUser() {
+    if (!navigator.geolocation) {
+      const btn = document.getElementById('explore-locate-btn');
+      if (btn) btn.classList.remove('explore-locating');
+      return;
+    }
     const btn = document.getElementById('explore-locate-btn');
     if (btn) btn.classList.add('explore-locating');
 
