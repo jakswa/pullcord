@@ -198,7 +198,7 @@ app.get("/health/diag", async (c) => {
     const FeedMessage = protoRoot.lookupType("transit_realtime.FeedMessage");
 
     const buffer = await response.arrayBuffer();
-    const message = FeedMessage.decode(new Uint8Array(buffer));
+    const message = FeedMessage.decode(new Uint8Array(buffer)) as any;
     const entities: any[] = message.entity || [];
 
     diag.rawEntities = entities.length;

@@ -172,7 +172,7 @@ export class GTFSImporter {
 
     const tx = this.db.transaction(() => {
       for (const record of records) {
-        stmt.run(...Object.values(record));
+        stmt.run(...(Object.values(record) as [string]));
       }
     });
     tx();
@@ -206,7 +206,7 @@ export class GTFSImporter {
           );
         }
         for (const record of chunk) {
-          stmt!.run(...Object.values(record));
+          stmt!.run(...(Object.values(record) as [string]));
         }
         totalCount += chunk.length;
         chunk = [];
@@ -271,7 +271,7 @@ export class GTFSImporter {
     );
     const tx = this.db.transaction(() => {
       for (const record of records) {
-        stmt.run(...Object.values(record));
+        stmt.run(...(Object.values(record) as [string]));
       }
       // group_id = MIN(stop_id) per stop_name — groups directional stops at same location
       this.db.run(`
@@ -435,8 +435,8 @@ export class GTFSImporter {
     if (tripIds.length === 0) {
       console.log('No expired trips to clean');
       // Still clean calendar entries even if no trips
-      this.db.run(`DELETE FROM calendar WHERE end_date < ?`, today);
-      this.db.run(`DELETE FROM calendar_dates WHERE service_id IN (${placeholders})`, ...ids);
+      this.db.run(`DELETE FROM calendar WHERE end_date < ?`, [today]);
+      this.db.run(`DELETE FROM calendar_dates WHERE service_id IN (${placeholders})`, ids);
       return;
     }
 
@@ -446,21 +446,21 @@ export class GTFSImporter {
       for (let i = 0; i < tripIds.length; i += 500) {
         const chunk = tripIds.slice(i, i + 500);
         const ph = chunk.map(() => '?').join(',');
-        this.db.run(`DELETE FROM stop_times WHERE trip_id IN (${ph})`, ...chunk);
+        this.db.run(`DELETE FROM stop_times WHERE trip_id IN (${ph})`, chunk);
       }
 
       // Delete trips
-      this.db.run(`DELETE FROM trips WHERE service_id IN (${placeholders})`, ...ids);
+      this.db.run(`DELETE FROM trips WHERE service_id IN (${placeholders})`, ids);
 
       // Delete expired calendar entries
-      this.db.run(`DELETE FROM calendar WHERE end_date < ?`, today);
-      this.db.run(`DELETE FROM calendar_dates WHERE service_id IN (${placeholders})`, ...ids);
+      this.db.run(`DELETE FROM calendar WHERE end_date < ?`, [today]);
+      this.db.run(`DELETE FROM calendar_dates WHERE service_id IN (${placeholders})`, ids);
 
       // Shapes: only delete if no remaining trips reference them
       for (const shapeId of shapeIds) {
         const remaining = this.db.prepare('SELECT 1 FROM trips WHERE shape_id = ? LIMIT 1').get(shapeId);
         if (!remaining) {
-          this.db.run('DELETE FROM shapes WHERE shape_id = ?', shapeId);
+          this.db.run('DELETE FROM shapes WHERE shape_id = ?', [shapeId]);
         }
       }
     });

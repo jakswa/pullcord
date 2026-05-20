@@ -9,13 +9,15 @@ import {
   RailTrainTimeline,
 } from "../views/pages/Rail.js";
 
-const app = new Hono();
+type Env = { Variables: { isRailHost: boolean } };
+
+const app = new Hono<Env>();
 
 // GET /rail — landing page (all stations)
 app.get("/rail", async (c) => {
   const arrivals = await fetchArrivals();
   const partial = c.req.query("partial");
-  const isRailHost = c.get("isRailHost" as any) || false;
+  const isRailHost = c.get("isRailHost") || false;
 
   if (partial === "1") {
     return c.html(<RailStationList arrivals={arrivals} />);
@@ -29,7 +31,7 @@ app.get("/rail/train/:trainId", async (c) => {
   const trainId = c.req.param("trainId");
   const arrivals = await fetchArrivals();
   const partial = c.req.query("partial");
-  const isRailHost = c.get("isRailHost" as any) || false;
+  const isRailHost = c.get("isRailHost") || false;
 
   if (partial === "1") {
     return c.html(<RailTrainTimeline trainId={trainId} arrivals={arrivals} />);
@@ -44,7 +46,7 @@ app.get("/rail/train/:trainId", async (c) => {
 app.get("/rail/:slug", async (c) => {
   const slug = c.req.param("slug");
   const arrivals = await fetchArrivals();
-  const isRailHost = c.get("isRailHost" as any) || false;
+  const isRailHost = c.get("isRailHost") || false;
 
   // Find matching station
   const stationArrivals = arrivals.filter(

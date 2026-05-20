@@ -15,7 +15,7 @@ if (startupPromotion.promoted) {
 }
 
 const dbPath = resolveScheduleDbPath();
-console.log(`📊 Database: ${Bun.file(dbPath).exists() ? "✓ Found" : "❌ Missing"} (${dbPath})`);
+console.log(`📊 Database: ${await Bun.file(dbPath).exists() ? "✓ Found" : "❌ Missing"} (${dbPath})`);
 
 runMigrations(); // throws on failure → process crashes → no server bind → deploy fails
 
