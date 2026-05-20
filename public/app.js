@@ -1163,15 +1163,15 @@ class PullcordApp {
     const isScheduled = !pred.isRealtime;
     const opacity = isScheduled ? 'opacity:0.45' : '';
     const timePrefix = isScheduled ? '~' : '';
-    const href = pred.trainId ? `/rail/train/${pred.trainId}` : '#';
+    const href = pred.trainId ? `/rail/train/${this.esc(pred.trainId)}` : '#';
 
     const timeText = minutes < 1 ? 'NOW' : `${timePrefix}${minutes} min`;
     return `
       <a class="d-upcoming-row d-rail-row" style="--row-color:${color};${opacity}" href="${href}">
         <div class="d-upcoming-info">
           <div class="d-upcoming-headsign">
-            <span class="d-rail-dir">${pred.direction}</span>
-            <span class="d-rail-line" style="background:${color}">${pred.line.toLowerCase()}</span>
+            <span class="d-rail-dir">${this.esc(pred.direction)}</span>
+            <span class="d-rail-line" style="background:${color}">${this.esc(pred.line).toLowerCase()}</span>
             ${this.esc(pred.headsign || '')}
           </div>
         </div>
@@ -1585,10 +1585,11 @@ class PullcordApp {
     Object.values(shapes).forEach(coords => {
       if (coords.length === 0) return;
       // Outline
-      L.polyline(coords, {
+      const outline = L.polyline(coords, {
         color: '#1e293b', weight: 8, opacity: 0.8,
         lineCap: 'round', lineJoin: 'round'
       }).addTo(this.map);
+      this.routePolylines.push(outline);
       // Route color
       const poly = L.polyline(coords, {
         color: this.routeColor, weight: 4, opacity: 0.9,
