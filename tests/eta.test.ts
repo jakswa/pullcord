@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { computeETA, parseTimeToSec, type TripStop } from '../src/data/eta';
+import { computeETA, parseTimeToSec, computeAdherenceSec, type TripStop } from '../src/data/eta';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -349,5 +349,52 @@ describe('computeETA', () => {
       expect(result!.eta).toBeGreaterThan(70);
       expect(result!.eta).toBeLessThan(110);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeAdherenceSec
+// ---------------------------------------------------------------------------
+
+describe('computeAdherenceSec', () => {
+  // 2026-05-20 04:00:00 UTC = midnight ET (EDT, UTC-4)
+  const midnight_et_unix = 1747713600;
+
+  test('on-time bus returns 0', () => {
+    // 18:30 ET = midnight_et + 18h30m
+    const rtArrival = midnight_et_unix + 18 * 3600 + 30 * 60;
+    const result = computeAdherenceSec(rtArrival, "18:30:00");
+    expect(result).toBe(0);
+  });
+
+  test('bus 5 min late returns positive', () => {
+    const rtArrival = midnight_et_unix + 18 * 3600 + 35 * 60; // arrived at 18:35 ET
+    const result = computeAdherenceSec(rtArrival, "18:30:00");
+    expect(result).toBe(300); // 5 min late
+  });
+
+  test('bus 3 min early returns negative', () => {
+    const rtArrival = midnight_et_unix + 18 * 3600 + 27 * 60; // arrived at 18:27 ET
+    const result = computeAdherenceSec(rtArrival, "18:30:00");
+    expect(result).toBe(-180); // 3 min early
+  });
+
+  test('delta beyond 30 min returns null', () => {
+    const rtArrival = midnight_et_unix + 20 * 3600; // 20:00 ET, scheduled 18:30 = 90 min late
+    const result = computeAdherenceSec(rtArrival, "18:30:00");
+    expect(result).toBeNull();
+  });
+
+  test('overnight GTFS time (25:30:00) adjusts service day', () => {
+    // 25:30:00 means 1:30 AM the next calendar day, but same service day as yesterday
+    // Real arrival at 1:30 AM next day = midnight_et + 25.5 hours
+    const rtArrival = midnight_et_unix + 25 * 3600 + 30 * 60;
+    const result = computeAdherenceSec(rtArrival, "25:30:00");
+    expect(result).toBe(0);
+  });
+
+  test('malformed time string returns null', () => {
+    expect(computeAdherenceSec(1747713600, "abc")).toBeNull();
+    expect(computeAdherenceSec(1747713600, "")).toBeNull();
   });
 });

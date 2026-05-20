@@ -1,7 +1,7 @@
 import { load } from "protobufjs";
 import path from "path";
 import { getScheduledArrivals, getStopIdsByName, getTripStopSequences, type Trip } from "./db";
-import { computeETA, parseTimeToSec, type TripStop } from "./eta";
+import { computeETA, parseTimeToSec, computeAdherenceSec, type TripStop } from "./eta";
 const VEHICLE_POSITIONS_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehiclepositions.pb";
 const TRIP_UPDATES_URL = "https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/tripupdate/tripupdates.pb";
 const CACHE_DURATION = 30 * 1000; // 30 seconds
@@ -270,30 +270,6 @@ class RealtimeDataService {
 // Single function for all prediction paths — single-route, multi-route, with or without tiers.
 // Handles: paired stops, ETA, staleness, adherence, dedup, tier classification.
 // ─────────────────────────────────────
-
-// Compute schedule adherence: positive = late, negative = early
-// Returns null if delta is unreasonable (>30 min, likely midnight edge case)
-function computeAdherenceSec(rtArrivalSec: number, scheduledTimeStr: string): number | null {
-  const parts = scheduledTimeStr.split(':').map(Number);
-  if (parts.length < 2) return null;
-  const [h, m, s] = [parts[0], parts[1], parts[2] || 0];
-  const schedTotalSec = h * 3600 + m * 60 + s;
-
-  // Determine service midnight from the RT arrival date in Eastern time
-  // (GTFS schedule times are in America/New_York; server may be UTC on Fly.io)
-  const rtDate = new Date(rtArrivalSec * 1000);
-  const etNow = new Date(rtDate.toLocaleString("en-US", { timeZone: "America/New_York" }));
-  const todayMidnightSec = new Date(etNow.getFullYear(), etNow.getMonth(), etNow.getDate()).getTime() / 1000;
-
-  // GTFS times >= 24:00:00 mean the service day started yesterday
-  const serviceMidnightSec = h >= 24 ? todayMidnightSec - 86400 : todayMidnightSec;
-  const scheduledSec = serviceMidnightSec + schedTotalSec;
-  const delta = Math.round(rtArrivalSec - scheduledSec);
-
-  // Cap at ±30 min — anything beyond is likely a data edge case
-  if (Math.abs(delta) > 1800) return null;
-  return delta;
-}
 
 // Singleton instance
 const realtimeService = new RealtimeDataService();

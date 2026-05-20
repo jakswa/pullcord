@@ -114,3 +114,33 @@ export function computeETA(
 
   return { eta: Math.max(0, Math.round(eta)), atTerminal: false };
 }
+
+/**
+ * Compute schedule adherence: positive = late, negative = early.
+ * Returns null if the delta exceeds ±30 min (likely a data edge case).
+ *
+ * Works correctly regardless of the server's local timezone by deriving
+ * midnight-ET as a Unix timestamp from the ET time-of-day components.
+ */
+export function computeAdherenceSec(rtArrivalSec: number, scheduledTimeStr: string): number | null {
+  const parts = scheduledTimeStr.split(':').map(Number);
+  if (parts.length < 2) return null;
+  const [h, m, s] = [parts[0], parts[1], parts[2] || 0];
+  const schedTotalSec = h * 3600 + m * 60 + s;
+
+  // Determine service midnight from the RT arrival date in Eastern time
+  // (GTFS schedule times are in America/New_York; server may be UTC on Fly.io)
+  const rtDate = new Date(rtArrivalSec * 1000);
+  const etNow = new Date(rtDate.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const elapsedSinceETMidnight = etNow.getHours() * 3600 + etNow.getMinutes() * 60 + etNow.getSeconds();
+  const todayMidnightSec = rtArrivalSec - elapsedSinceETMidnight;
+
+  // GTFS times >= 24:00:00 mean the service day started yesterday
+  const serviceMidnightSec = h >= 24 ? todayMidnightSec - 86400 : todayMidnightSec;
+  const scheduledSec = serviceMidnightSec + schedTotalSec;
+  const delta = Math.round(rtArrivalSec - scheduledSec);
+
+  // Cap at ±30 min — anything beyond is likely a data edge case
+  if (Math.abs(delta) > 1800) return null;
+  return delta;
+}
