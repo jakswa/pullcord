@@ -17,7 +17,22 @@ const MAX_DELAY_SEC = 1800; // 30 min — beyond this, assume data error
 const STALE_VEHICLE_SEC = 300; // 5 min — GPS older than this = ghost
 
 // MARTA rail route IDs in GTFS — exclude from bus metrics
-const RAIL_ROUTE_IDS = new Set(["27448", "27449", "27450", "27451"]);
+// Dynamically queried from the routes table (route_type = 1 = rail)
+let railRouteIds: Set<string> | null = null;
+
+function getRailRouteIds(db: Database): Set<string> {
+  if (railRouteIds) return railRouteIds;
+  const rows = db.prepare(
+    `SELECT route_id FROM routes WHERE route_type = 1`
+  ).all() as { route_id: string }[];
+  railRouteIds = new Set(rows.map(r => String(r.route_id)));
+  console.log(`📊 Rail route IDs cached: ${[...railRouteIds].join(", ") || "(none)"}`);
+  return railRouteIds;
+}
+
+export function invalidateRailRouteCache(): void {
+  railRouteIds = null;
+}
 
 let metricsDb: Database | null = null;
 let lastSampleTs = 0;
@@ -143,9 +158,10 @@ function getScheduledTripsPerRoute(db: Database): Map<string, number> {
   const spans = getTripTimeSpans(db);
   const nowSec = getCurrentTimeSec();
 
+  const railIds = getRailRouteIds(db);
   const counts = new Map<string, number>();
   for (const [, span] of spans) {
-    if (RAIL_ROUTE_IDS.has(span.routeId)) continue; // rail tracked separately
+    if (railIds.has(span.routeId)) continue; // rail tracked separately
     if (!serviceIds.has(span.serviceId)) continue;
     if (span.firstSec > nowSec || span.lastSec < nowSec) continue;
     counts.set(span.routeId, (counts.get(span.routeId) || 0) + 1);
