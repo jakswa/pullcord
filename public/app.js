@@ -1069,7 +1069,7 @@ class PullcordApp {
       row.addEventListener('click', () => {
         const vid = row.dataset.vehicle || null;
         const tid = row.dataset.trip || null;
-        const dir = row.dataset.dir != null ? parseInt(row.dataset.dir, 10) : null;
+        const dir = row.dataset.dir ? parseInt(row.dataset.dir, 10) : null;
 
         // Track this specific trip (or vehicle, or index for vehicleless predictions)
         this.trackedTripId = tid;
