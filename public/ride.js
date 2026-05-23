@@ -25,8 +25,11 @@
   let followBus = true; // map follows bus by default
   let routeShortName = '';
   let routeColor = '#E85D3A';
+  let missCount = 0;
+  let pollId = null;
   const CORD_ZONE_STOPS = 2;
   const BUS_POLL_MS = 10000;
+  const MAX_MISSES = 3;
 
   // ─── Init ───
 
@@ -84,7 +87,7 @@
 
     // Poll bus position immediately + interval
     pollBus();
-    setInterval(pollBus, BUS_POLL_MS);
+    pollId = setInterval(pollBus, BUS_POLL_MS);
 
     // If user pans/zooms, stop following bus
     map.on('dragstart', () => { followBus = false; });
@@ -212,7 +215,17 @@
       const data = await res.json();
       const vehicles = data.vehicles || [];
       const bus = vehicles.find(v => v.tripId === tripId);
-      if (!bus) return;
+      if (!bus) {
+        missCount++;
+        if (missCount >= MAX_MISSES) {
+          setStatus('Bus position unavailable — trip may have ended');
+          if (busMarker) busMarker.setOpacity(0.4);
+          clearInterval(pollId);
+        }
+        return;
+      }
+
+      missCount = 0;
 
       busLatLon = [bus.lat, bus.lon];
       busBearing = bus.bearing || 0;
