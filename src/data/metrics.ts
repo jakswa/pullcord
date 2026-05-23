@@ -17,13 +17,13 @@ const MAX_DELAY_SEC = 1800; // 30 min — beyond this, assume data error
 const STALE_VEHICLE_SEC = 300; // 5 min — GPS older than this = ghost
 
 // MARTA rail route IDs in GTFS — exclude from bus metrics
-// Dynamically queried from the routes table (route_type = 1 = rail)
+// Dynamically queried by short name (same pattern as gtfs-import.ts line 491)
 let railRouteIds: Set<string> | null = null;
 
 function getRailRouteIds(db: Database): Set<string> {
   if (railRouteIds) return railRouteIds;
   const rows = db.prepare(
-    `SELECT route_id FROM routes WHERE route_type = 1`
+    `SELECT route_id FROM routes WHERE route_short_name IN ('BLUE','GOLD','GREEN','RED')`
   ).all() as { route_id: string }[];
   railRouteIds = new Set(rows.map(r => String(r.route_id)));
   console.log(`📊 Rail route IDs cached: ${[...railRouteIds].join(", ") || "(none)"}`);
