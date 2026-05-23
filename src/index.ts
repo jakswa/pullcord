@@ -21,7 +21,7 @@ runMigrations(); // throws on failure → process crashes → no server bind →
 
 // ── Safe to import DB-dependent modules now ──
 const { default: app } = await import("./app.js");
-const { collectMetrics, cleanOldMetrics } = await import("./data/metrics.js");
+const { collectMetrics, cleanOldMetrics, invalidateTripSpanCache, invalidateRailRouteCache } = await import("./data/metrics.js");
 const { getMatchRate, isVehicleCacheWarm } = await import("./data/realtime.js");
 const { getTripLookup, invalidateCaches } = await import("./data/db.js");
 
@@ -38,6 +38,8 @@ async function refreshAndRestartIfPromoted(reason: string) {
     process.exit(0);
   }
   invalidateCaches();
+  invalidateTripSpanCache();
+  invalidateRailRouteCache();
 }
 
 // Daily GTFS refresh: every day at 3am ET. This is the only in-app path that
