@@ -132,14 +132,25 @@ import { getTripLookup } from "./data/db.js";
 import { isRefreshing } from "./data/gtfs-import.js";
 import { getScheduleStatus } from "./data/schedules.js";
 
+// 30-second TTL cache for /health to avoid opening fresh DB connections on every poll
+let healthCache: { data: Record<string, unknown>; status: number; expiresAt: number } | null = null;
+const HEALTH_CACHE_TTL_MS = 30_000;
+
 app.get("/health", async (c) => {
+  const now = Date.now();
+  if (healthCache && now < healthCache.expiresAt) {
+    return c.json(healthCache.data, healthCache.status as 200);
+  }
+
   const dbCheck = verifyDatabase();
   if (!dbCheck.ok) {
-    return c.json({
+    const data = {
       status: "unhealthy",
       timestamp: new Date().toISOString(),
       db: dbCheck,
-    }, 503);
+    };
+    // Don't cache unhealthy responses — re-check on next request
+    return c.json(data, 503);
   }
 
   // GTFS staleness check — only when vehicle cache is already warm (no network call)
@@ -154,13 +165,17 @@ app.get("/health", async (c) => {
     }
   }
 
-  return c.json({
+  const data = {
     status: "healthy",
     timestamp: new Date().toISOString(),
     db: { version: dbCheck.version, tables: dbCheck.tables },
     schedule: getScheduleStatus(),
     ...(gtfs && { gtfs }),
-  });
+  };
+
+  healthCache = { data, status: 200, expiresAt: now + HEALTH_CACHE_TTL_MS };
+
+  return c.json(data);
 });
 
 // Diagnostic endpoint — actively probes MARTA realtime API and reports detailed status
