@@ -609,6 +609,7 @@ class PullcordApp {
       } else {
         // Tab is visible again — immediate fresh fetch, then restart intervals
         this.updateData();
+        if (this.pollTimer) clearInterval(this.pollTimer);
         this.pollTimer = setInterval(() => this.updateData(), this.config.pollInterval);
         if (this.railEnabled) {
           this.fetchRailArrivals();
