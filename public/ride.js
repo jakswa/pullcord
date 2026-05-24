@@ -26,7 +26,7 @@
   let routeShortName = '';
   let routeColor = '#E85D3A';
   let missCount = 0;
-  let pollId = null;
+  let busPollTimer = null;
   const CORD_ZONE_STOPS = 2;
   const BUS_POLL_MS = 10000;
   const MAX_MISSES = 3;
@@ -87,12 +87,32 @@
 
     // Poll bus position immediately + interval
     pollBus();
-    pollId = setInterval(pollBus, BUS_POLL_MS);
+    busPollTimer = setInterval(pollBus, BUS_POLL_MS);
 
     // If user pans/zooms, stop following bus
     map.on('dragstart', () => { followBus = false; });
 
     setStatus('Waiting for bus position...');
+
+    // Pause polling + GPS when tab is hidden to save battery
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (busPollTimer) {
+          clearInterval(busPollTimer);
+          busPollTimer = null;
+        }
+        if (watchId != null) {
+          navigator.geolocation.clearWatch(watchId);
+          watchId = null;
+        }
+      } else {
+        // Tab is visible again — immediate fetch, restart intervals + GPS
+        pollBus();
+        if (busPollTimer) clearInterval(busPollTimer);
+        busPollTimer = setInterval(pollBus, BUS_POLL_MS);
+        startTracking();
+      }
+    });
   }
 
   // ─── Map ───
@@ -220,7 +240,7 @@
         if (missCount >= MAX_MISSES) {
           setStatus('Bus position unavailable — trip may have ended');
           if (busMarker) busMarker.setOpacity(0.4);
-          clearInterval(pollId);
+          clearInterval(busPollTimer);
         }
         return;
       }

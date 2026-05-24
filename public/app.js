@@ -385,6 +385,7 @@ class PullcordApp {
     }
     if (!this.multiRoute) this.discoverOtherRoutes();
     this.startPolling();
+    this.initVisibilityHandler();
   }
 
   // Load route-specific data (shapes, stops, vehicles) for multi-route map/progress
@@ -589,6 +590,33 @@ class PullcordApp {
   initRefreshBtn() {
     const btn = document.getElementById('refresh-btn');
     if (btn) btn.addEventListener('click', () => this.updateData());
+  }
+
+  // ── Page Visibility — pause polling when tab is hidden ──
+  initVisibilityHandler() {
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // Pause all timers to save battery
+        if (this.pollTimer) {
+          clearInterval(this.pollTimer);
+          this.pollTimer = null;
+        }
+        this.stopCountdown();
+        if (this._railTimer) {
+          clearInterval(this._railTimer);
+          this._railTimer = null;
+        }
+      } else {
+        // Tab is visible again — immediate fresh fetch, then restart intervals
+        this.updateData();
+        if (this.pollTimer) clearInterval(this.pollTimer);
+        this.pollTimer = setInterval(() => this.updateData(), this.config.pollInterval);
+        if (this.railEnabled) {
+          this.fetchRailArrivals();
+        }
+        // Countdown is restarted by renderHero() inside updateData()
+      }
+    });
   }
 
   initFavoriteBtn() {
