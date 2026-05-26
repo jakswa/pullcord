@@ -11,6 +11,9 @@ import {
 
 type Env = { Variables: { isRailHost: boolean } };
 
+const TRAIN_ID_RE = /^[a-zA-Z0-9_-]{1,20}$/;
+const SLUG_RE = /^[a-z0-9-]{1,60}$/;
+
 const app = new Hono<Env>();
 
 // GET /rail — landing page (all stations)
@@ -29,6 +32,7 @@ app.get("/rail", async (c) => {
 // GET /rail/train/:trainId — train timeline
 app.get("/rail/train/:trainId", async (c) => {
   const trainId = c.req.param("trainId");
+  if (!TRAIN_ID_RE.test(trainId)) return c.notFound();
   const arrivals = await fetchArrivals();
   const partial = c.req.query("partial");
   const isRailHost = c.get("isRailHost") || false;
@@ -45,6 +49,7 @@ app.get("/rail/train/:trainId", async (c) => {
 // GET /rail/:slug — station detail
 app.get("/rail/:slug", async (c) => {
   const slug = c.req.param("slug");
+  if (!SLUG_RE.test(slug)) return c.notFound();
   const arrivals = await fetchArrivals();
   const isRailHost = c.get("isRailHost") || false;
 
