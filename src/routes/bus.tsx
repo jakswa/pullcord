@@ -175,7 +175,7 @@ app.get("/bus", async (c) => {
 // Redirect old /stop URLs to /bus
 app.get("/stop", (c) => {
   const stopId = c.req.query("id");
-  return stopId ? c.redirect(`/bus?stop=${stopId}`) : c.redirect("/");
+  return stopId ? c.redirect(`/bus?stop=${encodeURIComponent(stopId)}`) : c.redirect("/");
 });
 
 export default app;

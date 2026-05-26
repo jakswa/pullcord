@@ -83,6 +83,8 @@ app.use("*", async (c, next) => {
   c.header("X-Frame-Options", "DENY");
   c.header("X-XSS-Protection", "1; mode=block");
   c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  c.header("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
+  c.header("Permissions-Policy", "geolocation=(self), push=(self), camera=(), microphone=()");
   c.header(
     "Content-Security-Policy",
     "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' https://unpkg.com 'unsafe-inline'; connect-src 'self' https://developerservices.itsmarta.com:*; img-src 'self' https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com data: blob:; font-src 'self'; worker-src 'self'; manifest-src 'self'"
@@ -116,12 +118,10 @@ app.route("/", statsRoutes);
 // Serve push SW from root scope (SW scope = path of the file)
 app.get("/push-sw.js", async (c) => {
   const file = Bun.file("./public/push-sw.js");
-  return new Response(await file.arrayBuffer(), {
-    headers: {
-      "Content-Type": "application/javascript",
-      "Service-Worker-Allowed": "/",
-    },
-  });
+  c.header("Content-Type", "application/javascript");
+  c.header("Service-Worker-Allowed", "/");
+  c.header("Cache-Control", "no-cache");
+  return c.body(await file.arrayBuffer());
 });
 
 // Health check endpoint — verifies DB is queryable
