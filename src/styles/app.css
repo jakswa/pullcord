@@ -801,7 +801,7 @@
      STALENESS DOTS (shared)
      ────────────────────────────── */
 
-  .dot-live, .dot-delayed, .dot-stale, .dot-lost, .dot-rescued {
+  .dot-live, .dot-delayed, .dot-stale, .dot-lost, .dot-rescued, .dot-terminal {
     display: inline-block;
     width: 7px;
     height: 7px;

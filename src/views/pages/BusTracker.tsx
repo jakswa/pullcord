@@ -111,10 +111,10 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
           <div id="cord-idle" class="d-cord-idle">
             <div class="d-cord-label" id="cord-label">🔔 Alert me</div>
             <div id="cord-options" class="d-cord-options">
-              <button class="d-cord-option" data-minutes="2" type="button">2m</button>
-              <button class="d-cord-option" data-minutes="5" type="button">5m</button>
-              <button class="d-cord-option" data-minutes="10" type="button">10m</button>
-              <button class="d-cord-option" data-minutes="15" type="button">15m</button>
+              <button class="d-cord-option" data-minutes="2" type="button" aria-label="Alert me 2 minutes before arrival">2m</button>
+              <button class="d-cord-option" data-minutes="5" type="button" aria-label="Alert me 5 minutes before arrival">5m</button>
+              <button class="d-cord-option" data-minutes="10" type="button" aria-label="Alert me 10 minutes before arrival">10m</button>
+              <button class="d-cord-option" data-minutes="15" type="button" aria-label="Alert me 15 minutes before arrival">15m</button>
             </div>
           </div>
           <div id="cord-active-display" class="d-cord-active hidden">
