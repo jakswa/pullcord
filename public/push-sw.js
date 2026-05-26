@@ -2,7 +2,12 @@
 // This SW exists solely to receive push events and show notifications
 
 self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : {};
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { title: 'Bus Alert', body: 'Your bus may be arriving soon' };
+  }
   const title = data.title || 'Pullcord';
   const options = {
     body: data.body || 'Your bus is arriving soon!',
