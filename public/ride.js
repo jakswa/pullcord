@@ -27,6 +27,9 @@
   let routeColor = '#E85D3A';
   let missCount = 0;
   let busPollTimer = null;
+  let tripEnded = false;
+  let polling = false;
+  let prevBusStopIndex = -1;
   const CORD_ZONE_STOPS = 2;
   const BUS_POLL_MS = 10000;
   const MAX_MISSES = 3;
@@ -107,9 +110,11 @@
         }
       } else {
         // Tab is visible again — immediate fetch, restart intervals + GPS
-        pollBus();
-        if (busPollTimer) clearInterval(busPollTimer);
-        busPollTimer = setInterval(pollBus, BUS_POLL_MS);
+        if (!tripEnded) {
+          pollBus();
+          if (busPollTimer) clearInterval(busPollTimer);
+          busPollTimer = setInterval(pollBus, BUS_POLL_MS);
+        }
         startTracking();
       }
     });
@@ -229,6 +234,8 @@
 
   async function pollBus() {
     if (!routeId) return;
+    if (polling) return;
+    polling = true;
     try {
       const res = await fetch(`/api/realtime/${routeId}`);
       if (!res.ok) return;
@@ -241,6 +248,8 @@
           setStatus('Bus position unavailable — trip may have ended');
           if (busMarker) busMarker.setOpacity(0.4);
           clearInterval(busPollTimer);
+          busPollTimer = null;
+          tripEnded = true;
         }
         return;
       }
@@ -277,7 +286,9 @@
       if (followBus) {
         map.setView(busLatLon, Math.max(map.getZoom(), 16), { animate: true });
       }
-    } catch (err) { /* silent */ }
+    } catch (err) { /* silent */ } finally {
+      polling = false;
+    }
   }
 
   function makeBusIcon(bearing) {
@@ -299,6 +310,7 @@
 
   function startTracking() {
     if (!navigator.geolocation) return;
+    if (watchId != null) return;
 
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -402,10 +414,13 @@
       el.classList.toggle('ride-stop-current', i === busStopIndex);
     });
 
-    // Scroll bus's current stop into view
-    const current = document.querySelector('.ride-stop-current');
-    if (current) {
-      current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Only scroll when the bus advances to a new stop
+    if (busStopIndex !== prevBusStopIndex) {
+      prevBusStopIndex = busStopIndex;
+      const current = document.querySelector('.ride-stop-current');
+      if (current) {
+        current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
   }
 
