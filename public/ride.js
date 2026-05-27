@@ -60,7 +60,7 @@
     // Fetch route info for badge + color
     if (routeId) {
       try {
-        const rRes = await fetch(`/api/realtime/${routeId}`);
+        const rRes = await fetch(`/api/route/${routeId}`);
         if (rRes.ok) {
           const rData = await rRes.json();
           if (rData.route?.route_short_name) {

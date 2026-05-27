@@ -1,6 +1,14 @@
 // Pullcord Push Service Worker — notification delivery ONLY, zero caching
 // This SW exists solely to receive push events and show notifications
 
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('push', (event) => {
   let data = {};
   try {
