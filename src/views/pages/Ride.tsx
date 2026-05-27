@@ -1,7 +1,4 @@
-/** Safely serialize data for embedding in a <script> tag. Escapes '<' to prevent </script> injection. */
-function safeJsonForScript(data: unknown): string {
-  return JSON.stringify(data).replace(/</g, '\\u003c');
-}
+import { safeJsonForScript } from "../helpers.js";
 
 export const RidePage = ({ tripId, stopId, routeId }: { tripId: string; stopId: string; routeId: string }) => (
   <div class="ride-shell">

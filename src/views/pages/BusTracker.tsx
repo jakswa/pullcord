@@ -1,9 +1,5 @@
 import type { Route, Stop, RouteDetail } from "../../data/db.js";
-
-/** Safely serialize data for embedding in a <script> tag. Escapes '<' to prevent </script> injection. */
-function safeJsonForScript(data: unknown): string {
-  return JSON.stringify(data).replace(/</g, '\\u003c');
-}
+import { safeJsonForScript } from "../helpers.js";
 
 export interface BusTrackerPageProps {
   route: Route | null;

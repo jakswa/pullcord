@@ -1,6 +1,7 @@
 import type { RailArrival } from "../../rail/api.js";
 import { stationSlug, stationDisplayName, getRailApiError } from "../../rail/api.js";
 import { html } from "hono/html";
+import { safeJsonForScript } from "../helpers.js";
 
 // Banner shown at the top of any rail page when the MARTA rail API is
 // unreachable. Kept dead simple — no icons, no dismiss, just a clear
@@ -571,7 +572,7 @@ export function RailStationPage({
             </div>
           </main>
         </div>
-        <script dangerouslySetInnerHTML={{ __html: `window.__RAIL_STATION = ${JSON.stringify(stationName)};` }} />
+        <script dangerouslySetInnerHTML={{ __html: `window.__RAIL_STATION = ${safeJsonForScript(stationName)};` }} />
         <script dangerouslySetInnerHTML={{ __html: buildInlineJS(false) }} />
       </body>
     </html>
