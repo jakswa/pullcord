@@ -652,7 +652,7 @@ async function extractZip(zipPath: string, gtfsDir: string) {
     if (code !== 0) throw new Error(`unzip exited ${code}`);
   } catch (error) {
     console.error("❌ GTFS extraction failed, trying python3 fallback:", error);
-    const proc = Bun.spawn(["python3", "-c", `import zipfile; zipfile.ZipFile("${zipPath}").extractall("${gtfsDir}")`]);
+    const proc = Bun.spawn(["python3", "-c", "import sys,zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])", zipPath, gtfsDir]);
     const code = await proc.exited;
     if (code !== 0) throw new Error("Both unzip and python3 extraction failed");
   }

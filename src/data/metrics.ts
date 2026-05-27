@@ -3,14 +3,16 @@
 // Computes schedule adherence: vehicles observed vs trips scheduled, per-vehicle delay
 
 import { Database } from "bun:sqlite";
-import { getTripLookup, getRoutes } from "./db";
+import path from "path";
+import { getTripLookup } from "./db";
 import { resolveScheduleDbPath } from "./schedules";
 import { getAllVehicles, isVehicleCacheWarm, type VehiclePosition } from "./realtime";
 // Rail sampling paused — no good KPI yet
 // import { fetchArrivals as fetchRailArrivals, isRailCacheWarm } from "../rail/api";
 import { parseTimeToSec, type TripStop } from "./eta";
 
-function getDBPath(): string { return resolveScheduleDbPath(); }
+const METRICS_DB_PATH = process.env.METRICS_DATABASE_URL
+  || path.join(process.cwd(), 'data', 'metrics.db');
 const SAMPLE_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const RETENTION_DAYS = 60;
 const MAX_DELAY_SEC = 1800; // 30 min — beyond this, assume data error
@@ -35,14 +37,39 @@ export function invalidateRailRouteCache(): void {
 }
 
 let metricsDb: Database | null = null;
+let scheduleDb: Database | null = null;
+let scheduleDbPath: string | null = null;
 let lastSampleTs = 0;
 
 function getDb(): Database {
   if (!metricsDb) {
-    metricsDb = new Database(getDBPath());
+    metricsDb = new Database(METRICS_DB_PATH);
     metricsDb.exec("PRAGMA journal_mode=WAL");
+    metricsDb.exec(`
+      CREATE TABLE IF NOT EXISTS metrics (
+        ts INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        route_id TEXT,
+        vehicles INTEGER,
+        ghost_count INTEGER,
+        avg_delay_sec REAL,
+        trips_active INTEGER,
+        trips_scheduled INTEGER,
+        on_time_count INTEGER
+      )
+    `);
+    metricsDb.exec(`CREATE INDEX IF NOT EXISTS idx_metrics_kind_ts ON metrics(kind, ts)`);
   }
   return metricsDb;
+}
+
+function getScheduleDb(): Database {
+  const currentPath = resolveScheduleDbPath();
+  if (scheduleDb && scheduleDbPath === currentPath) return scheduleDb;
+  if (scheduleDb) scheduleDb.close();
+  scheduleDb = new Database(currentPath, { readonly: true });
+  scheduleDbPath = currentPath;
+  return scheduleDb;
 }
 
 // ─── Spatial math (same as eta.ts, not exported there) ───
@@ -264,7 +291,7 @@ interface RouteSample {
 
 async function sampleBusMetrics(): Promise<RouteSample[]> {
   const tripLookup = getTripLookup();
-  const db = getDb();
+  const gtfsDb = getScheduleDb();
 
   // 1. Get ALL vehicles at once (one cached proto fetch)
   const allVehicles = await getAllVehicles(tripLookup);
@@ -280,11 +307,11 @@ async function sampleBusMetrics(): Promise<RouteSample[]> {
   }
 
   // 3. Scheduled trips per route (from GTFS static + calendar)
-  const scheduledByRoute = getScheduledTripsPerRoute(db);
+  const scheduledByRoute = getScheduledTripsPerRoute(gtfsDb);
 
   // 4. Batch-load trip stops for delay computation (~10ms for 175 trips)
   const activeTripIds = allVehicles.map(v => v.tripId);
-  const tripStopsMap = getBatchTripStops(db, activeTripIds);
+  const tripStopsMap = getBatchTripStops(gtfsDb, activeTripIds);
 
   // 5. Current time for delay computation
   const nowSec = getCurrentTimeSec();
