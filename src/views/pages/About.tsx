@@ -10,10 +10,10 @@ export const AboutPage = () => (
         </a>
         <div class="about-brand">
           <svg class="about-logo" width="32" height="32" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <line x1="22" y1="2" x2="22" y2="16" stroke="#6B8E23" stroke-width="3" stroke-linecap="round"/>
-            <rect x="12" y="16" width="20" height="18" rx="6" fill="#6B8E23"/>
+            <line x1="22" y1="2" x2="22" y2="16" stroke="#E85D3A" stroke-width="3" stroke-linecap="round"/>
+            <rect x="12" y="16" width="20" height="18" rx="6" fill="#E85D3A"/>
             <rect x="16" y="22" width="12" height="6" rx="3" fill="#fff" opacity="0.3"/>
-            <circle cx="22" cy="40" r="2" fill="#A3C6A8" opacity="0.6"/>
+            <circle cx="22" cy="40" r="2" fill="#F0A030" opacity="0.6"/>
           </svg>
           <span class="about-wordmark">Pullcord</span>
         </div>
