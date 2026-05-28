@@ -10,7 +10,7 @@
 
 const CSS = `<style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0c0c0c;--card:#151515;--text:#d4d0c8;--dim:#8a8478;--border:#222;--coral:#e8725a}
+:root{--bg:#0a1a0e;--card:#132a18;--text:#e8f0e4;--dim:#7a9a70;--border:#1e3a20;--coral:#6B8E23}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .wrap{max-width:480px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column}
@@ -29,7 +29,7 @@ const ABOUT_CSS = `.about-section{padding:1rem;border-bottom:1px solid var(--bor
 .about-section h2{font-size:0.95rem;font-weight:600;color:var(--coral);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.05em}
 .about-section p{font-size:0.92rem;line-height:1.55;color:var(--text);margin-bottom:0.6rem}
 .about-section p:last-child{margin-bottom:0}
-.about-section a{color:var(--coral);border-bottom:1px solid rgba(232,114,90,0.3)}
+.about-section a{color:var(--coral);border-bottom:1px solid rgba(107,142,35,0.3)}
 .about-muted{color:var(--dim);font-size:0.85rem !important}
 .about-tag{display:inline-block;padding:0.2rem 0.5rem;margin:0.15rem 0.2rem 0.15rem 0;font-size:0.82rem;background:var(--card);border-radius:3px;color:var(--text)}
 .about-stat-row{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem}

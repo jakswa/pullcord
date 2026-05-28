@@ -24,7 +24,7 @@
   let cordZoneActive = false;
   let followBus = true; // map follows bus by default
   let routeShortName = '';
-  let routeColor = '#E85D3A';
+  let routeColor = '#6B8E23';
   let missCount = 0;
   let busPollTimer = null;
   let tripEnded = false;

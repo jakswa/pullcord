@@ -44,18 +44,18 @@ Plus `preconnect` setup cost (~100ms DNS+TLS to two origins).
 All colors defined as CSS vars on `:root`, overridden in `@media (prefers-color-scheme: dark)`.
 
 ### Brand
-- **Primary:** `#E85D3A` (coral/orange) — used for CTAs, active states, the cord, logo
-- **Brand hover:** `#D24A31`
-- **Brand active:** `#BC3F28`
+- **Primary:** `#6B8E23` (forest green) — used for CTAs, active states, the cord, logo
+- **Brand hover:** `#5A7A1E`
+- **Brand active:** `#4A6A18`
 
 ### Semantic Colors (Light / Dark)
 | Token | Light | Dark | Usage |
 |-------|-------|------|-------|
-| `--bg-primary` | `#FDF8F2` (warm cream) | `#090E1A` (near-black blue) | Page background |
-| `--bg-surface` | `#FFF` | `#111827` | Cards, elevated surfaces |
-| `--text-primary` | `#3B2820` (warm brown) | `#F1F5F9` | Headings, stop names |
-| `--text-body` | `#5C4030` | `#CBD5E1` | Body text |
-| `--text-muted` | `#A89282` | `#8896A8` | Secondary info, timestamps |
+| `--bg-primary` | `#FDFBD4` (cream) | `#0A1A0E` (dark forest) | Page background |
+| `--bg-surface` | `#FFFFF0` (ivory) | `#132A18` | Cards, elevated surfaces |
+| `--text-primary` | `#2D3A20` (dark forest) | `#E8F0E4` | Headings, stop names |
+| `--text-body` | `#4A5A3A` | `#B8CCB0` | Body text |
+| `--text-muted` | `#7A8B6A` | `#7A9A70` | Secondary info, timestamps |
 | `--live-green` | `#0D9488` (teal) | `#22C55E` (green) | Live status dots |
 | `--live-delayed` | `#F0A030` (amber) | `#EAB308` (yellow) | Delayed/late |
 
