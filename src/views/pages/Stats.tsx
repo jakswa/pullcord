@@ -280,7 +280,7 @@ function statsJS(): string {
     var d=document.getElementById("stats-data"),f=document.getElementById("fresh");
     if(!d||!f)return;
     var t=Date.now();
-    function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<5?"live":a+"s ago";f.style.color=a>60?"#6B8E23":""}
+    function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<5?"live":a+"s ago";f.style.color=a>60?"#D97706":""}
     setInterval(u,1e3);
     function poll(){fetch("/stats?partial=1",{signal:AbortSignal.timeout(8e3)}).then(function(r){if(r.ok)return r.text()}).then(function(h){if(h){d.innerHTML=h;t=Date.now();u()}}).catch(function(){})}
     var p=setInterval(poll,30000);

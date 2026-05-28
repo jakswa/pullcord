@@ -1228,7 +1228,7 @@
     gap: 0.4rem;
     flex: 1;
     padding: 0.7rem 1rem;
-    background: var(--brand);
+    background: var(--brand-hover);
     color: #fff;
     font-size: 0.95rem;
     font-weight: 600;
@@ -1239,10 +1239,10 @@
     box-shadow: 0 2px 8px rgba(107, 142, 35, 0.2);
   }
 
-  .home-locate-btn:hover { background: var(--brand-hover); }
+  .home-locate-btn:hover { background: var(--brand-active); }
   .home-locate-btn:active {
     transform: scale(0.98);
-    background: var(--brand-active);
+    background: #3D5A13;
     box-shadow: 0 2px 8px rgba(107, 142, 35, 0.2);
   }
   .home-locate-btn:disabled {

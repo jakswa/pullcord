@@ -981,7 +981,7 @@ class PullcordApp {
     // Adaptive colors
     const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const stripLine = dark ? '#1e3a20' : '#D8E5C8';
-    const stopDot = dark ? '#475569' : '#B4C4A4';
+    const stopDot = dark ? '#5a7a50' : '#B4C4A4';
     const myStopStroke = dark ? '#0a1a0e' : '#FFFFFF';
     const labelFill = dark ? '#94a3b8' : '#5A6B4A';
     const busFill = dark ? '#f8fafc' : '#2D3A20';
@@ -1157,7 +1157,7 @@ class PullcordApp {
 
     // Row color — use route color in multi-route, otherwise by tier
     const predColor = pred.routeColor ? `#${pred.routeColor}` : this.routeColor;
-    const rowColor = tier === 'next' ? '#60a5fa' : tier === 'scheduled' ? '#334155' : predColor;
+    const rowColor = tier === 'next' ? '#60a5fa' : tier === 'scheduled' ? '#5a7a50' : predColor;
 
     // Route badge for multi-route mode
     // Route number for multi-route mode — bold colored text, no pill

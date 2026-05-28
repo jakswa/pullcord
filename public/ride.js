@@ -146,7 +146,7 @@
     const coords = stops.map(s => [s.lat, s.lon]);
     // Outline
     L.polyline(coords, {
-      color: prefersDark ? '#1e293b' : '#94a3b8',
+      color: prefersDark ? '#1e3a20' : '#94a3b8',
       weight: 7, opacity: 0.5, lineCap: 'round', lineJoin: 'round',
     }).addTo(map);
     L.polyline(coords, {
