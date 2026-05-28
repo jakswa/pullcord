@@ -101,7 +101,7 @@ const STATION_COORDS: Record<string, [number, number]> = {
 
 // Inline JS — zero external requests, handles polling + starred/nearby reordering
 function buildInlineJS(isLanding: boolean): string {
-  const base = `(function(){var P=1e4,d=document.getElementById("rail-data"),f=document.getElementById("freshness");if(!d||!f)return;var t=Date.now(),p=null,b=window.location.pathname;function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<2?"live":a+"s ago";f.style.color=a>30?"#E85D3A":""}setInterval(u,1e3);u();function q(){fetch(b+"?partial=1",{signal:AbortSignal.timeout(8e3)}).then(function(r){if(r.ok)return r.text()}).then(function(h){if(h){d.innerHTML=h;t=Date.now();u();typeof reorder==="function"&&reorder();typeof postUpdate==="function"&&postUpdate()}}).catch(function(){})}p=setInterval(q,P);document.addEventListener("visibilitychange",function(){if(document.hidden){clearInterval(p);p=null}else{q();p=setInterval(q,P)}})})();`;
+  const base = `(function(){var P=1e4,d=document.getElementById("rail-data"),f=document.getElementById("freshness");if(!d||!f)return;var t=Date.now(),p=null,b=window.location.pathname;function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<2?"live":a+"s ago";f.style.color=a>30?"#D97706":""}setInterval(u,1e3);u();function q(){fetch(b+"?partial=1",{signal:AbortSignal.timeout(8e3)}).then(function(r){if(r.ok)return r.text()}).then(function(h){if(h){d.innerHTML=h;t=Date.now();u();typeof reorder==="function"&&reorder();typeof postUpdate==="function"&&postUpdate()}}).catch(function(){})}p=setInterval(q,P);document.addEventListener("visibilitychange",function(){if(document.hidden){clearInterval(p);p=null}else{q();p=setInterval(q,P)}})})();`;
 
   if (!isLanding) return base;
 
@@ -828,27 +828,27 @@ function railStyles(): string {
   return `
     /* ── CSS Variables (design system tokens) ── */
     :root {
-      --bg-primary: #0f0f0f;
-      --bg-surface: #1a1a18;
-      --text-primary: #d4d0c8;
-      --text-body: #b0a898;
-      --text-muted: #9A9088;
-      --border-color: #2a2a26;
-      --border-subtle: #333330;
-      --brand: #E85D3A;
+      --bg-primary: #0a1a0e;
+      --bg-surface: #132a18;
+      --text-primary: #e8f0e4;
+      --text-body: #b8ccb0;
+      --text-muted: #7a9a70;
+      --border-color: #1e3a20;
+      --border-subtle: #2a4a28;
+      --brand: #6B8E23;
       --font-sans: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif;
       --font-mono: ui-monospace, Cascadia Code, Source Code Pro, Menlo, Consolas, monospace;
     }
 
     @media (prefers-color-scheme: light) {
       :root {
-        --bg-primary: #f5f0eb;
-        --bg-surface: #ece5dc;
-        --text-primary: #3B2820;
-        --text-body: #5C4030;
-        --text-muted: #8B7462;
-        --border-color: #d8cfc4;
-        --border-subtle: #e0d8cf;
+        --bg-primary: #F0F2D8;
+        --bg-surface: #E0E5C8;
+        --text-primary: #2D3A20;
+        --text-body: #4A5A3A;
+        --text-muted: #7A8B6A;
+        --border-color: #C8D4B4;
+        --border-subtle: #D0DCC0;
       }
     }
 

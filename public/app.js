@@ -347,7 +347,7 @@ class PullcordApp {
     this.data = window.__INITIAL_DATA__;
     this.config = window.__CONFIG__;
     this.multiRoute = !!this.config.multiRoute;
-    this.routeColor = this.data.route?.color ? `#${this.data.route.color}` : '#E85D3A';
+    this.routeColor = this.data.route?.color ? `#${this.data.route.color}` : '#6B8E23';
     const params = new URLSearchParams(window.location.search);
     this.mockMode = params.has('mock');
 
@@ -425,7 +425,7 @@ class PullcordApp {
         direction: s.direction_id, sequence: s.stop_sequence ?? 0
       }));
       this.data.shapes = rd.shapes || [];
-      this.routeColor = rd.route?.route_color ? `#${rd.route.route_color}` : '#E85D3A';
+      this.routeColor = rd.route?.route_color ? `#${rd.route.route_color}` : '#6B8E23';
       this.loadedRouteId = routeId;
 
       // Re-prepare stop directions for progress strip
@@ -856,7 +856,7 @@ class PullcordApp {
     const hsEl = document.getElementById('hero-headsign');
     const fullHeadsign = this.heroPrediction.headsign || 'Unknown';
     hsEl.innerHTML = this.multiRoute && this.heroPrediction.routeBadge
-      ? `<span class="d-hero-route" style="color:#${this.heroPrediction.routeColor || 'E85D3A'}">${this.esc(this.heroPrediction.routeBadge)}</span> <span class="d-hero-headsign-text">${this.esc(fullHeadsign)}</span>`
+      ? `<span class="d-hero-route" style="color:#${this.heroPrediction.routeColor || '6B8E23'}">${this.esc(this.heroPrediction.routeBadge)}</span> <span class="d-hero-headsign-text">${this.esc(fullHeadsign)}</span>`
       : `<span class="d-hero-headsign-text">${this.esc(fullHeadsign)}</span>`;
 
     // Measure actual overflow, then middle-truncate if needed
@@ -980,11 +980,11 @@ class PullcordApp {
 
     // Adaptive colors
     const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const stripLine = dark ? '#1e293b' : '#EDE5D8';
-    const stopDot = dark ? '#475569' : '#C4B4A4';
-    const myStopStroke = dark ? '#090e1a' : '#FFFFFF';
-    const labelFill = dark ? '#94a3b8' : '#7C6354';
-    const busFill = dark ? '#f8fafc' : '#3B2820';
+    const stripLine = dark ? '#1e3a20' : '#D8E5C8';
+    const stopDot = dark ? '#5a7a50' : '#B4C4A4';
+    const myStopStroke = dark ? '#0a1a0e' : '#FFFFFF';
+    const labelFill = dark ? '#94a3b8' : '#5A6B4A';
+    const busFill = dark ? '#f8fafc' : '#2D3A20';
 
     // Positions: bus at left, me at right, between-stops evenly spaced
     const totalSlots = betweenCount + 1; // segments between bus and me
@@ -1044,7 +1044,7 @@ class PullcordApp {
     const pad = 20;
     const lineY = 16;
     const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const stripLine = dark ? '#1e293b' : '#EDE5D8';
+    const stripLine = dark ? '#1e3a20' : '#D8E5C8';
 
     strip.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
       `<line x1="${pad}" y1="${lineY}" x2="${w-pad}" y2="${lineY}" stroke="${stripLine}" stroke-width="2" stroke-linecap="round"/>` +
@@ -1157,12 +1157,12 @@ class PullcordApp {
 
     // Row color — use route color in multi-route, otherwise by tier
     const predColor = pred.routeColor ? `#${pred.routeColor}` : this.routeColor;
-    const rowColor = tier === 'next' ? '#60a5fa' : tier === 'scheduled' ? '#334155' : predColor;
+    const rowColor = tier === 'next' ? '#60a5fa' : tier === 'scheduled' ? '#5a7a50' : predColor;
 
     // Route badge for multi-route mode
     // Route number for multi-route mode — bold colored text, no pill
     const routeNum = this.multiRoute && pred.routeBadge
-      ? `<span class="d-upcoming-route" style="color:#${pred.routeColor || 'E85D3A'}">${this.esc(pred.routeBadge)}</span>`
+      ? `<span class="d-upcoming-route" style="color:#${pred.routeColor || '6B8E23'}">${this.esc(pred.routeBadge)}</span>`
       : '';
 
     return `
@@ -1614,7 +1614,7 @@ class PullcordApp {
       if (coords.length === 0) return;
       // Outline
       const outline = L.polyline(coords, {
-        color: '#1e293b', weight: 8, opacity: 0.8,
+        color: '#1e3a20', weight: 8, opacity: 0.8,
         lineCap: 'round', lineJoin: 'round'
       }).addTo(this.map);
       this.routePolylines.push(outline);
