@@ -141,7 +141,7 @@ export function StatsPage() {
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <title>System Stats — Pullcord</title>
         <meta name="description" content="MARTA on-time performance and operational health." />
-        <meta name="theme-color" content="#0a1a0e" />
+        <meta name="theme-color" content="#090e1a" />
         <link rel="icon" type="image/svg+xml" href="/public/icons/favicon.svg" />
         <style>{statsCSS()}</style>
       </head>
@@ -280,7 +280,7 @@ function statsJS(): string {
     var d=document.getElementById("stats-data"),f=document.getElementById("fresh");
     if(!d||!f)return;
     var t=Date.now();
-    function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<5?"live":a+"s ago";f.style.color=a>60?"#D97706":""}
+    function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<5?"live":a+"s ago";f.style.color=a>60?"#E85D3A":""}
     setInterval(u,1e3);
     function poll(){fetch("/stats?partial=1",{signal:AbortSignal.timeout(8e3)}).then(function(r){if(r.ok)return r.text()}).then(function(h){if(h){d.innerHTML=h;t=Date.now();u()}}).catch(function(){})}
     var p=setInterval(poll,30000);
@@ -294,13 +294,13 @@ function statsCSS(): string {
     *{box-sizing:border-box;margin:0;padding:0}
     body{
       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-      background:#0a1a0e;color:#e8f0e4;-webkit-font-smoothing:antialiased;
+      background:#090e1a;color:#e8e8e8;-webkit-font-smoothing:antialiased;
     }
     .s-shell{max-width:960px;margin:0 auto;padding:0 1rem}
     .s-header{
       display:flex;align-items:center;gap:.75rem;padding:1rem 0;
       border-bottom:1px solid rgba(255,255,255,.06);
-      position:sticky;top:0;background:#0a1a0e;z-index:10;
+      position:sticky;top:0;background:#090e1a;z-index:10;
     }
     .s-back{color:#aaa;text-decoration:none;display:flex}.s-back:hover{color:#fff}
     .s-h1{font-size:1.25rem;font-weight:600;letter-spacing:-.02em;flex:1}

@@ -59,8 +59,8 @@ export const Layout = (props: LayoutProps) => {
 
         {/* PWA */}
         <link rel="manifest" href="/public/manifest.json" />
-        <meta name="theme-color" content="#6B8E23" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#0a1a0e" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#E85D3A" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#090e1a" media="(prefers-color-scheme: dark)" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Pullcord" />

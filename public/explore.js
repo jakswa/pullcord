@@ -154,7 +154,7 @@
     toRender.forEach(stop => {
       const marker = L.circleMarker([stop.stop_lat, stop.stop_lon], {
         radius: 6,
-        fillColor: '#6B8E23',
+        fillColor: '#E85D3A',
         fillOpacity: 0.85,
         color: '#fff',
         weight: 1.5,
@@ -196,7 +196,7 @@
 
       const marker = L.circleMarker([lat, lon], {
         radius,
-        fillColor: '#6B8E23',
+        fillColor: '#E85D3A',
         fillOpacity: 0.7,
         color: '#fff',
         weight: 2,
