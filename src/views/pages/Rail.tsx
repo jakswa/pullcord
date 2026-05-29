@@ -1270,16 +1270,18 @@ function railStyles(): string {
 
     /* Boarding — train at terminal, can board now */
     .rail-badge-boarding {
-      display: inline-block;
-      padding: 0.05rem 0.3rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.1rem 0.35rem;
       border-radius: 0.2rem;
-      font-size: 0.7rem;
+      font-size: 0.75rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.04em;
       background: #2d8a4e;
       color: #fff;
-      vertical-align: middle;
+      flex-shrink: 0;
     }
 
     .rail-empty {
