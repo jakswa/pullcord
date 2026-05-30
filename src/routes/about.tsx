@@ -1,12 +1,13 @@
 import { Hono } from "hono";
+import type { AppEnv } from "../app.js";
 import { Layout } from "../views/Layout.js";
 import { AboutPage } from "../views/pages/About.js";
 import { aboutView as railAboutView } from "../rail/views.js";
 
-const app = new Hono();
+const app = new Hono<AppEnv>();
 
 app.get("/about", (c) => {
-  const isRailHost = (c.get as any)("isRailHost") || false;
+  const isRailHost = c.get("isRailHost") || false;
 
   if (isRailHost) {
     return c.html(railAboutView());

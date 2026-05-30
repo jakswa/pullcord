@@ -21,18 +21,6 @@ interface VehiclePosition {
   staleSeconds: number;
 }
 
-// Legacy type — kept for backward compatibility. Identical to ArrivalPrediction.
-interface PredictionUpdate {
-  vehicleId?: string;
-  tripId?: string;
-  headsign?: string;
-  directionId?: number;
-  etaSeconds: number;
-  staleSeconds: number;
-  tier?: string;
-  adherenceSec?: number | null; // positive = late, negative = early, null = unknown
-}
-
 // Unified prediction type returned by findArrivals()
 interface ArrivalPrediction {
   vehicleId?: string;
@@ -486,7 +474,7 @@ export async function getVehicles(routeId: string, tripLookup: Map<string, Trip>
 }
 
 // Single-route predictions (no tier classification — use findArrivals directly for tiers)
-export async function getPredictions(routeId: string, stopId: string, tripLookup: Map<string, Trip>): Promise<PredictionUpdate[]> {
+export async function getPredictions(routeId: string, stopId: string, tripLookup: Map<string, Trip>): Promise<ArrivalPrediction[]> {
   return findArrivals({
     stopId,
     tripLookup,
@@ -495,7 +483,7 @@ export async function getPredictions(routeId: string, stopId: string, tripLookup
 }
 
 // Multi-route arrivals for a stop
-export interface StopArrival extends PredictionUpdate {
+export interface StopArrival extends ArrivalPrediction {
   routeId: string;
   routeShortName: string;
   routeColor: string;
@@ -542,4 +530,4 @@ export function isVehicleCacheWarm(): boolean {
   return realtimeService.isCacheWarm();
 }
 
-export type { VehiclePosition, PredictionUpdate, ArrivalPrediction };
+export type { VehiclePosition, ArrivalPrediction };
