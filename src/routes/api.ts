@@ -30,6 +30,18 @@ function clampLimit(raw: string | undefined, fallback = 20): number {
   return Math.max(1, Math.min(50, n));
 }
 
+/** Clamp radius to 50–5000m. Returns null for NaN/invalid input. */
+function clampRadius(raw: string | undefined, fallback = 500): number | null {
+  const n = parseInt(raw || String(fallback));
+  if (isNaN(n)) return null;
+  return Math.max(50, Math.min(5000, n));
+}
+
+/** Lightweight trip ID guard: non-empty, ≤200 chars (no strict regex — GTFS trip_ids may contain underscores, colons, etc.) */
+function validTripId(id: string): boolean {
+  return id.length > 0 && id.length <= 200;
+}
+
 function validLat(n: number): boolean {
   return !isNaN(n) && n >= -90 && n <= 90;
 }
@@ -56,8 +68,12 @@ app.get("/stops", (c) => {
     const rawQuery = c.req.query("q");
     const lat = c.req.query("lat");
     const lon = c.req.query("lon");
-    const radius = parseInt(c.req.query("radius") || "500");
+    const radius = clampRadius(c.req.query("radius"));
     const limit = clampLimit(c.req.query("limit"));
+
+    if (radius === null) {
+      return c.json({ error: "Invalid radius parameter" }, 400);
+    }
 
     if (rawQuery) {
       const query = sanitizeQuery(rawQuery);
@@ -296,6 +312,9 @@ app.get("/stops/:stopId/arrivals", async (c) => {
 app.get("/trip/:tripId/stops", (c) => {
   try {
     const tripId = c.req.param("tripId");
+    if (!validTripId(tripId)) {
+      return c.json({ error: "Invalid tripId" }, 400);
+    }
     const sequences = getTripStopSequences([tripId]);
     const stops = sequences.get(tripId);
     if (!stops || stops.length === 0) {
@@ -370,10 +389,12 @@ app.delete("/push/cord/:id", (c) => {
   return c.json({ cancelled });
 });
 
-// GET /api/push/status — debug: how many active cords
-app.get("/push/status", (c) => {
-  return c.json({ activeCords: getActiveCordCount() });
-});
+// GET /api/push/status — debug: how many active cords (development only)
+if (process.env.NODE_ENV === "development") {
+  app.get("/push/status", (c) => {
+    return c.json({ activeCords: getActiveCordCount() });
+  });
+}
 
 
 // ── Metrics ──
