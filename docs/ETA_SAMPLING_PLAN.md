@@ -11,7 +11,7 @@
 | Median error | **54s** | 84s |
 | Head-to-head wins | **41 (70.7%)** | 15 (25.9%) |
 
-**Raw log:** `data/eta_compare_round1.log` (18,887 lines)
+**Raw log:** `data/eta_compare_round1.log` (18,887 lines — removed from repo; regenerate from sampling if needed)
 
 ### Known Biases
 - Single route, single stop — no generalization
