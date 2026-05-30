@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRoutesForStops, getRouteHeadsigns, getAllStopsWithRoutes, getTripStopSequences } from "../data/db.js";
 import { getVehicles, findArrivals, getStopArrivals } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
-import { getVapidPublicKey, registerCord, cancelCord, cordExists, getActiveCordCount, testFireAll } from "../data/push.js";
+import { getVapidPublicKey, registerCord, cancelCord, cordExists, getActiveCordCount } from "../data/push.js";
 import { getLatestSnapshot, getSystemTimeSeries, getLatestRouteSnapshots, getLatestRailSnapshots, getRouteTimeSeries } from "../data/metrics.js";
 
 const app = new Hono();
@@ -28,6 +28,12 @@ function clampLimit(raw: string | undefined, fallback = 20): number {
   const n = parseInt(raw || String(fallback));
   if (isNaN(n)) return fallback;
   return Math.max(1, Math.min(50, n));
+}
+
+function clampRadius(raw: string | undefined, fallback = 500): number {
+  const n = parseInt(raw || String(fallback));
+  if (isNaN(n)) return fallback;
+  return Math.max(50, Math.min(5000, n));
 }
 
 function validLat(n: number): boolean {
@@ -56,7 +62,7 @@ app.get("/stops", (c) => {
     const rawQuery = c.req.query("q");
     const lat = c.req.query("lat");
     const lon = c.req.query("lon");
-    const radius = parseInt(c.req.query("radius") || "500");
+    const radius = clampRadius(c.req.query("radius"));
     const limit = clampLimit(c.req.query("limit"));
 
     if (rawQuery) {
@@ -296,6 +302,9 @@ app.get("/stops/:stopId/arrivals", async (c) => {
 app.get("/trip/:tripId/stops", (c) => {
   try {
     const tripId = c.req.param("tripId");
+    if (!tripId || tripId.length === 0 || tripId.length > 200) {
+      return c.json({ error: "Invalid tripId" }, 400);
+    }
     const sequences = getTripStopSequences([tripId]);
     const stops = sequences.get(tripId);
     if (!stops || stops.length === 0) {
@@ -365,15 +374,12 @@ app.delete("/push/cord/:id", (c) => {
   return c.json({ cancelled });
 });
 
-// GET /api/push/status — debug: how many active cords
+// GET /api/push/status — debug: how many active cords (dev only)
 app.get("/push/status", (c) => {
+  if (process.env.NODE_ENV !== "development") {
+    return c.json({ error: "Not found" }, 404);
+  }
   return c.json({ activeCords: getActiveCordCount() });
-});
-
-// POST /api/push/test — fire a test push to all active cords
-app.post("/push/test", async (c) => {
-  const sent = await testFireAll();
-  return c.json({ sent });
 });
 
 // ── Metrics ──
