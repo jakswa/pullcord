@@ -12,3 +12,6 @@ data/cords.db*
 data/marta.db-*
 public/rail.js
 app.js
+package-lock.json
+yarn.lock
+data/*.log
