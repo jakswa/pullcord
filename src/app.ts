@@ -11,13 +11,13 @@ import apiRoutes from "./routes/api.js";
 
 const RAIL_HOST = process.env.RAIL_HOST || ""; // e.g. "train.home.jake.town"
 
-type Env = {
+export type AppEnv = {
   Variables: {
     isRailHost: boolean;
   };
 };
 
-const app = new Hono<Env>();
+const app = new Hono<AppEnv>();
 
 // Host detection — set isRailHost for downstream routes
 app.use("*", async (c, next) => {
