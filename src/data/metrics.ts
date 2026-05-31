@@ -6,8 +6,6 @@ import { Database } from "bun:sqlite";
 import path from "path";
 import { getTripLookup, getRoutes } from "./db";
 import { getAllVehicles, isVehicleCacheWarm, type VehiclePosition } from "./realtime";
-// Rail sampling paused — no good KPI yet
-// import { fetchArrivals as fetchRailArrivals, isRailCacheWarm } from "../rail/api";
 import { parseTimeToSec, type TripStop } from "./eta";
 
 const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "data", "marta.db");
@@ -316,48 +314,6 @@ async function sampleBusMetrics(): Promise<RouteSample[]> {
   return samples;
 }
 
-// ─── Rail sampling (unchanged) ───
-
-interface RailSample {
-  line: string;
-  trains: number;
-  avgDelaySec: number;
-  realtimeCount: number;
-  scheduledCount: number;
-}
-
-async function sampleRailMetrics(): Promise<RailSample[]> {
-  let arrivals;
-  try {
-    arrivals = await fetchRailArrivals();
-  } catch {
-    return [];
-  }
-
-  const byLine = new Map<string, { trains: Set<string>; totalWait: number; count: number; realtime: number; scheduled: number }>();
-
-  for (const a of arrivals) {
-    let line = byLine.get(a.line);
-    if (!line) {
-      line = { trains: new Set(), totalWait: 0, count: 0, realtime: 0, scheduled: 0 };
-      byLine.set(a.line, line);
-    }
-    line.trains.add(a.trainId);
-    line.totalWait += a.waitSeconds;
-    line.count++;
-    if (a.isRealtime) line.realtime++;
-    else line.scheduled++;
-  }
-
-  return Array.from(byLine.entries()).map(([lineName, data]) => ({
-    line: lineName,
-    trains: data.trains.size,
-    avgDelaySec: data.count > 0 ? data.totalWait / data.count : 0,
-    realtimeCount: data.realtime,
-    scheduledCount: data.scheduled,
-  }));
-}
-
 // ─── Collection orchestrator ───
 
 export async function collectMetrics(): Promise<void> {
@@ -376,8 +332,6 @@ export async function collectMetrics(): Promise<void> {
 
   try {
     const busSamples = await sampleBusMetrics();
-    // Rail sampling paused — no good KPI yet. Re-enable when we find one.
-    const railSamples: RailSample[] = [];
 
     const insert = db.prepare(
       `INSERT INTO metrics (ts, kind, route_id, vehicles, ghost_count, avg_delay_sec, trips_active, trips_scheduled, on_time_count)
@@ -412,21 +366,6 @@ export async function collectMetrics(): Promise<void> {
       // System summary
       const sysAvgDelay = systemDelayCount > 0 ? systemDelay / systemDelayCount : null;
       insert.run(ts, "system", null, totalVehicles, totalGhosts, sysAvgDelay, totalActive, totalScheduled, totalOnTime || null);
-
-      // Rail
-      let totalTrains = 0;
-      for (const s of railSamples) {
-        insert.run(ts, "rail", s.line, s.trains, null,
-          s.avgDelaySec, s.realtimeCount, s.scheduledCount, null);
-        totalTrains += s.trains;
-      }
-
-      if (railSamples.length > 0) {
-        const avgWait = railSamples.reduce((sum, s) => sum + s.avgDelaySec, 0) / railSamples.length;
-        const totalRealtime = railSamples.reduce((sum, s) => sum + s.realtimeCount, 0);
-        const totalScheduledRail = railSamples.reduce((sum, s) => sum + s.scheduledCount, 0);
-        insert.run(ts, "rail-system", null, totalTrains, null, avgWait, totalRealtime, totalScheduledRail, null);
-      }
     });
 
     tx();
@@ -440,9 +379,8 @@ export async function collectMetrics(): Promise<void> {
     const coverage = busScheduled > 0 ? ((busVehicles / busScheduled) * 100).toFixed(0) : "?";
     const avgDelay = busSamples.reduce((s, r) => s + r.totalDelaySec, 0);
     const delayStr = delayN > 0 ? `${(avgDelay / delayN / 60).toFixed(1)}min avg` : "no delay data";
-    const trains = railSamples.reduce((s, r) => s + r.trains, 0);
 
-    console.log(`📊 Metrics: ${busOnTime}/${delayN} on-time (${onTimePct}%), ${busVehicles}/${busScheduled} coverage (${coverage}%), ${delayStr}, ${trains} trains`);
+    console.log(`📊 Metrics: ${busOnTime}/${delayN} on-time (${onTimePct}%), ${busVehicles}/${busScheduled} coverage (${coverage}%), ${delayStr}`);
   } catch (err) {
     console.error("📊 Metrics collection failed:", err);
   }

@@ -46,7 +46,7 @@ For every `active`-tier prediction (bus confirmed on this trip via GPS), we comp
 3. Sum the scheduled inter-stop travel times from there to the target stop
 4. Adjust for how ahead/behind schedule the bus is at its current position
 
-This GPS-based ETA replaces MARTA's prediction. We keep MARTA's original as `martaEtaSeconds` for comparison.
+This GPS-based ETA replaces MARTA's prediction.
 
 ### Results
 **Round 1 (Route 21, 1 stop, Feb 17–21):**

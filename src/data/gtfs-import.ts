@@ -54,14 +54,6 @@ class GTFSImporter {
       )
     `);
 
-    // Add service_id column if upgrading from old schema
-    try {
-      this.db.exec(`ALTER TABLE trips ADD COLUMN service_id TEXT`);
-      console.log("  ↳ Added service_id column to trips");
-    } catch (_) {
-      // Column already exists
-    }
-
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS shapes (
         shape_id TEXT,
@@ -450,7 +442,6 @@ class GTFSImporter {
 
     // Rebuild derived tables
     this.buildRouteStops();
-    this.buildStopGroups();
   }
 
   buildTransferLookup() {
