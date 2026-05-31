@@ -28,7 +28,15 @@ app.get("/stats", (c) => {
     );
   }
 
-  return c.html(<StatsPage />);
+  return c.html(
+    <StatsPage
+      snapshot={snapshot}
+      timeSeries={timeSeries}
+      routeSnapshots={routeSnapshots}
+      nameMap={nameMap}
+      hoursOfData={hoursOfData}
+    />
+  );
 });
 
 export default app;

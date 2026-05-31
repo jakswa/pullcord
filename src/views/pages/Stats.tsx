@@ -1,13 +1,7 @@
 // Stats dashboard — MARTA operational health
 // Hero: on-time performance. Secondary: delay, coverage, ghosts. SVG sparklines.
 
-import { getLatestSnapshot, getSystemTimeSeries, getLatestRouteSnapshots, type SystemSnapshot, type TimeSeriesPoint, type RouteSnapshot } from "../../data/metrics.js";
-import { getRoutes } from "../../data/db.js";
-
-function routeNameMap(): Map<string, string> {
-  const routes = getRoutes();
-  return new Map(routes.map(r => [r.route_id, r.route_short_name]));
-}
+import { type SystemSnapshot, type TimeSeriesPoint, type RouteSnapshot } from "../../data/metrics.js";
 
 // ── SVG Sparkline ──
 function Sparkline({ points, width = 600, height = 80, color = "#4A9FE5", label = "", unit = "", yMin, yMax }: {
@@ -123,16 +117,19 @@ function RouteTable({ routes, nameMap }: { routes: RouteSnapshot[]; nameMap: Map
 }
 
 // ── Main page ──
-export function StatsPage() {
-  const snapshot = getLatestSnapshot();
-  const timeSeries = getSystemTimeSeries(6);
-  const routeSnapshots = getLatestRouteSnapshots();
-  const nameMap = routeNameMap();
-
-  const firstTs = timeSeries.length > 0 ? timeSeries[0].ts : 0;
-  const lastTs = timeSeries.length > 0 ? timeSeries[timeSeries.length - 1].ts : 0;
-  const hoursOfData = ((lastTs - firstTs) / 3600).toFixed(1);
-
+export function StatsPage({
+  snapshot,
+  timeSeries,
+  routeSnapshots,
+  nameMap,
+  hoursOfData,
+}: {
+  snapshot: SystemSnapshot | null;
+  timeSeries: TimeSeriesPoint[];
+  routeSnapshots: RouteSnapshot[];
+  nameMap: Map<string, string>;
+  hoursOfData: string;
+}) {
   return (
     <html lang="en">
       <head>
