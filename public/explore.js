@@ -162,9 +162,6 @@
       markers.push(marker);
     });
 
-    if (stops.length > limit) {
-      console.log(`Showing ${limit}/${stops.length} stops (zoom in for more)`);
-    }
   }
 
   function renderClusters(stops, zoom) {

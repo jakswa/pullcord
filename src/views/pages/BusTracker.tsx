@@ -79,9 +79,6 @@ export const BusTrackerPage = (props: BusTrackerPageProps) => {
         {/* PROGRESS STRIP */}
         <section class="d-progress" id="progress-section">
           <div class="d-progress-strip" id="progress-strip"></div>
-          <div class="d-progress-meta">
-            <div class="d-progress-label" id="progress-label"></div>
-          </div>
         </section>
 
         {/* UPCOMING — remaining predictions */}

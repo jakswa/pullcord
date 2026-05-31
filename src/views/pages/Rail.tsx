@@ -16,18 +16,10 @@ function RailApiBanner() {
 
 // ── Accessible line colors ──
 const LINE_COLORS = {
-  dark: {
-    RED: "#E05555",
-    GOLD: "#D4A020",
-    BLUE: "#4A9FE5",
-    GREEN: "#3BAA6E",
-  },
-  light: {
-    RED: "#B33030",
-    GOLD: "#8B6D14",
-    BLUE: "#1A6BB5",
-    GREEN: "#1B7A45",
-  },
+  RED: "#E05555",
+  GOLD: "#D4A020",
+  BLUE: "#4A9FE5",
+  GREEN: "#3BAA6E",
 };
 
 // ── Station orderings for train timeline (north→south per line) ──
@@ -248,14 +240,6 @@ reorder();
   return base + landing;
 }
 
-// Map direction codes to short labels
-const DIR_LABELS: Record<string, string> = {
-  N: "N",
-  S: "S",
-  E: "E",
-  W: "W",
-};
-
 // Canonical station order — alphabetical for landing page
 const STATION_ORDER = [
   "AIRPORT STATION",
@@ -377,11 +361,10 @@ function buildStationRows(arrivals: RailArrival[]): StationRow[] {
 }
 
 // ── Pill component ──
-function Pill({ pill, mode = "dark" }: { pill: StationPill; mode?: "dark" | "light" }) {
-  const colors = LINE_COLORS[mode];
-  const bg = colors[pill.line as keyof typeof colors] || "#666";
+function Pill({ pill }: { pill: StationPill }) {
+  const bg = LINE_COLORS[pill.line as keyof typeof LINE_COLORS] || "#666";
   const isNow = pill.waitSeconds < 60;
-  const label = `${DIR_LABELS[pill.direction] || pill.direction} ${formatTime(pill.waitSeconds)}`;
+  const label = `${pill.direction} ${formatTime(pill.waitSeconds)}`;
 
   return (
     <span
@@ -395,7 +378,7 @@ function Pill({ pill, mode = "dark" }: { pill: StationPill; mode?: "dark" | "lig
 }
 
 // ── Four-direction pill grid (Five Points) ──
-function FourPillGrid({ pills, mode = "dark" }: { pills: StationPill[]; mode?: "dark" | "light" }) {
+function FourPillGrid({ pills }: { pills: StationPill[] }) {
   const byDir = new Map(pills.map((p) => [p.direction, p]));
   const grid = [
     ["N", "E"],
@@ -407,7 +390,7 @@ function FourPillGrid({ pills, mode = "dark" }: { pills: StationPill[]; mode?: "
       {grid.flat().map((dir) => {
         const p = byDir.get(dir);
         return p ? (
-          <Pill pill={p} mode={mode} />
+          <Pill pill={p} />
         ) : (
           <span class="rail-pill rail-pill-empty">—</span>
         );
@@ -417,7 +400,7 @@ function FourPillGrid({ pills, mode = "dark" }: { pills: StationPill[]; mode?: "
 }
 
 // ── Station row ──
-function StationRowEl({ row, mode = "dark" }: { row: StationRow; mode?: "dark" | "light" }) {
+function StationRowEl({ row }: { row: StationRow }) {
   return (
     <a href={`/rail/${row.slug}`} class="rail-row" aria-label={`${row.name} station`}>
       <span class="rail-station-name">{row.name.toLowerCase()}</span>
@@ -425,11 +408,11 @@ function StationRowEl({ row, mode = "dark" }: { row: StationRow; mode?: "dark" |
         {row.pills.length === 0 ? (
           <span class="rail-no-data">—</span>
         ) : row.isFourDir ? (
-          <FourPillGrid pills={row.pills} mode={mode} />
+          <FourPillGrid pills={row.pills} />
         ) : (
           <span class="rail-pills-inline">
             {row.pills.map((p) => (
-              <Pill pill={p} mode={mode} />
+              <Pill pill={p} />
             ))}
           </span>
         )}
@@ -586,12 +569,11 @@ export function RailStationDetail({
   arrivals: RailArrival[];
 }) {
   const sorted = [...arrivals].sort((a, b) => a.waitSeconds - b.waitSeconds);
-  const colors = LINE_COLORS.dark;
 
   return (
     <div class="rail-detail-list">
       {sorted.map((a) => {
-        const bg = colors[a.line as keyof typeof colors] || "#666";
+        const bg = LINE_COLORS[a.line as keyof typeof LINE_COLORS] || "#666";
         const isNow = a.waitSeconds < 60;
         const isScheduled = !a.isRealtime;
         const isBoarding = a.isRealtime && !a.hasStarted && a.isFirstStop;
@@ -640,7 +622,7 @@ export function RailTrainPage({
   const hasData = trainArrivals.length > 0;
   const line = hasData ? trainArrivals[0].line : "";
   const destination = hasData ? stationDisplayName(trainArrivals[0].destination) : "Unknown";
-  const color = hasData ? (LINE_COLORS.dark[line as keyof typeof LINE_COLORS["dark"]] || "#666") : "#666";
+  const color = hasData ? (LINE_COLORS[line as keyof typeof LINE_COLORS] || "#666") : "#666";
 
   const title = standalone
     ? `Train ${trainId} — marta.io rail`
@@ -747,7 +729,7 @@ export function RailTrainTimeline({
 
   const line = trainArrivals[0].line;
   const direction = trainArrivals[0].direction;
-  const color = LINE_COLORS.dark[line as keyof typeof LINE_COLORS["dark"]] || "#666";
+  const color = LINE_COLORS[line as keyof typeof LINE_COLORS] || "#666";
 
   // Build ordered stop list from API data, using LINE_STATIONS for sort order
   const lineOrder = LINE_STATIONS[line] || [];
