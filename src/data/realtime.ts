@@ -32,7 +32,6 @@ interface ArrivalPrediction {
   tier?: string;
   adherenceSec?: number | null;
   etaSource?: 'marta' | 'computed' | 'scheduled'; // 'computed' = GPS interpolation, 'scheduled' = GTFS static (terminal vehicles)
-  martaEtaSeconds?: number; // original MARTA ETA before computed override (for comparison)
   rescued?: boolean; // true = ghost vehicle rescue (no valid MARTA trip update existed)
   atTerminal?: boolean; // true = vehicle at first stop, waiting to depart
   // Route enrichment — present when routeInfo provided
@@ -373,7 +372,7 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
 
   // Unified active-tier ETA: for ALL vehicles with GPS positions, compute ETA from
   // vehicle position + scheduled inter-stop deltas. Updates existing MARTA predictions
-  // (preserving martaEtaSeconds) or synthesizes new ones for ghost vehicles (rescued: true).
+  // or synthesizes new ones for ghost vehicles (rescued: true).
   if (vehicles && vehicles.length > 0) {
     const existingByTrip = new Map(
       arrivals.filter(a => a.tripId).map(a => [a.tripId!, a])
@@ -412,7 +411,6 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
 
       if (existing && existing.tier === 'active') {
         // Override existing MARTA prediction with computed/scheduled ETA
-        existing.martaEtaSeconds = existing.etaSeconds;
         existing.etaSeconds = eta;
         existing.etaSource = source;
         if (atTerminal) existing.atTerminal = true;

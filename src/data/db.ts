@@ -178,20 +178,11 @@ class MARTADatabase {
 
   // Get single stop
   getStop(stopId: string): Stop | null {
-    try {
-      return this.db.prepare(`
-        SELECT stop_id, stop_name, stop_lat, stop_lon, nearest_rail_station, nearest_rail_distance_m
-        FROM stops 
-        WHERE stop_id = ?
-      `).get(stopId) as Stop | null;
-    } catch {
-      // Fallback if transfer columns don't exist yet
-      return this.db.prepare(`
-        SELECT stop_id, stop_name, stop_lat, stop_lon
-        FROM stops 
-        WHERE stop_id = ?
-      `).get(stopId) as Stop | null;
-    }
+    return this.db.prepare(`
+      SELECT stop_id, stop_name, stop_lat, stop_lon, nearest_rail_station, nearest_rail_distance_m
+      FROM stops
+      WHERE stop_id = ?
+    `).get(stopId) as Stop | null;
   }
 
   // Get all stop IDs in the same group (paired directional stops at same location).
