@@ -549,13 +549,6 @@
     min-height: 1.4em;
   }
 
-  .d-progress-meta {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-
   /* ──────────────────────────────────
      PROGRESS STRIP — linear route viz
      ────────────────────────────────── */
@@ -572,14 +565,6 @@
 
   .d-progress-strip svg {
     display: block;
-  }
-
-  .d-progress-label {
-    text-align: center;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    padding: 0.5rem 0 0;
   }
 
 

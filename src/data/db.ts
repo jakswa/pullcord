@@ -52,6 +52,7 @@ const RAIL_ROUTES = new Set(['BLUE', 'GREEN', 'RED', 'GOLD']);
 class MARTADatabase {
   public db: Database;
   private tripLookupCache: Map<string, Trip> | null = null;
+  private _allStopsCache: { stops: any[]; cachedAt: number } | null = null;
 
   constructor() {
     // Migrations run separately in index.ts before server start.
@@ -386,8 +387,6 @@ class MARTADatabase {
   // Get all bus stops with routes (for explore map)
   // Returns deduplicated stops with comma-separated route short names
   // Cached — this query is expensive but data rarely changes
-  private _allStopsCache: { stops: any[]; cachedAt: number } | null = null;
-  
   getAllStopsWithRoutes(): { stop_id: string; stop_name: string; stop_lat: number; stop_lon: number; routes: string }[] {
     // Cache for 1 hour
     if (this._allStopsCache && Date.now() - this._allStopsCache.cachedAt < 3600000) {
@@ -426,7 +425,7 @@ export function getStopsForRoute(routeId: string, limit?: number): Stop[] {
   return db.getStopsForRoute(routeId, limit);
 }
 
-export function getNearbyStops(lat: number, lon: number, radiusMeters?: number, limit?: number): Stop[] {
+export function getNearbyStops(lat: number, lon: number, radiusMeters?: number, limit?: number): (Stop & { distance: number })[] {
   return db.getNearbyStops(lat, lon, radiusMeters, limit);
 }
 

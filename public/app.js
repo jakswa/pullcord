@@ -16,7 +16,6 @@ class PullcordApp {
     this.lastPredictions = [];
     this.lastVehicles = [];
     this.heroEtaSeconds = null;
-    this.heroVehicleId = null;
     this.heroPrediction = null;
 
     // Countdown timer (ticks every second between polls)
@@ -742,7 +741,6 @@ class PullcordApp {
     }
     this.heroPrediction = hero;
     this.heroEtaSeconds = hero.etaSeconds;
-    this.heroVehicleId = hero.vehicleId;
 
     this.renderHeroDisplay();
     this.startCountdown();
@@ -776,7 +774,7 @@ class PullcordApp {
 
     if (isArriving) {
       // Show seconds countdown for last minute
-      numEl.textContent = seconds < 30 ? 'NOW' : `<1`;
+      numEl.textContent = seconds < 30 ? 'NOW' : '<1';
       unitEl.textContent = seconds < 30 ? '' : 'min';
     } else if (this.heroPrediction.atTerminal) {
       numEl.textContent = `${minutes}+`;
@@ -877,20 +875,19 @@ class PullcordApp {
   renderProgressStrip(predictions, vehicles) {
     const section = document.getElementById('progress-section');
     const strip = document.getElementById('progress-strip');
-    const label = document.getElementById('progress-label');
     if (!section || !strip) return;
 
     // Use the current hero prediction (respects tracked vehicle / direction)
     const hero = this.heroPrediction;
     if (!hero || hero.tier === 'scheduled' || hero.tier === 'next' || !hero.vehicleId) {
-      this.renderEmptyStrip(strip, label);
+      this.renderEmptyStrip(strip);
       return;
     }
 
     // Find the vehicle
     const vehicle = vehicles.find(v => v.id === hero.vehicleId || v.vehicleId === hero.vehicleId);
     if (!vehicle) {
-      this.renderEmptyStrip(strip, label);
+      this.renderEmptyStrip(strip);
       return;
     }
 
@@ -912,13 +909,13 @@ class PullcordApp {
     }
 
     if (bestDir === null || bestMyIdx < 0 || bestBusIdx < 0) {
-      this.renderEmptyStrip(strip, label);
+      this.renderEmptyStrip(strip);
       return;
     }
 
     const stops = this.dirStops[bestDir];
     const n = stops.length;
-    if (n < 2) { this.renderEmptyStrip(strip, label); return; }
+    if (n < 2) { this.renderEmptyStrip(strip); return; }
 
     // Calculate bus fractional position between stops
     let busFrac = 0;
@@ -1001,7 +998,7 @@ class PullcordApp {
   }
 
   // Empty progress strip — reserves space, shows just the track line
-  renderEmptyStrip(strip, label) {
+  renderEmptyStrip(strip) {
     if (!strip) return;
     const w = strip.clientWidth || 340;
     const h = 40;
@@ -1013,7 +1010,6 @@ class PullcordApp {
     strip.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
       `<line x1="${pad}" y1="${lineY}" x2="${w-pad}" y2="${lineY}" stroke="${stripLine}" stroke-width="2" stroke-linecap="round"/>` +
       `</svg>`;
-    if (label) label.textContent = '';
   }
 
   // ─────────────────────────────
@@ -1477,7 +1473,6 @@ class PullcordApp {
   initMapToggle() {
     const toggleBtn = document.getElementById('map-toggle-btn');
     const closeBtn = document.getElementById('map-close-btn');
-    const toggleText = document.getElementById('map-toggle-text');
 
     if (toggleBtn) toggleBtn.addEventListener('click', () => {
       // Live hero → navigate to ride view
@@ -1689,12 +1684,6 @@ class PullcordApp {
   renderRouteTabs(current, others) {
     const container = document.getElementById('route-tabs');
     if (!container) return;
-
-    // Only show tabs if there ARE other routes — no need to show just the current one
-    if (others.length === 0) {
-      container.innerHTML = '';
-      return;
-    }
 
     const basePath = window.__BASE_PATH__ || '';
     const stopId = this.config.stopId;

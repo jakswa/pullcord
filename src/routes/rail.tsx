@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app.js";
-import { fetchArrivals, stationSlug, stationDisplayName } from "../rail/api.js";
+import { fetchArrivals, stationSlug } from "../rail/api.js";
 import {
   RailLandingPage,
   RailStationList,

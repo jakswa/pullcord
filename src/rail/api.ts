@@ -124,11 +124,6 @@ async function _refresh(): Promise<RailArrival[]> {
   return data;
 }
 
-// True if rail data was recently fetched successfully.
-export function isRailCacheWarm(): boolean {
-  return cache?.kind === "ok" && Date.now() - cache.ts < 5 * 60 * 1000;
-}
-
 // Current cached error message, or null if the last cached result was a success
 // (or there's no cache yet).
 export function getRailApiError(): string | null {
@@ -151,18 +146,3 @@ export function stationDisplayName(name: string): string {
     .join(" ");
 }
 
-// Group arrivals by station
-export function byStation(arrivals: RailArrival[]): Map<string, RailArrival[]> {
-  const map = new Map<string, RailArrival[]>();
-  for (const a of arrivals) {
-    const list = map.get(a.station) || [];
-    list.push(a);
-    map.set(a.station, list);
-  }
-  return map;
-}
-
-// Lines that serve a station
-export function stationLines(arrivals: RailArrival[]): Set<string> {
-  return new Set(arrivals.map((a) => a.line));
-}
