@@ -519,6 +519,19 @@ class GTFSImporter {
     console.log(`🚇 ${count} bus stops linked to ${stations.size} rail stations (${RADIUS_M}m radius)`);
   }
 
+  async runFullImport() {
+    await this.importRoutes();
+    await this.importStops(); // includes atomic group_id assignment
+    await this.importCalendar();
+    await this.importCalendarDates();
+    await this.importTrips();
+    await this.importShapes();
+    await this.importStopTimes();
+    this.buildRouteStops();
+    this.cleanExpiredServices();
+    this.buildTransferLookup();
+  }
+
   printStats() {
     console.log("\n📊 DATABASE STATISTICS");
     console.log("======================");
@@ -554,17 +567,7 @@ async function main() {
   const importer = new GTFSImporter();
 
   try {
-    await importer.importRoutes();
-    await importer.importStops(); // includes atomic group_id assignment
-    await importer.importCalendar();
-    await importer.importCalendarDates();
-    await importer.importTrips();
-    await importer.importShapes();
-    await importer.importStopTimes();
-    importer.buildRouteStops();
-    importer.cleanExpiredServices();
-    importer.buildTransferLookup();
-
+    await importer.runFullImport();
     importer.printStats();
 
     console.log("\n✅ GTFS import complete!");
@@ -616,16 +619,7 @@ export async function refreshGTFS() {
   // Run import
   const importer = new GTFSImporter();
   try {
-    await importer.importRoutes();
-    await importer.importStops(); // includes atomic group_id assignment
-    await importer.importCalendar();
-    await importer.importCalendarDates();
-    await importer.importTrips();
-    await importer.importShapes();
-    await importer.importStopTimes();
-    importer.buildRouteStops();
-    importer.cleanExpiredServices();
-    importer.buildTransferLookup();
+    await importer.runFullImport();
     importer.printStats();
     console.log("✅ GTFS refresh complete!");
   } catch (error) {
