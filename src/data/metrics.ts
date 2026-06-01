@@ -6,7 +6,7 @@ import { Database } from "bun:sqlite";
 import path from "path";
 import { getTripLookup, getRoutes } from "./db";
 import { getAllVehicles, isVehicleCacheWarm, type VehiclePosition } from "./realtime";
-import { parseTimeToSec, type TripStop } from "./eta";
+import { distSq, parseTimeToSec, type TripStop } from "./eta";
 
 const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "data", "marta.db");
 const SAMPLE_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -26,14 +26,6 @@ function getDb(): Database {
     metricsDb.exec("PRAGMA journal_mode=WAL");
   }
   return metricsDb;
-}
-
-// ─── Spatial math (same as eta.ts, not exported there) ───
-
-function distSq(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const dLat = lat2 - lat1;
-  const dLon = (lon2 - lon1) * Math.cos(((lat1 + lat2) / 2) * Math.PI / 180);
-  return dLat * dLat + dLon * dLon;
 }
 
 // ─── Time helpers ───

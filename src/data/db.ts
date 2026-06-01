@@ -54,6 +54,12 @@ class MARTADatabase {
   private tripLookupCache: Map<string, Trip> | null = null;
   private _allStopsCache: { stops: any[]; cachedAt: number } | null = null;
 
+  // SQL subquery: all stop_ids sharing the same group_id as the given stop.
+  // Parameterised with one `?` placeholder bound to the input stop_id.
+  private groupIdSubquery(): string {
+    return `SELECT stop_id FROM stops WHERE group_id = (SELECT group_id FROM stops WHERE stop_id = ?)`;
+  }
+
   constructor() {
     // Migrations run separately in index.ts before server start.
     // By the time this constructor runs, schema is guaranteed current.
@@ -191,7 +197,7 @@ class MARTADatabase {
   getStopIdsByName(stopId: string): string[] {
     const ids = this.db.prepare(`
       SELECT stop_id FROM stops
-      WHERE group_id = (SELECT group_id FROM stops WHERE stop_id = ?)
+      WHERE stop_id IN (${this.groupIdSubquery()})
     `).all(stopId) as Array<{ stop_id: string }>;
     return ids.length > 0 ? ids.map(r => r.stop_id) : [stopId];
   }
@@ -203,10 +209,7 @@ class MARTADatabase {
       SELECT DISTINCT r.route_id, r.route_short_name, r.route_long_name, r.route_color, r.route_text_color
       FROM routes r
       JOIN route_stops rs ON r.route_id = rs.route_id
-      WHERE rs.stop_id IN (
-        SELECT stop_id FROM stops
-        WHERE group_id = (SELECT group_id FROM stops WHERE stop_id = ?)
-      )
+      WHERE rs.stop_id IN (${this.groupIdSubquery()})
       ORDER BY CAST(r.route_short_name AS INTEGER), r.route_short_name
     `).all(stopId) as Route[];
     return routes.filter(r => !RAIL_ROUTES.has(r.route_short_name));
@@ -341,12 +344,10 @@ class MARTADatabase {
     if (tripIds.length === 0) return new Map();
     const tripPlaceholders = tripIds.map(() => '?').join(',');
     const rows = this.db.prepare(`
-      SELECT trip_id, arrival_time 
-      FROM stop_times 
-      WHERE stop_id IN (
-        SELECT stop_id FROM stops
-        WHERE group_id = (SELECT group_id FROM stops WHERE stop_id = ?)
-      ) AND trip_id IN (${tripPlaceholders})
+      SELECT trip_id, arrival_time
+      FROM stop_times
+      WHERE stop_id IN (${this.groupIdSubquery()})
+        AND trip_id IN (${tripPlaceholders})
     `).all(stopId, ...tripIds) as Array<{ trip_id: string; arrival_time: string }>;
     const result = new Map<string, string>();
     for (const row of rows) {
