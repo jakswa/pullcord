@@ -1,3 +1,7 @@
+import { fileHash } from "../Layout.js";
+
+const EXPLORE_HASH = fileHash("public/explore.js");
+
 export const ExplorePage = () => (
   <div class="explore-shell">
     {/* Header bar with integrated search */}
@@ -34,6 +38,6 @@ export const ExplorePage = () => (
     </div>
 
     {/* Inline script to bootstrap the map */}
-    <script src="/public/explore.js"></script>
+    <script src={`/public/explore.js?v=${EXPLORE_HASH}`}></script>
   </div>
 );

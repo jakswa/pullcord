@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 import { readFileSync } from "fs";
 
 // Cache-bust: hash static assets at startup so deploys get fresh files
-function fileHash(path: string): string {
+export function fileHash(path: string): string {
   try {
     const content = readFileSync(path);
     return createHash("md5").update(content).digest("hex").slice(0, 8);
@@ -11,6 +11,7 @@ function fileHash(path: string): string {
 }
 const JS_HASH = fileHash("public/app.js");
 const CSS_HASH = fileHash("public/styles.css");
+const ETA_HASH = fileHash("public/eta.js");
 const OG_HASH = fileHash("public/icons/og-image.png");
 
 export interface LayoutProps {
@@ -90,7 +91,7 @@ export const Layout = (props: LayoutProps) => {
         ></script>
 
         {/* App JS */}
-        <script src="/public/eta.js"></script>
+        <script src={`/public/eta.js?v=${ETA_HASH}`}></script>
         <script src={`/public/app.js?v=${JS_HASH}`}></script>
 
         {/* Push SW is registered on-demand by Pull the Cord — no page-load SW */}
