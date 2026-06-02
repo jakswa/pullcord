@@ -142,6 +142,13 @@
     }
   }
 
+  function getStopRadius(zoom) {
+    if (zoom <= 15) return 7;
+    if (zoom <= 16) return 10;
+    if (zoom <= 17) return 13;
+    return 16;
+  }
+
   function renderIndividual(stops) {
     // Limit to avoid DOM overload
     const limit = 500;
@@ -149,7 +156,7 @@
 
     toRender.forEach(stop => {
       const marker = L.circleMarker([stop.stop_lat, stop.stop_lon], {
-        radius: 6,
+        radius: getStopRadius(map.getZoom()),
         fillColor: '#E85D3A',
         fillOpacity: 0.85,
         color: '#fff',
