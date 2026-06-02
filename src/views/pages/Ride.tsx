@@ -1,3 +1,7 @@
+import { fileHash } from "../Layout.js";
+
+const RIDE_HASH = fileHash("public/ride.js");
+
 export const RidePage = ({ tripId, stopId, routeId }: { tripId: string; stopId: string; routeId: string }) => (
   <div class="ride-shell">
     {/* Header */}
@@ -40,6 +44,6 @@ export const RidePage = ({ tripId, stopId, routeId }: { tripId: string; stopId: 
     <script dangerouslySetInnerHTML={{ __html: `
       window.__RIDE_CONFIG__ = ${JSON.stringify({ tripId, stopId, routeId })};
     ` }} />
-    <script src="/public/ride.js"></script>
+    <script src={`/public/ride.js?v=${RIDE_HASH}`}></script>
   </div>
 );

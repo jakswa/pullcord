@@ -145,6 +145,8 @@ app.get("/health", (c) => {
 });
 
 // Error handling
+import { ErrorPage } from "./views/pages/ErrorPage.js";
+
 app.onError((err, c) => {
   console.error("Application error:", err);
 
@@ -160,31 +162,16 @@ app.onError((err, c) => {
     );
   }
 
+  const message = process.env.NODE_ENV === "development"
+    ? `We're sorry, but an error occurred: ${err.message}`
+    : "We're sorry, but an error occurred while processing your request.";
+
   return c.html(
-    `
-    <html>
-      <head>
-        <title>Error — Pullcord</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <style>
-          body { font-family: system-ui; text-align: center; padding: 50px; background: #f9fafb; }
-          .error { max-width: 400px; margin: 0 auto; }
-          h1 { color: #ef4444; }
-          p { color: #6b7280; margin: 20px 0; }
-          a { color: #2563eb; text-decoration: none; }
-          a:hover { text-decoration: underline; }
-        </style>
-      </head>
-      <body>
-        <div class="error">
-          <h1>Something went wrong</h1>
-          <p>We're sorry, but an error occurred while processing your request.</p>
-          ${process.env.NODE_ENV === "development" ? `<p><code>${err.message}</code></p>` : ""}
-          <p><a href="/">← Back to Home</a></p>
-        </div>
-      </body>
-    </html>
-  `,
+    <ErrorPage
+      title="Error — Pullcord"
+      heading="Something went wrong"
+      message={message}
+    />,
     500,
   );
 });
@@ -196,29 +183,11 @@ app.notFound((c) => {
   }
 
   return c.html(
-    `
-    <html>
-      <head>
-        <title>Not Found — Pullcord</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <style>
-          body { font-family: system-ui; text-align: center; padding: 50px; background: #f9fafb; }
-          .error { max-width: 400px; margin: 0 auto; }
-          h1 { color: #6b7280; }
-          p { color: #6b7280; margin: 20px 0; }
-          a { color: #2563eb; text-decoration: none; }
-          a:hover { text-decoration: underline; }
-        </style>
-      </head>
-      <body>
-        <div class="error">
-          <h1>Page not found</h1>
-          <p>The page you're looking for doesn't exist.</p>
-          <p><a href="/">← Back to Home</a></p>
-        </div>
-      </body>
-    </html>
-  `,
+    <ErrorPage
+      title="Not Found — Pullcord"
+      heading="Page not found"
+      message="The page you're looking for doesn't exist."
+    />,
     404,
   );
 });

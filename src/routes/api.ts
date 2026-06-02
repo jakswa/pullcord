@@ -4,6 +4,7 @@ import { getVehicles, findArrivals, getStopArrivals } from "../data/realtime.js"
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
 import { getVapidPublicKey, registerCord, cancelCord, cordExists, getActiveCordCount } from "../data/push.js";
 import { getLatestSnapshot, getSystemTimeSeries, getLatestRouteSnapshots, getLatestRailSnapshots, getRouteTimeSeries } from "../data/metrics.js";
+import { fetchArrivals } from "../rail/api.js";
 
 const app = new Hono();
 
@@ -413,6 +414,17 @@ app.get("/metrics/route/:routeId", (c) => {
   if (!ROUTE_ID_RE.test(routeId)) return c.json({ error: "Invalid routeId" }, 400);
   const hours = Math.min(168, Math.max(1, parseInt(c.req.query("hours") || "24")));
   return c.json(getRouteTimeSeries(routeId, hours));
+});
+
+// ── Rail ──
+
+// GET /api/rail — JSON endpoint (real-time rail arrivals)
+app.get("/rail", async (c) => {
+  const arrivals = await fetchArrivals();
+  return c.json({
+    arrivals,
+    timestamp: Date.now(),
+  });
 });
 
 export default app;
