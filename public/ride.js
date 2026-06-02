@@ -129,7 +129,7 @@
     stops.forEach((stop, i) => {
       const isDest = i === destIndex;
       const marker = L.circleMarker([stop.lat, stop.lon], {
-        radius: isDest ? 9 : 5,
+        radius: isDest ? 10 : 8,
         fillColor: isDest ? '#3B82F6' : routeColor,
         fillOpacity: isDest ? 1 : 0.7,
         color: '#fff',
