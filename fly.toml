@@ -10,6 +10,8 @@ primary_region = "iad"
   PORT = "4200"
   DATABASE_URL = "/data/marta.db"
   CORDS_DATABASE_URL = "/data/cords.db"
+  # marta.io serves the rail view at / (bus.marta.io still serves the bus tracker).
+  RAIL_HOST = "marta.io"
 
 [http_service]
   internal_port = 4200
