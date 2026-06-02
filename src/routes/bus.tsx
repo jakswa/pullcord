@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { Layout } from "../views/Layout.js";
 import { BusTrackerPage } from "../views/pages/BusTracker.js";
+import { ErrorPage } from "../views/pages/ErrorPage.js";
 import { getRoute, getStop, getRouteDetail, getRoutesForStop } from "../data/db.js";
 
 const app = new Hono();
@@ -70,33 +71,23 @@ app.get("/bus", async (c) => {
 
     if (!route) {
       return c.html(
-        <Layout title="Route Not Found — Pullcord">
-          <div class="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div class="text-center">
-              <h1 class="text-2xl font-bold text-gray-900 mb-4">Route Not Found</h1>
-              <p class="text-gray-600 mb-6">The route "{routeId}" could not be found.</p>
-              <a href="/" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
-                ← Back to Home
-              </a>
-            </div>
-          </div>
-        </Layout>
+        <ErrorPage
+          title="Route Not Found — Pullcord"
+          heading="Route Not Found"
+          message={`The route "${routeId}" could not be found.`}
+        />,
+        404,
       );
     }
 
     if (!stop) {
       return c.html(
-        <Layout title="Stop Not Found — Pullcord">
-          <div class="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div class="text-center">
-              <h1 class="text-2xl font-bold text-gray-900 mb-4">Stop Not Found</h1>
-              <p class="text-gray-600 mb-6">The stop "{stopId}" could not be found.</p>
-              <a href="/" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
-                ← Back to Home
-              </a>
-            </div>
-          </div>
-        </Layout>
+        <ErrorPage
+          title="Stop Not Found — Pullcord"
+          heading="Stop Not Found"
+          message={`The stop "${stopId}" could not be found.`}
+        />,
+        404,
       );
     }
 
@@ -148,19 +139,14 @@ app.get("/bus", async (c) => {
 
   } catch (error) {
     console.error("Error rendering bus tracker page:", error);
-    
+
     return c.html(
-      <Layout title="Error — Pullcord">
-        <div class="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div class="text-center">
-            <h1 class="text-2xl font-bold text-gray-900 mb-4">Something went wrong</h1>
-            <p class="text-gray-600 mb-6">Unable to load the bus tracker. Please try again.</p>
-            <a href="/" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
-              ← Back to Home
-            </a>
-          </div>
-        </div>
-      </Layout>
+      <ErrorPage
+        title="Error — Pullcord"
+        heading="Something went wrong"
+        message="Unable to load the bus tracker. Please try again."
+      />,
+      500,
     );
   }
 });

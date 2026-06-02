@@ -96,13 +96,4 @@ app.get("/rail/:slug", async (c) => {
   );
 });
 
-// GET /api/rail — JSON endpoint
-app.get("/api/rail", async (c) => {
-  const arrivals = await fetchArrivals();
-  return c.json({
-    arrivals,
-    timestamp: Date.now(),
-  });
-});
-
 export default app;
