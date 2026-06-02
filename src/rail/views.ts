@@ -2,11 +2,11 @@
 //
 // Historical note: this file used to also contain landingView / stationView /
 // trainView render functions, which became orphans when the real routes moved
-// to src/views/pages/Rail.tsx. Those dead implementations kept attracting
+// to src/views/pages/rail/. Those dead implementations kept attracting
 // edits from people (and AI agents) who thought they were live, including a
 // font-size bump and a graceful-downtime branch that never actually ran in
 // production. They've been removed; all rail rendering now lives in
-// src/views/pages/Rail.tsx.
+// src/views/pages/rail/ (split into data.ts, styles.ts, client.ts, index.tsx).
 
 const CSS = `<style>
 *{margin:0;padding:0;box-sizing:border-box}

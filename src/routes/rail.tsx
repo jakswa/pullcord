@@ -8,7 +8,7 @@ import {
   RailStationDetail,
   RailTrainPage,
   RailTrainTimeline,
-} from "../views/pages/Rail.js";
+} from "../views/pages/rail/index.js";
 
 const app = new Hono<AppEnv>();
 
