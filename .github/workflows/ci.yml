@@ -14,7 +14,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2"
 
       - run: bun install --frozen-lockfile
 
@@ -111,18 +111,19 @@ jobs:
           "
 
           # Start server in background
-          MARTA_API_KEY=test PORT=4200 bun run src/index.ts &
+          MARTA_API_KEY=test PORT=4200 bun run src/index.ts > /tmp/server.log 2>&1 &
           SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
 
           # Wait for server to become healthy
-          for i in $(seq 1 30); do
+          for i in $(seq 1 15); do
             if curl -sf http://localhost:4200/health > /dev/null 2>&1; then
               echo "Server healthy after ${i}s"
               break
             fi
-            if [ $i -eq 30 ]; then
-              echo "Server failed to start within 30s"
-              kill $SERVER_PID 2>/dev/null || true
+            if [ $i -eq 15 ]; then
+              echo "Server failed to start within 15s"
+              cat /tmp/server.log
               exit 1
             fi
             sleep 1
@@ -132,9 +133,8 @@ jobs:
           HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4200/health)
           if [ "$HTTP_CODE" != "200" ]; then
             echo "Health check returned $HTTP_CODE"
-            kill $SERVER_PID 2>/dev/null || true
+            cat /tmp/server.log
             exit 1
           fi
 
           echo "Boot smoke test passed"
-          kill $SERVER_PID 2>/dev/null || true
