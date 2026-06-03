@@ -1146,6 +1146,7 @@ class PullcordApp {
 
   renderRailRow(pred) {
     const minutes = Math.floor(pred.etaSeconds / 60);
+    // Source of truth: src/data/rail-colors.ts (dark palette). Keep in sync.
     const lineColors = { RED: '#E05555', GOLD: '#D4A020', BLUE: '#4A9FE5', GREEN: '#3BAA6E' };
     const color = lineColors[pred.line] || '#888';
     const isScheduled = !pred.isRealtime;
@@ -1772,7 +1773,7 @@ class PullcordApp {
   }
 
   dist(lat1, lon1, lat2, lon2) {
-    // Simple equirectangular approximation (fine for short distances)
+    // Equirectangular approx — intentionally differs from ride.js's Haversine (see issue #68)
     const R = 6371000;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;

@@ -1,13 +1,6 @@
 import type { RailArrival } from "../../../rail/api.js";
 import { stationSlug, stationDisplayName } from "../../../rail/api.js";
-
-// ── Accessible line colors ──
-export const LINE_COLORS = {
-  RED: "#E05555",
-  GOLD: "#D4A020",
-  BLUE: "#4A9FE5",
-  GREEN: "#3BAA6E",
-};
+export { LINE_COLORS } from "../../../data/rail-colors.js";
 
 // ── Station orderings for train timeline (north→south per line) ──
 export const LINE_STATIONS: Record<string, string[]> = {

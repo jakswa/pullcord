@@ -1,5 +1,5 @@
 // Pure ETA computation — no dependencies.
-// Mirrors src/data/eta.ts for client-side use.
+// Mirrors src/data/eta.ts for client-side use; terminal branch intentionally differs (see issue #68).
 
 /**
  * Parse HH:MM:SS to seconds since midnight. GTFS allows H > 23 for overnight.

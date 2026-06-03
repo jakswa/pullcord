@@ -1,5 +1,6 @@
 import { fileHash } from "../Layout.js";
 
+const SHARED_HASH = fileHash("public/shared.js");
 const RIDE_HASH = fileHash("public/ride.js");
 
 export const RidePage = ({ tripId, stopId, routeId }: { tripId: string; stopId: string; routeId: string }) => (
@@ -44,6 +45,7 @@ export const RidePage = ({ tripId, stopId, routeId }: { tripId: string; stopId: 
     <script dangerouslySetInnerHTML={{ __html: `
       window.__RIDE_CONFIG__ = ${JSON.stringify({ tripId, stopId, routeId })};
     ` }} />
+    <script src={`/public/shared.js?v=${SHARED_HASH}`}></script>
     <script src={`/public/ride.js?v=${RIDE_HASH}`}></script>
   </div>
 );
