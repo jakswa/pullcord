@@ -1,5 +1,6 @@
 import { fileHash } from "../Layout.js";
 
+const SHARED_HASH = fileHash("public/shared.js");
 const EXPLORE_HASH = fileHash("public/explore.js");
 
 export const ExplorePage = () => (
@@ -38,6 +39,7 @@ export const ExplorePage = () => (
     </div>
 
     {/* Inline script to bootstrap the map */}
+    <script src={`/public/shared.js?v=${SHARED_HASH}`}></script>
     <script src={`/public/explore.js?v=${EXPLORE_HASH}`}></script>
   </div>
 );
