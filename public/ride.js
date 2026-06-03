@@ -397,7 +397,7 @@
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  const esc = window.esc;
+  const esc = window.esc || function(s) { const e = document.createElement('span'); e.textContent = s; return e.innerHTML; };
 
   // ─── Boot ───
   if (document.readyState === 'loading') {

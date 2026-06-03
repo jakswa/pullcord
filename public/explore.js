@@ -333,7 +333,7 @@
 
   // ─── Utilities ───
 
-  const esc = window.esc;
+  const esc = window.esc || function(s) { const e = document.createElement('span'); e.textContent = s; return e.innerHTML; };
 
   function debounce(fn, ms) {
     let timer;
