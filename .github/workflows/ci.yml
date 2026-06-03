@@ -1,0 +1,140 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Type check
+        run: bunx tsc --noEmit
+
+      - name: Run tests
+        run: bun test
+
+      - name: Boot smoke test
+        run: |
+          # Create minimal marta.db so migrations + health check pass.
+          # Tables match the GTFS schema from gtfs-import.ts; migrations
+          # will add extra columns (group_id, nearest_rail_station, etc.)
+          # and create the metrics table on first run.
+          mkdir -p data
+          bun -e "
+            import { Database } from 'bun:sqlite';
+            const db = new Database('data/marta.db');
+            db.exec(\`
+              CREATE TABLE IF NOT EXISTS stops (
+                stop_id TEXT PRIMARY KEY,
+                stop_name TEXT,
+                stop_lat REAL,
+                stop_lon REAL,
+                zone_id TEXT,
+                stop_url TEXT,
+                location_type INTEGER,
+                parent_station TEXT,
+                stop_timezone TEXT,
+                wheelchair_boarding INTEGER
+              );
+              CREATE TABLE IF NOT EXISTS routes (
+                route_id TEXT PRIMARY KEY,
+                agency_id TEXT,
+                route_short_name TEXT,
+                route_long_name TEXT,
+                route_type INTEGER,
+                route_url TEXT,
+                route_color TEXT,
+                route_text_color TEXT
+              );
+              CREATE TABLE IF NOT EXISTS trips (
+                trip_id TEXT PRIMARY KEY,
+                route_id TEXT,
+                service_id TEXT,
+                trip_headsign TEXT,
+                direction_id INTEGER,
+                block_id TEXT,
+                shape_id TEXT
+              );
+              CREATE TABLE IF NOT EXISTS stop_times (
+                trip_id TEXT,
+                arrival_time TEXT,
+                departure_time TEXT,
+                stop_id TEXT,
+                stop_sequence INTEGER,
+                pickup_type INTEGER,
+                drop_off_type INTEGER
+              );
+              CREATE TABLE IF NOT EXISTS calendar (
+                service_id TEXT PRIMARY KEY,
+                monday INTEGER,
+                tuesday INTEGER,
+                wednesday INTEGER,
+                thursday INTEGER,
+                friday INTEGER,
+                saturday INTEGER,
+                sunday INTEGER,
+                start_date TEXT,
+                end_date TEXT
+              );
+              CREATE TABLE IF NOT EXISTS calendar_dates (
+                service_id TEXT,
+                date TEXT,
+                exception_type INTEGER
+              );
+              CREATE TABLE IF NOT EXISTS shapes (
+                shape_id TEXT,
+                shape_pt_lat REAL,
+                shape_pt_lon REAL,
+                shape_pt_sequence INTEGER,
+                shape_dist_traveled REAL
+              );
+              CREATE TABLE IF NOT EXISTS route_stops (
+                route_id TEXT,
+                stop_id TEXT,
+                direction_id INTEGER,
+                UNIQUE(route_id, stop_id, direction_id)
+              );
+            \`);
+            db.close();
+            console.log('Minimal marta.db created');
+          "
+
+          # Start server in background
+          MARTA_API_KEY=test PORT=4200 bun run src/index.ts &
+          SERVER_PID=$!
+
+          # Wait for server to become healthy
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4200/health > /dev/null 2>&1; then
+              echo "Server healthy after ${i}s"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Server failed to start within 30s"
+              kill $SERVER_PID 2>/dev/null || true
+              exit 1
+            fi
+            sleep 1
+          done
+
+          # Verify health response
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4200/health)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Health check returned $HTTP_CODE"
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Boot smoke test passed"
+          kill $SERVER_PID 2>/dev/null || true
