@@ -14,7 +14,7 @@ function toggleStar(slug){var s=getStarred(),i=s.indexOf(slug);if(i>-1)s.splice(
 function getSections(){try{return JSON.parse(localStorage.getItem(SEC))||{}}catch(e){return{}}}
 function setSections(o){localStorage.setItem(SEC,JSON.stringify(o))}
 
-// Haversine in km
+// Haversine in km — used only for sorting stations by proximity, not display. See issue #68.
 function dist(a,b){var R=6371,dLat=(b[0]-a[0])*Math.PI/180,dLon=(b[1]-a[1])*Math.PI/180;var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
 
 var userPos=null,geoRequested=false,GEO_KEY="rail-geo";

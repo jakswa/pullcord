@@ -351,3 +351,115 @@ describe('computeETA', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Server ↔ Client parity (issue #68)
+// ---------------------------------------------------------------------------
+
+describe('server ↔ client ETA parity', () => {
+  // Load client-side eta.js at test time — it has no module exports,
+  // so we eval it and extract the functions.
+  const clientCode = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'public', 'eta.js'), 'utf8'
+  );
+  const clientModule = new Function(
+    clientCode + '\nreturn { parseTimeToSec, distSq, computeClientETA };'
+  )() as {
+    parseTimeToSec: (t: string) => number;
+    distSq: (a: number, b: number, c: number, d: number) => number;
+    computeClientETA: (
+      vLat: number, vLon: number,
+      stops: { id: string; name?: string; lat: number; lon: number; sequence: number; arrivalSec: number }[],
+      targetStopId: string, targetStopName: string,
+      staleSeconds?: number,
+    ) => number | null;
+  };
+
+  function toClientStops(stops: TripStop[]) {
+    return stops.map(s => ({
+      id: s.stop_id,
+      name: s.stop_id,
+      lat: s.lat,
+      lon: s.lon,
+      sequence: s.sequence,
+      arrivalSec: s.arrivalSec,
+    }));
+  }
+
+  const STOPS = makeStops(5);
+  const CLIENT_STOPS = toClientStops(STOPS);
+
+  test('parseTimeToSec matches', () => {
+    for (const t of ['08:30:00', '00:00:00', '23:59:59', '25:00:00', '8:5:3']) {
+      expect(clientModule.parseTimeToSec(t)).toBe(parseTimeToSec(t));
+    }
+  });
+
+  test('distSq matches', () => {
+    const { distSq } = require('../src/data/eta');
+    const cases: [number, number, number, number][] = [
+      [33.749, -84.388, 33.752, -84.385],
+      [0, 0, 1, 1],
+      [60, 10, 60.01, 10.01],
+    ];
+    for (const [a, b, c, d] of cases) {
+      expect(clientModule.distSq(a, b, c, d)).toBe(distSq(a, b, c, d));
+    }
+  });
+
+  test('vehicle between stops — parity', () => {
+    const vLat = (STOPS[2].lat + STOPS[3].lat) / 2;
+    const server = computeETA(vLat, STOPS[2].lon, STOPS, new Set(['STOP_4']));
+    const client = clientModule.computeClientETA(vLat, STOPS[2].lon, CLIENT_STOPS, 'STOP_4', 'STOP_4');
+    expect(server).not.toBeNull();
+    expect(client).toBe(server!.eta);
+  });
+
+  test('vehicle at a stop — parity', () => {
+    const server = computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, new Set(['STOP_4']));
+    const client = clientModule.computeClientETA(STOPS[2].lat, STOPS[2].lon, CLIENT_STOPS, 'STOP_4', 'STOP_4');
+    expect(client).toBe(server!.eta);
+  });
+
+  test('vehicle at target — parity', () => {
+    const server = computeETA(STOPS[3].lat, STOPS[3].lon, STOPS, new Set(['STOP_3']));
+    const client = clientModule.computeClientETA(STOPS[3].lat, STOPS[3].lon, CLIENT_STOPS, 'STOP_3', 'STOP_3');
+    expect(client).toBe(server!.eta);
+  });
+
+  test('vehicle past target — both null', () => {
+    const server = computeETA(STOPS[4].lat, STOPS[4].lon, STOPS, new Set(['STOP_1']));
+    const client = clientModule.computeClientETA(STOPS[4].lat, STOPS[4].lon, CLIENT_STOPS, 'STOP_1', 'STOP_1');
+    expect(server).toBeNull();
+    expect(client).toBeNull();
+  });
+
+  test('staleness subtracted identically', () => {
+    const server = computeETA(STOPS[2].lat, STOPS[2].lon, STOPS, new Set(['STOP_4']), 60);
+    const client = clientModule.computeClientETA(STOPS[2].lat, STOPS[2].lon, CLIENT_STOPS, 'STOP_4', 'STOP_4', 60);
+    expect(client).toBe(server!.eta);
+  });
+
+  test('terminal branch — intentional divergence', () => {
+    // Server returns { eta: travelDelta, atTerminal: true } when vehicle is at
+    // terminal (nearestIdx <= 1) and target is far (targetIdx > 3).
+    // Client returns null — it falls back to MARTA's scheduled ETA instead.
+    // This is deliberate: the server enriches the dashboard response with a
+    // floor estimate, while the ride view defers to the server's richer data.
+    const server = computeETA(STOPS[0].lat, STOPS[0].lon, STOPS, new Set(['STOP_4']));
+    const client = clientModule.computeClientETA(STOPS[0].lat, STOPS[0].lon, CLIENT_STOPS, 'STOP_4', 'STOP_4');
+    expect(server).not.toBeNull();
+    expect(server!.atTerminal).toBe(true);
+    expect(server!.eta).toBe(720);
+    expect(client).toBeNull();
+  });
+
+  test('degenerate inputs — both null', () => {
+    const single = makeStops(1);
+    const clientSingle = toClientStops(single);
+    expect(computeETA(single[0].lat, single[0].lon, single, new Set(['STOP_0']))).toBeNull();
+    expect(clientModule.computeClientETA(single[0].lat, single[0].lon, clientSingle, 'STOP_0', 'STOP_0')).toBeNull();
+    expect(computeETA(33.749, -84.388, [], new Set(['STOP_0']))).toBeNull();
+    expect(clientModule.computeClientETA(33.749, -84.388, [], 'STOP_0', 'STOP_0')).toBeNull();
+  });
+});

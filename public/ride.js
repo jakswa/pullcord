@@ -387,6 +387,7 @@
     return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
   }
 
+  // Haversine — accurate for the ride view's stop-matching. See issue #68 for why app.js uses equirectangular instead.
   function haversine(lat1, lon1, lat2, lon2) {
     const R = 6371000;
     const dLat = (lat2 - lat1) * Math.PI / 180;
