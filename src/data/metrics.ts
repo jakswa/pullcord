@@ -382,7 +382,7 @@ export function cleanOldMetrics(): void {
   const cutoff = Math.floor(Date.now() / 1000) - RETENTION_DAYS * 86400;
   try {
     const db = getDb();
-    const result = db.run(`DELETE FROM metrics WHERE ts < ?`, cutoff);
+    const result = db.run(`DELETE FROM metrics WHERE ts < ?`, [cutoff]);
     if (result.changes > 0) {
       console.log(`📊 Metrics cleanup: removed ${result.changes} old rows`);
     }

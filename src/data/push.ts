@@ -2,6 +2,7 @@
 // Cords persist in SQLite — survive restarts and deploys
 // Polls MARTA only when active cords exist — zero API calls when idle
 import { Database } from 'bun:sqlite';
+// @ts-ignore
 import webpush from 'web-push';
 import path from 'path';
 import { getPredictions } from './realtime.js';

@@ -393,9 +393,9 @@ async function findArrivals(opts: FindArrivalsOptions): Promise<ArrivalPredictio
 
       // For rescue candidates, verify trip serves our target stops
       const existing = existingByTrip.get(veh.tripId);
-      if (!existing && !rawStops.some(s => allStopIds.has(s.stop_id))) continue;
+      if (!existing && !rawStops.some((s: { stop_id: string; lat: number; lon: number; sequence: number; arrival_time: string }) => allStopIds.has(s.stop_id))) continue;
 
-      const tripStops: TripStop[] = rawStops.map(s => ({
+      const tripStops: TripStop[] = rawStops.map((s: { stop_id: string; lat: number; lon: number; sequence: number; arrival_time: string }) => ({
         stop_id: s.stop_id,
         lat: s.lat,
         lon: s.lon,
