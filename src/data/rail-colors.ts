@@ -1,5 +1,5 @@
 // Canonical MARTA rail line colors — single source of truth.
-// Also used client-side in public/app.js (inlined since app.js cannot import TS).
+// Emitted to the client as window.LINE_COLORS via Layout.tsx.
 
 export const LINE_COLORS = {
   RED: "#E05555",

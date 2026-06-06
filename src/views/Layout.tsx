@@ -1,6 +1,7 @@
 import type { Child } from "hono/jsx";
 import { createHash } from "crypto";
 import { readFileSync } from "fs";
+import { LINE_COLORS } from "../data/rail-colors.js";
 
 // Cache-bust: hash static assets at startup so deploys get fresh files
 export function fileHash(path: string): string {
@@ -89,6 +90,9 @@ export const Layout = (props: LayoutProps) => {
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
           crossorigin=""
         ></script>
+
+        {/* Rail line colors — emitted from src/data/rail-colors.ts (single source of truth) */}
+        <script dangerouslySetInnerHTML={{ __html: `window.LINE_COLORS=${JSON.stringify(LINE_COLORS)};` }} />
 
         {/* App JS */}
         <script src={`/public/eta.js?v=${ETA_HASH}`}></script>

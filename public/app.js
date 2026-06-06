@@ -1146,8 +1146,7 @@ class PullcordApp {
 
   renderRailRow(pred) {
     const minutes = Math.floor(pred.etaSeconds / 60);
-    // Source of truth: src/data/rail-colors.ts (dark palette). Keep in sync.
-    const lineColors = { RED: '#E05555', GOLD: '#D4A020', BLUE: '#4A9FE5', GREEN: '#3BAA6E' };
+    const lineColors = window.LINE_COLORS || { RED: '#E05555', GOLD: '#D4A020', BLUE: '#4A9FE5', GREEN: '#3BAA6E' };
     const color = lineColors[pred.line] || '#888';
     const isScheduled = !pred.isRealtime;
     const opacity = isScheduled ? 'opacity:0.45' : '';
