@@ -4,7 +4,7 @@ import { runMigrations } from "./data/migrate.js";
 // If this throws, the process exits non-zero → Fly health check fails → deploy halts.
 console.log(`🚌 Pullcord starting...`);
 const dbPath = process.env.DATABASE_URL || "data/marta.db";
-console.log(`📊 Database: ${Bun.file(dbPath).exists() ? "✓ Found" : "❌ Missing"} (${dbPath})`);
+console.log(`📊 Database: ${(await Bun.file(dbPath).exists()) ? "✓ Found" : "❌ Missing"} (${dbPath})`);
 
 runMigrations(); // throws on failure → process crashes → no server bind → deploy fails
 
