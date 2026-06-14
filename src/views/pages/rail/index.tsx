@@ -178,7 +178,7 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
         <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/rail-favicon.png" />
         <meta name="theme-color" content="#0f0e0b" media="(prefers-color-scheme: dark)" />
         <meta name="theme-color" content="#efeae0" media="(prefers-color-scheme: light)" />
-        <style>{railStyles()}</style>
+        <style>{raw(railStyles())}</style>
       </head>
       <body class="rail-body">
         <div class="rail-shell">
@@ -278,7 +278,7 @@ export function RailStationPage({
         <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/rail-favicon.png" />
         <meta name="theme-color" content="#0f0e0b" media="(prefers-color-scheme: dark)" />
         <meta name="theme-color" content="#efeae0" media="(prefers-color-scheme: light)" />
-        <style>{railStyles()}</style>
+        <style>{raw(railStyles())}</style>
       </head>
       <body class="rail-body">
         <div class="rail-shell">
@@ -435,7 +435,7 @@ export function RailTrainPage({
         <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/rail-favicon.png" />
         <meta name="theme-color" content="#0f0e0b" media="(prefers-color-scheme: dark)" />
         <meta name="theme-color" content="#efeae0" media="(prefers-color-scheme: light)" />
-        <style>{railStyles()}</style>
+        <style>{raw(railStyles())}</style>
       </head>
       <body class="rail-body">
         <div class="rail-shell">

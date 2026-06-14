@@ -187,7 +187,7 @@ export function railStyles(): string {
     }
     .rail-hero-eyebrow svg { width: 12px; height: 12px; }
     .rail-hero-star {
-      position: absolute; top: 14px; right: 12px;
+      position: absolute; top: 8px; right: 12px;
       width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
       color: var(--accent); cursor: pointer; -webkit-tap-highlight-color: transparent;
       border-radius: 99px;
@@ -269,14 +269,15 @@ export function railStyles(): string {
       font-weight: 600; font-size: 18px; letter-spacing: -0.015em;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .rail-row-times { display: flex; gap: 14px; flex-shrink: 0; }
+    .rail-row-times { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
     .rail-dirtoken {
       font-family: var(--mono);
-      display: inline-flex; align-items: baseline; gap: 4px;
+      display: inline-flex; align-items: center; gap: 5px;
       font-size: 22px; font-weight: 600; letter-spacing: -0.03em; white-space: nowrap;
+      line-height: 1;
     }
-    .rail-dirtoken b { font-size: 13px; font-weight: 700; }
-    .rail-dirtoken.is-now span { font-size: 15px; letter-spacing: 0; }
+    .rail-dirtoken b { font-size: 14px; font-weight: 700; line-height: 1; }
+    .rail-dirtoken.is-now span { font-size: 16px; letter-spacing: 0; }
 
     .rail-row-empty { padding: 16px; color: var(--faint); font-size: 13px; text-align: center; }
 
