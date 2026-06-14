@@ -111,18 +111,34 @@ export const STATION_ORDER = [
   "WEST LAKE STATION",
 ];
 
+// Direction → glyph used across hero cards, board rows, and list tokens.
+export const DIR_ARROW: Record<string, string> = { N: "↑", S: "↓", E: "→", W: "←" };
+
+// Canonical direction order (N/S then E/W) so quad-direction hubs lay out
+// consistently as ↑/↓ over →/←.
+export const DIR_ORDER = ["N", "S", "E", "W"];
+
+// Canonical line order for line dots / chips.
+export const LINE_ORDER = ["RED", "GOLD", "BLUE", "GREEN"];
+
 // ── Types ──
-export interface StationPill {
-  direction: string;
-  waitSeconds: number;
-  line: string;
+// A single upcoming arrival in one direction, trimmed to what the hero card and
+// list rows need to render (the full RailArrival is heavier than the view uses).
+export interface DirArrival {
+  eta: number; // seconds until arrival (waitSeconds)
+  dest: string; // display-cased destination, line dropped of "STATION"
+  line: string; // RED | GOLD | BLUE | GREEN
+  rt: boolean; // realtime (vs scheduled)
 }
 
 export interface StationRow {
-  name: string;
-  slug: string;
-  pills: StationPill[];
-  isFourDir: boolean;
+  name: string; // display name, e.g. "Five Points"
+  slug: string; // url slug, e.g. "five-points"
+  lines: string[]; // lines serving this station, canonical order
+  // Up to 3 soonest arrivals per direction, soonest first. Only directions with
+  // service are present. This is the single payload the client projects into
+  // both compact list rows (soonest token) and full hero cards (then-times).
+  dirs: Record<string, DirArrival[]>;
 }
 
 // ── Helpers ──
@@ -160,29 +176,30 @@ export function buildStationRows(arrivals: RailArrival[]): StationRow[] {
 
     const stationArrivals = byStation.get(stationName) || [];
 
-    const bestByDir = new Map<string, RailArrival>();
-    for (const a of stationArrivals) {
-      const existing = bestByDir.get(a.direction);
-      if (!existing || a.waitSeconds < existing.waitSeconds) {
-        bestByDir.set(a.direction, a);
+    // Group arrivals by direction, soonest first, keep up to 3 per direction.
+    const byDir: Record<string, DirArrival[]> = {};
+    const sorted = [...stationArrivals].sort((a, b) => a.waitSeconds - b.waitSeconds);
+    for (const a of sorted) {
+      const list = byDir[a.direction] || (byDir[a.direction] = []);
+      if (list.length < 3) {
+        list.push({
+          eta: a.waitSeconds,
+          dest: stationDisplayName(a.destination),
+          line: a.line,
+          rt: a.isRealtime,
+        });
       }
     }
 
-    const dirOrder = ["N", "S", "E", "W"];
-    const pills: StationPill[] = dirOrder
-      .filter((d) => bestByDir.has(d))
-      .map((d) => {
-        const a = bestByDir.get(d)!;
-        return { direction: d, waitSeconds: a.waitSeconds, line: a.line };
-      });
-
-    const isFourDir = pills.length === 4 || stationName === "FIVE POINTS STATION";
+    // Lines serving this station, in canonical order, derived from live arrivals.
+    const lineSet = new Set<string>(stationArrivals.map((a) => a.line));
+    const lines = LINE_ORDER.filter((l) => lineSet.has(l));
 
     rows.push({
       name: stationDisplayName(stationName),
       slug: stationSlug(stationName),
-      pills,
-      isFourDir,
+      lines,
+      dirs: byDir,
     });
   }
 
