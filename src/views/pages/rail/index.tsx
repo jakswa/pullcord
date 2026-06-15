@@ -51,19 +51,6 @@ function IconBack() {
     </svg>
   );
 }
-function IconStar({ filled }: { filled?: boolean }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24">
-      <path
-        d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.3L12 17.1l-5.7 3.1 1.2-6.3L2.8 9.5l6.4-.8L12 2.8z"
-        fill={filled ? "currentColor" : "none"}
-        stroke="currentColor"
-        stroke-width="1.6"
-        stroke-linejoin="round"
-      />
-    </svg>
-  );
-}
 function IconPin() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24">
@@ -194,11 +181,6 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
         <div class="rail-shell">
           <header class="rail-header">
             <div class="rail-header-top">
-              {!standalone && (
-                <a href="/" class="rail-backbtn" aria-label="Back to home">
-                  <IconBack />
-                </a>
-              )}
               <h1 class="rail-wordmark">marta<span>.io</span></h1>
               <span class="rail-live mono">
                 <span class="rail-pulse"></span>
@@ -258,7 +240,6 @@ export function RailStationPage({
   standalone?: boolean;
 }) {
   const displayName = stationDisplayName(stationName);
-  const slug = stationSlug(stationName);
   const title = standalone
     ? `${displayName} — marta.io rail`
     : `${displayName} — MARTA Rail — Pullcord`;
@@ -293,9 +274,6 @@ export function RailStationPage({
             <a href="/rail" class="rail-backbtn" aria-label="Back to all stations" onclick="if(history.length>1){history.back();return false}">
               <IconBack />
             </a>
-            <button class="rail-iconbtn" id="rail-fav" type="button" aria-label="Favorite this station">
-              <IconStar />
-            </button>
             <div class="rail-topbar-title">
               <span class="rail-topbar-name">{displayName.toLowerCase()}</span>
               <span class="rail-topbar-chips">
@@ -317,17 +295,10 @@ export function RailStationPage({
           </main>
           <RailFooter />
         </div>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `window.__RAIL_SLUG=${JSON.stringify(slug)};`,
-          }}
-        />
         <script dangerouslySetInnerHTML={{ __html: buildInlineJS(false) }} />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){
-var K="rail-starred",b=document.getElementById("rail-fav"),s=window.__RAIL_SLUG;
-if(b&&s){function get(){try{return JSON.parse(localStorage.getItem(K))||[]}catch(e){return[]}}function on(){return get().indexOf(s)>-1}function paint(){b.classList.toggle("is-on",on());b.setAttribute("aria-pressed",on()?"true":"false")}b.addEventListener("click",function(){var a=get(),i=a.indexOf(s);if(i>-1)a.splice(i,1);else a.push(s);localStorage.setItem(K,JSON.stringify(a));paint()});paint()}
 // direction filter — delegated so it survives poll swaps; re-applied via postUpdate
 var curDir="all";
 function applyFilter(){var seg=document.getElementById("rail-seg");if(seg)Array.prototype.forEach.call(seg.querySelectorAll("button"),function(x){x.classList.toggle("is-on",x.getAttribute("data-dir")===curDir)});Array.prototype.forEach.call(document.querySelectorAll("#rail-board .rail-brow"),function(r){r.hidden=curDir!=="all"&&r.getAttribute("data-dir")!==curDir})}

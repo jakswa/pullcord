@@ -11,7 +11,7 @@ export function buildInlineJS(isLanding: boolean): string {
   const landing = `
 (function(){
 var SK="rail-starred",coords=window.__COORDS||{},LC=window.__LC||{};
-var DORD=["N","S","E","W"],ARROW={N:"\\u2191",S:"\\u2193",E:"\\u2192",W:"\\u2190"};
+var DORD=["N","S","E","W"],ARROW={N:"\\u25B2",S:"\\u25BC",E:"\\u25B6",W:"\\u25C0"};
 
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function col(l){return LC[l]||"#666"}

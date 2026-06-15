@@ -115,25 +115,21 @@ export function railStyles(): string {
 
     /* ── Sub header (station / train detail) ── */
     .rail-topbar-sub { padding-bottom: 8px; align-items: center; }
-    .rail-backbtn, .rail-iconbtn {
+    .rail-backbtn {
       appearance: none; border: none; background: none; padding: 0; cursor: pointer;
       color: var(--muted); display: flex; align-items: center; justify-content: center;
       text-decoration: none; flex-shrink: 0;
+      width: 40px; height: 40px; margin-left: -8px; border-radius: 99px;
     }
-    .rail-backbtn { width: 40px; height: 40px; margin-left: -8px; border-radius: 99px; }
     .rail-backbtn:active { background: var(--surface2); }
     .rail-topbar-title { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
     .rail-topbar-name {
-      font-weight: 800; font-size: 23px; letter-spacing: -0.025em; line-height: 1;
+      font-weight: 800; font-size: 23px; letter-spacing: -0.025em; line-height: 1.2;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .rail-topbar-name.mono { font-weight: 700; letter-spacing: -0.04em; }
     .rail-topbar-chips { display: flex; align-items: center; gap: 6px; }
     .rail-topbar-dest { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
-    .rail-iconbtn { width: 40px; height: 40px; border-radius: 99px; margin-left: -4px; }
-    .rail-iconbtn:active { background: var(--surface2); }
-    .rail-iconbtn.is-on { color: var(--accent); }
-    .rail-iconbtn.is-on svg path { fill: currentColor; }
 
     /* ── Chips & dots ── */
     .rail-chip {
@@ -210,7 +206,8 @@ export function railStyles(): string {
       font-size: 13.5px; color: var(--muted); letter-spacing: 0.01em;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .rail-herodir-route b { color: var(--text); font-weight: 700; margin-right: 1px; }
+    /* direction marker: solid triangle (▲▼▶◀) — reads better than thin arrows */
+    .rail-herodir-route b { color: var(--text); font-size: 1.15em; margin-right: 4px; }
     .rail-herodir-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .rail-herodir-then { font-family: var(--mono); font-size: 13px; color: var(--muted); white-space: nowrap; font-weight: 500; }
     .rail-hero-foot { font-family: var(--mono); margin-top: 16px; font-size: 10px; color: var(--faint); letter-spacing: 0.1em; }
