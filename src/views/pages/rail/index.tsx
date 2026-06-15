@@ -111,6 +111,16 @@ function RailApiBanner() {
   );
 }
 
+// Shared footer — present on every rail view.
+function RailFooter() {
+  return (
+    <footer class="rail-footer">
+      Real-time MARTA data via public API. Not affiliated with or endorsed by MARTA.
+      <span> · <a href="/about">About marta.io</a></span>
+    </footer>
+  );
+}
+
 // ── Station list row (hidden source-of-truth; client projects into heroes + lists) ──
 function StationRowEl({ row }: { row: StationRow }) {
   // Soonest arrival per direction in canonical order, for the compact tokens.
@@ -223,10 +233,7 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
               <RailStationList arrivals={arrivals} />
             </div>
           </main>
-          <footer class="rail-footer">
-            Real-time MARTA data via public API. Not affiliated with or endorsed by MARTA.
-            <span> · <a href="/about">About marta.io</a></span>
-          </footer>
+          <RailFooter />
         </div>
         <script
           dangerouslySetInnerHTML={{
@@ -286,6 +293,9 @@ export function RailStationPage({
             <a href="/rail" class="rail-backbtn" aria-label="Back to all stations" onclick="if(history.length>1){history.back();return false}">
               <IconBack />
             </a>
+            <button class="rail-iconbtn" id="rail-fav" type="button" aria-label="Favorite this station">
+              <IconStar />
+            </button>
             <div class="rail-topbar-title">
               <span class="rail-topbar-name">{displayName.toLowerCase()}</span>
               <span class="rail-topbar-chips">
@@ -294,15 +304,10 @@ export function RailStationPage({
                 ))}
               </span>
             </div>
-            <div class="rail-topbar-actions">
-              <button class="rail-iconbtn" id="rail-fav" type="button" aria-label="Favorite this station">
-                <IconStar />
-              </button>
-              <span class="rail-live mono" style="margin-left:0">
-                <span class="rail-pulse"></span>
-                <span class="rail-freshness" id="freshness">live</span>
-              </span>
-            </div>
+            <span class="rail-live mono">
+              <span class="rail-pulse"></span>
+              <span class="rail-freshness" id="freshness">live</span>
+            </span>
           </header>
           <main class="rail-main">
             <RailApiBanner />
@@ -310,6 +315,7 @@ export function RailStationPage({
               <RailStationDetail stationName={stationName} arrivals={arrivals} />
             </div>
           </main>
+          <RailFooter />
         </div>
         <script
           dangerouslySetInnerHTML={{
@@ -463,6 +469,7 @@ export function RailTrainPage({
               <RailTrainTimeline trainId={trainId} arrivals={arrivals} />
             </div>
           </main>
+          <RailFooter />
         </div>
         <script dangerouslySetInnerHTML={{ __html: buildInlineJS(false) }} />
       </body>

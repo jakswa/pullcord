@@ -130,12 +130,10 @@ export function railStyles(): string {
     .rail-topbar-name.mono { font-weight: 700; letter-spacing: -0.04em; }
     .rail-topbar-chips { display: flex; align-items: center; gap: 6px; }
     .rail-topbar-dest { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
-    .rail-topbar-actions { margin-left: auto; display: flex; gap: 4px; }
-    .rail-iconbtn {
-      width: 42px; height: 42px; border-radius: 12px;
-      background: var(--surface); border: 1px solid var(--hairline);
-    }
-    .rail-iconbtn.is-on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+    .rail-iconbtn { width: 40px; height: 40px; border-radius: 99px; margin-left: -4px; }
+    .rail-iconbtn:active { background: var(--surface2); }
+    .rail-iconbtn.is-on { color: var(--accent); }
+    .rail-iconbtn.is-on svg path { fill: currentColor; }
 
     /* ── Chips & dots ── */
     .rail-chip {
@@ -329,8 +327,8 @@ export function railStyles(): string {
       color: var(--faint);
       line-height: 1.5;
     }
-    .rail-footer a { color: var(--faint); text-decoration: none; }
-    .rail-footer a:active { color: var(--muted); }
+    .rail-footer a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+    .rail-footer a:active { color: var(--accent); }
 
     /* ── Station board ── */
     .rail-seg {

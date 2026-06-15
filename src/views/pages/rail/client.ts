@@ -124,6 +124,15 @@ var qi=document.getElementById("rail-q"),qx=document.getElementById("rail-q-x");
 if(qi)qi.addEventListener("input",applySearch);
 if(qx)qx.addEventListener("click",function(){qi.value="";applySearch();qi.focus()});
 
+// If location permission is already granted, skip the tap-to-expand and fetch
+// straight away (survives new tabs / cache expiry, where sessionStorage is empty).
+if(navigator.permissions&&navigator.permissions.query){
+  navigator.permissions.query({name:"geolocation"}).then(function(st){
+    function maybe(){if(st.state==="granted"&&!userPos&&!geoRequested)requestGeo()}
+    maybe();st.onchange=maybe;
+  }).catch(function(){});
+}
+
 reorder();
 })();`;
 
