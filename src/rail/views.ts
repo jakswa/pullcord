@@ -98,11 +98,11 @@ export function aboutView(): string {
 <div class="about-section">
   <h2>Links</h2>
   <div class="about-links">
-    <a class="card" href="https://codeberg.org/clatis/pullcord" target="_blank" rel="noopener">
+    <a class="card" href="https://github.com/jakswa/pullcord" target="_blank" rel="noopener">
       <span class="ico">📦</span>
-      <div><div class="t">Source Code</div><div class="d">codeberg.org/clatis/pullcord</div></div>
+      <div><div class="t">Source Code</div><div class="d">github.com/jakswa/pullcord</div></div>
     </a>
-    <a class="card" href="https://codeberg.org/clatis/pullcord/issues" target="_blank" rel="noopener">
+    <a class="card" href="https://github.com/jakswa/pullcord/issues" target="_blank" rel="noopener">
       <span class="ico">💬</span>
       <div><div class="t">Issues &amp; Feedback</div><div class="d">Bug reports and feature requests</div></div>
     </a>

@@ -188,14 +188,14 @@ export const AboutPage = () => (
       <section class="about-section">
         <h2 class="about-h2">Links</h2>
         <div class="about-links">
-          <a href="https://codeberg.org/clatis/pullcord" class="about-link-card" target="_blank" rel="noopener">
+          <a href="https://github.com/jakswa/pullcord" class="about-link-card" target="_blank" rel="noopener">
             <span class="about-link-icon">📦</span>
             <div>
               <div class="about-link-title">Source Code</div>
-              <div class="about-link-desc">codeberg.org/clatis/pullcord</div>
+              <div class="about-link-desc">github.com/jakswa/pullcord</div>
             </div>
           </a>
-          <a href="https://codeberg.org/clatis/pullcord/issues" class="about-link-card" target="_blank" rel="noopener">
+          <a href="https://github.com/jakswa/pullcord/issues" class="about-link-card" target="_blank" rel="noopener">
             <span class="about-link-icon">💬</span>
             <div>
               <div class="about-link-title">Issues &amp; Feedback</div>

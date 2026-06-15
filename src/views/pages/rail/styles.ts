@@ -195,10 +195,15 @@ export function railStyles(): string {
       font-size: 44px; font-weight: 800; letter-spacing: -0.035em; line-height: 0.95;
       margin: 10px 0 18px;
     }
-    .rail-hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .rail-herodir { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-    .rail-herodir + .rail-herodir { border-left: 1px solid var(--hairline); padding-left: 14px; }
-    .rail-hero-grid.is-quad .rail-herodir:nth-child(3) { border-left: none; padding-left: 0; }
+    /* gap:0 + symmetric inner gutters → the dividers sit on the exact 50% track
+       lines and meet in one continuous, centered cross (no per-cell corner gap,
+       no left/right squish). Works for 2/3/4 directions and respects the card
+       gradient, since cells aren't painted. */
+    .rail-hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+    .rail-herodir { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-right: 14px; }
+    .rail-herodir + .rail-herodir { border-left: 1px solid var(--hairline); padding-left: 14px; padding-right: 0; }
+    .rail-hero-grid.is-quad .rail-herodir:nth-child(3) { border-left: none; padding-left: 0; padding-right: 14px; }
+    .rail-hero-grid.is-quad .rail-herodir:nth-child(-n+2) { padding-bottom: 12px; }
     .rail-hero-grid.is-quad .rail-herodir:nth-child(n+3) { border-top: 1px solid var(--hairline); padding-top: 12px; }
     .rail-herodir-route {
       font-family: var(--mono);
@@ -421,10 +426,15 @@ export function railStyles(): string {
     }
     .rail-tlstop.is-end .rail-tlname { font-weight: 700; }
 
-    /* Reveal on load (transform only → print/reduced-motion show end state) */
+    /* Fresh-data tick: hero stars are rebuilt on each poll, so this entrance
+       animation replays every refresh — the star advances one point (72°)
+       clockwise and settles. Transform only → reduced-motion shows end state. */
     @media (prefers-reduced-motion: no-preference) {
-      .rail-rv { animation: rail-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+      .rail-hero-star svg {
+        transform-origin: 50% 50%;
+        animation: rail-star-tick 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+      }
     }
-    @keyframes rail-rise { from { transform: translateY(12px); } to { transform: translateY(0); } }
+    @keyframes rail-star-tick { from { transform: rotate(-72deg); } to { transform: rotate(0); } }
   `;
 }
