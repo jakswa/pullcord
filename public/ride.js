@@ -100,7 +100,10 @@
       }
     });
     window.addEventListener('pageshow', (e) => {
-      if (e.persisted) refreshIfStale();
+      if (e.persisted) {
+        refreshIfStale();
+        resumeTimers();
+      }
     });
 
     // If user pans/zooms, stop following bus

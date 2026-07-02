@@ -394,7 +394,10 @@ class PullcordApp {
     });
     // bfcache restore (Android/iOS back-forward) fires pageshow, not visibilitychange
     window.addEventListener('pageshow', (e) => {
-      if (e.persisted) this.refreshIfStale();
+      if (e.persisted) {
+        this.refreshIfStale();
+        this.resumeTimers();
+      }
     });
   }
 
