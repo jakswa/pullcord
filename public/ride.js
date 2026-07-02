@@ -25,8 +25,12 @@
   let followBus = true; // map follows bus by default
   let routeShortName = '';
   let routeColor = '#E85D3A';
+  let pollTimer = null;
+  let lastUpdated = null;
+  let updating = false;
   const CORD_ZONE_STOPS = 2;
   const BUS_POLL_MS = 10000;
+  const STALE_MS = 8000; // refresh on resume if the last poll is older than this (#92)
 
   // ─── Init ───
 
@@ -84,12 +88,38 @@
 
     // Poll bus position immediately + interval
     pollBus();
-    setInterval(pollBus, BUS_POLL_MS);
+    pollTimer = setInterval(pollBus, BUS_POLL_MS);
+
+    // Pause polling in the background; refresh on resume so a stale bus position doesn't linger (#92)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        pauseTimers();
+      } else {
+        refreshIfStale();
+        resumeTimers();
+      }
+    });
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted) refreshIfStale();
+    });
 
     // If user pans/zooms, stop following bus
     map.on('dragstart', () => { followBus = false; });
 
     setStatus('Waiting for bus position...');
+  }
+
+  function pauseTimers() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  function resumeTimers() {
+    if (!pollTimer) pollTimer = setInterval(pollBus, BUS_POLL_MS);
+  }
+
+  function refreshIfStale() {
+    if (updating) return;
+    if (isStale(lastUpdated, Date.now(), STALE_MS)) pollBus();
   }
 
   // ─── Map ───
@@ -206,10 +236,13 @@
 
   async function pollBus() {
     if (!routeId) return;
+    if (updating) return; // prevent double-fetch races (resume + interval tick)
+    updating = true;
     try {
       const res = await fetch(`/api/realtime/${routeId}`);
       if (!res.ok) return;
       const data = await res.json();
+      lastUpdated = Date.now();
       const vehicles = data.vehicles || [];
       const bus = vehicles.find(v => v.tripId === tripId);
       if (!bus) return;
@@ -244,7 +277,9 @@
       if (followBus) {
         map.setView(busLatLon, Math.max(map.getZoom(), 16), { animate: true });
       }
-    } catch (err) { /* silent */ }
+    } catch (err) { /* silent */ } finally {
+      updating = false;
+    }
   }
 
   function makeBusIcon(bearing) {
