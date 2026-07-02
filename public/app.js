@@ -1,6 +1,9 @@
 // Pullcord — Real-time MARTA bus tracker
 // Hero countdown, linear progress strip, map on demand, pull the cord, favorites
 
+// Refresh on resume if the last poll is older than this (a bit under the 30s poll)
+const STALE_MS = 10000;
+
 class PullcordApp {
   constructor() {
     // Map state
@@ -17,9 +20,12 @@ class PullcordApp {
     this.lastVehicles = [];
     this.heroEtaSeconds = null;
     this.heroPrediction = null;
+    this.lastUpdatedAt = null;
+    this._updating = false;
 
     // Countdown timer (ticks every second between polls)
     this.countdownTimer = null;
+    this.heroTargetAt = null; // wall-clock epoch the hero ETA counts down to
 
     // Rail transfer state
     this.railEnabled = localStorage.getItem('rail-on') === '1';
@@ -376,6 +382,42 @@ class PullcordApp {
     }
     if (!this.multiRoute) this.discoverOtherRoutes();
     this.startPolling();
+
+    // Pause timers in the background; refresh on resume so stale ETAs don't linger (#92)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.pauseTimers();
+      } else {
+        this.refreshIfStale();
+        this.resumeTimers();
+      }
+    });
+    // bfcache restore (Android/iOS back-forward) fires pageshow, not visibilitychange
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted) {
+        this.refreshIfStale();
+        this.resumeTimers();
+      }
+    });
+  }
+
+  pauseTimers() {
+    if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
+    this.stopCountdown();
+    if (this._railTimer) { clearInterval(this._railTimer); this._railTimer = null; }
+  }
+
+  resumeTimers() {
+    if (!this.pollTimer) {
+      this.pollTimer = setInterval(() => this.updateData(), this.config.pollInterval);
+    }
+    if (this.heroPrediction) this.startCountdown();
+    if (this.railEnabled && !this._railTimer) this.fetchRailArrivals();
+  }
+
+  refreshIfStale() {
+    if (this._updating) return;
+    if (isStale(this.lastUpdatedAt, Date.now(), STALE_MS)) this.updateData();
   }
 
   // Load route-specific data (shapes, stops, vehicles) for multi-route map/progress
@@ -529,6 +571,8 @@ class PullcordApp {
   }
 
   async updateData() {
+    if (this._updating) return; // prevent double-fetch races (resume + interval tick)
+    this._updating = true;
     try {
       const qs = this.mockMode ? '?mock=1' : '';
 
@@ -571,9 +615,12 @@ class PullcordApp {
       this.flashRefresh();
       this.startRefreshCycle();
       this.hideOffline();
+      this.lastUpdatedAt = Date.now();
     } catch (e) {
       console.error('Update error:', e);
       this.showOffline();
+    } finally {
+      this._updating = false;
     }
   }
 
@@ -690,6 +737,7 @@ class PullcordApp {
       if (cordSection) cordSection.style.display = 'none';
       this.heroPrediction = null;
       this.heroEtaSeconds = null;
+      this.heroTargetAt = null;
       this.stopCountdown();
       return;
     }
@@ -741,6 +789,7 @@ class PullcordApp {
     }
     this.heroPrediction = hero;
     this.heroEtaSeconds = hero.etaSeconds;
+    this.heroTargetAt = Date.now() + hero.etaSeconds * 1000;
 
     this.renderHeroDisplay();
     this.startCountdown();
@@ -854,10 +903,10 @@ class PullcordApp {
   startCountdown() {
     this.stopCountdown();
     this.countdownTimer = setInterval(() => {
-      if (this.heroEtaSeconds !== null && this.heroEtaSeconds > 0 && !this.heroPrediction?.atTerminal) {
-        this.heroEtaSeconds--;
-        this.renderHeroDisplay();
-      }
+      // Wall-clock based so a frozen background gap self-corrects on the next tick
+      if (this.heroTargetAt === null || this.heroPrediction?.atTerminal) return;
+      this.heroEtaSeconds = Math.max(0, Math.round((this.heroTargetAt - Date.now()) / 1000));
+      this.renderHeroDisplay();
     }, 1000);
   }
 
