@@ -3,7 +3,12 @@
 // favorite hero cards, a geo "nearby" list, and a searchable all-stations list.
 export function buildInlineJS(isLanding: boolean): string {
   // Base: poll the page's own ?partial=1 and swap #rail-data, tick freshness.
-  const base = `(function(){var P=1e4,d=document.getElementById("rail-data"),f=document.getElementById("freshness");if(!d||!f)return;var t=Date.now(),p=null,b=window.location.pathname;function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<2?"live":a+"s";f.style.color=a>30?"var(--accent)":""}setInterval(u,1e3);u();function q(){fetch(b+"?partial=1",{signal:AbortSignal.timeout(8e3)}).then(function(r){if(r.ok)return r.text()}).then(function(h){if(h){d.innerHTML=h;t=Date.now();u();typeof reorder==="function"&&reorder();typeof postUpdate==="function"&&postUpdate()}}).catch(function(){})}p=setInterval(q,P);document.addEventListener("visibilitychange",function(){if(document.hidden){clearInterval(p);p=null}else{q();p=setInterval(q,P)}})})();`;
+  // Freshness: `t` is the wall-clock moment the arrivals were fetched from
+  // MARTA. It starts from the server-reported age (data-age / X-Rail-Age), not
+  // page load, so a board rendered from an old cache is never labelled "live".
+  // Past STALE the board dims and the label reads "stale" until a poll lands.
+  // Resume paths (tab visible, bfcache restore, network back) refetch at once.
+  const base = `(function(){var P=1e4,STALE=30,d=document.getElementById("rail-data"),f=document.getElementById("freshness"),m=document.querySelector(".rail-main");if(!d||!f)return;var t=Date.now()-(parseInt(d.getAttribute("data-age"),10)||0),p=null,busy=false,b=window.location.pathname;function u(){var a=Math.floor((Date.now()-t)/1e3),s=a>STALE;f.textContent=a<2?"live":s?"stale "+(a<120?a+"s":Math.floor(a/60)+"m"):a+"s";f.style.color=s?"var(--accent)":"";if(m)m.classList.toggle("is-stale",s)}setInterval(u,1e3);u();function q(){if(busy)return;busy=true;var age=0;fetch(b+"?partial=1",{cache:"no-store",signal:AbortSignal.timeout(8e3)}).then(function(r){if(r.ok){age=parseInt(r.headers.get("X-Rail-Age"),10)||0;return r.text()}}).then(function(h){if(h){d.innerHTML=h;t=Date.now()-age;u();typeof reorder==="function"&&reorder();typeof postUpdate==="function"&&postUpdate()}}).catch(function(){}).then(function(){busy=false})}function stop(){if(p){clearInterval(p);p=null}}function resume(){stop();q();p=setInterval(q,P)}p=setInterval(q,P);document.addEventListener("visibilitychange",function(){if(document.hidden)stop();else resume()});window.addEventListener("pageshow",function(e){if(e.persisted)resume()});window.addEventListener("online",resume)})();`;
 
   if (!isLanding) return base;
 

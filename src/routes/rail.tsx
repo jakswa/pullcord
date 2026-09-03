@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app.js";
-import { fetchArrivals, stationSlug } from "../rail/api.js";
+import { fetchArrivals, getArrivalsAgeMs, stationSlug } from "../rail/api.js";
 import {
   RailLandingPage,
   RailStationList,
@@ -12,9 +12,24 @@ import {
 
 const app = new Hono<AppEnv>();
 
+// Rail pages and partials are real-time: never let the browser, a PWA shell,
+// or a proxy hand back an old copy.
+app.use("*", async (c, next) => {
+  await next();
+  c.header("Cache-Control", "no-store");
+});
+
+// Stamp the age of the arrivals this response was rendered from, so the
+// client's freshness counter reflects the data rather than page load. Called
+// right after fetchArrivals() so it can't drift from what was rendered.
+function stampAge(c: { header: (k: string, v: string) => void }) {
+  c.header("X-Rail-Age", String(getArrivalsAgeMs() ?? 0));
+}
+
 // GET /rail — landing page (all stations)
 app.get("/rail", async (c) => {
   const arrivals = await fetchArrivals();
+  stampAge(c);
   const partial = c.req.query("partial");
   const isRailHost = c.get("isRailHost") || false;
 
@@ -29,6 +44,7 @@ app.get("/rail", async (c) => {
 app.get("/rail/train/:trainId", async (c) => {
   const trainId = c.req.param("trainId");
   const arrivals = await fetchArrivals();
+  stampAge(c);
   const partial = c.req.query("partial");
   const isRailHost = c.get("isRailHost") || false;
 
@@ -45,6 +61,7 @@ app.get("/rail/train/:trainId", async (c) => {
 app.get("/rail/:slug", async (c) => {
   const slug = c.req.param("slug");
   const arrivals = await fetchArrivals();
+  stampAge(c);
   const isRailHost = c.get("isRailHost") || false;
 
   // Find matching station

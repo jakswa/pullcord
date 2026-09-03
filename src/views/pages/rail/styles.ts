@@ -112,6 +112,9 @@ export function railStyles(): string {
     }
 
     .rail-freshness { font-variant-numeric: tabular-nums; }
+    /* Board dims while the arrivals are older than we trust (see client.ts) */
+    .rail-main { transition: opacity .25s ease; }
+    .rail-main.is-stale { opacity: .45; }
 
     /* ── Sub header (station / train detail) ── */
     .rail-topbar-sub { padding-bottom: 8px; align-items: center; }

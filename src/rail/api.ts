@@ -49,6 +49,13 @@ let cache: CacheEntry | null = null;
 // triggers a refresh (via stale-while-revalidate) instead of redundantly
 // re-serving the same cached bytes. 9s leaves slack for small clock skew.
 const CACHE_TTL = 9_000;
+// Upper bound on stale-while-revalidate. Between CACHE_TTL and MAX_STALE we
+// serve the cached board and refresh in the background (keeps polls snappy).
+// Beyond MAX_STALE the cache is from another era — e.g. the first request of
+// the morning after a quiet night — so we WAIT for a fresh fetch rather than
+// render last night's arrivals as "live". A 30s-old board is still a board;
+// an 8-hour-old one is a lie.
+const MAX_STALE = 30_000;
 // Shared in-flight promise: if a refresh is already running, any caller that
 // needs one piggybacks on it instead of firing its own fetch. This prevents a
 // thundering herd on cold start (100 concurrent /rail loads = 1 MARTA fetch,
@@ -69,18 +76,32 @@ export async function fetchArrivals(): Promise<RailArrival[]> {
   if (cache && now - cache.ts < CACHE_TTL) {
     return cache.kind === "ok" ? cache.data : [];
   }
-  // Stale cache: kick off (or piggyback on) a background refresh, keep serving
-  // the current cached value (empty array if we previously errored).
-  if (cache) {
+  // Slightly stale: kick off (or piggyback on) a background refresh, keep
+  // serving the current cached value (empty array if we previously errored).
+  if (cache && now - cache.ts < MAX_STALE) {
     refresh().catch(() => {});
     return cache.kind === "ok" ? cache.data : [];
   }
-  // Cold start: wait for the shared refresh. On failure return [].
+  // Cold start or very stale: wait for the shared refresh. On failure return
+  // [] — never the ancient cached board.
   try {
     return await refresh();
   } catch {
     return [];
   }
+}
+
+// Age in ms of the arrivals the caller was just served (time since MARTA was
+// last polled successfully or unsuccessfully), or null with no cache yet. Views
+// embed this so the client's freshness counter reflects the data, not page load.
+export function getArrivalsAgeMs(): number | null {
+  return cache ? Math.max(0, Date.now() - cache.ts) : null;
+}
+
+// Test hook: drop the cache and any in-flight refresh.
+export function _resetRailCacheForTests(): void {
+  cache = null;
+  inflight = null;
 }
 
 async function _refresh(): Promise<RailArrival[]> {

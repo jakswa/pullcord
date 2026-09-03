@@ -1,6 +1,6 @@
 import { raw } from "hono/html";
 import type { RailArrival } from "../../../rail/api.js";
-import { stationSlug, stationDisplayName, getRailApiError } from "../../../rail/api.js";
+import { stationSlug, stationDisplayName, getRailApiError, getArrivalsAgeMs } from "../../../rail/api.js";
 
 import {
   LINE_COLORS,
@@ -211,7 +211,7 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
             </section>
 
             {/* Hidden source list — swapped wholesale on each poll, projected by reorder() */}
-            <div id="rail-data" hidden>
+            <div id="rail-data" hidden data-age={getArrivalsAgeMs() ?? 0}>
               <RailStationList arrivals={arrivals} />
             </div>
           </main>
@@ -289,7 +289,7 @@ export function RailStationPage({
           </header>
           <main class="rail-main">
             <RailApiBanner />
-            <div id="rail-data">
+            <div id="rail-data" data-age={getArrivalsAgeMs() ?? 0}>
               <RailStationDetail stationName={stationName} arrivals={arrivals} />
             </div>
           </main>
@@ -436,7 +436,7 @@ export function RailTrainPage({
           </header>
           <main class="rail-main">
             <RailApiBanner />
-            <div id="rail-data">
+            <div id="rail-data" data-age={getArrivalsAgeMs() ?? 0}>
               <RailTrainTimeline trainId={trainId} arrivals={arrivals} />
             </div>
           </main>
