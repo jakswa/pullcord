@@ -421,6 +421,7 @@ app.get("/metrics/route/:routeId", (c) => {
 // GET /api/rail — JSON endpoint (real-time rail arrivals)
 app.get("/rail", async (c) => {
   const arrivals = await fetchArrivals();
+  c.header("Cache-Control", "no-store");
   return c.json({
     arrivals,
     timestamp: Date.now(),

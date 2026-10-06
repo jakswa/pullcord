@@ -3,7 +3,70 @@
 // favorite hero cards, a geo "nearby" list, and a searchable all-stations list.
 export function buildInlineJS(isLanding: boolean): string {
   // Base: poll the page's own ?partial=1 and swap #rail-data, tick freshness.
-  const base = `(function(){var P=1e4,d=document.getElementById("rail-data"),f=document.getElementById("freshness");if(!d||!f)return;var t=Date.now(),p=null,b=window.location.pathname;function u(){var a=Math.floor((Date.now()-t)/1e3);f.textContent=a<2?"live":a+"s";f.style.color=a>30?"var(--accent)":""}setInterval(u,1e3);u();function q(){fetch(b+"?partial=1",{signal:AbortSignal.timeout(8e3)}).then(function(r){if(r.ok)return r.text()}).then(function(h){if(h){d.innerHTML=h;t=Date.now();u();typeof reorder==="function"&&reorder();typeof postUpdate==="function"&&postUpdate()}}).catch(function(){})}p=setInterval(q,P);document.addEventListener("visibilitychange",function(){if(document.hidden){clearInterval(p);p=null}else{q();p=setInterval(q,P)}})})();`;
+  // Freshness comes from the server's data age (data-age on #rail-data, then
+  // X-Data-Age on each partial) so old data never reads as "live". In steady
+  // state the server serves data 10-20s old (9s cache TTL + stale-while-
+  // revalidate, MAX_STALE_MS=20s), so anything under LIVE_S reads "live" and a
+  // seconds count only appears once polling has actually fallen behind.
+  // Resuming the app (visibilitychange, bfcache pageshow, focus) fetches
+  // immediately if the data is older than that; a failed resume fetch retries
+  // quickly (radio waking up).
+  const base = `
+(function(){
+var P=1e4,LIVE_S=20,RESUME_AGE=2e4,STALE_S=30,RETRY_MS=2e3,RETRIES=3;
+var d=document.getElementById("rail-data"),f=document.getElementById("freshness");
+if(!d||!f)return;
+var b=window.location.pathname,p=null,busy=false,sentAt=0,seq=0,retryT=null;
+function ageMs(v){var n=parseInt(v,10);return isNaN(n)||n<0?0:n}
+// t = local-clock time the displayed data was fetched from MARTA
+var t=Date.now()-ageMs(d.getAttribute("data-age"));
+function u(){
+  var a=Math.max(0,Math.floor((Date.now()-t)/1e3));
+  f.textContent=a<LIVE_S?"live":a+"s";
+  f.style.color=a>STALE_S?"var(--accent)":"";
+  document.body.classList.toggle("is-stale",a>STALE_S);
+}
+setInterval(u,1e3);u();
+// force: skip the in-flight guard (a pre-sleep request may be hung); the seq
+// check below discards whichever response is no longer the latest.
+function q(force,retries){
+  if(busy&&!force)return;
+  busy=true;sentAt=Date.now();var my=++seq;
+  clearTimeout(retryT);
+  fetch(b+"?partial=1",{cache:"no-store",signal:AbortSignal.timeout(8e3)})
+    .then(function(r){
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      var age=r.headers.get("X-Data-Age");
+      return r.text().then(function(h){return{h:h,age:age}});
+    })
+    .then(function(x){
+      if(my!==seq)return;
+      busy=false;
+      // No age header = MARTA never answered yet: keep counting from before.
+      d.innerHTML=x.h;if(x.age!==null)t=Date.now()-ageMs(x.age);u();
+      typeof reorder==="function"&&reorder();
+      typeof postUpdate==="function"&&postUpdate();
+    })
+    .catch(function(){
+      if(my!==seq)return;
+      busy=false;
+      if(retries>0&&!document.hidden)retryT=setTimeout(function(){q(true,retries-1)},RETRY_MS);
+    });
+}
+function start(){if(!p)p=setInterval(function(){q(false,0)},P)}
+function stop(){clearInterval(p);p=null;clearTimeout(retryT)}
+function resume(){
+  if(document.hidden)return;
+  // visibilitychange + focus often fire together: don't double-fetch while a
+  // recent request is still in flight.
+  if(Date.now()-t>RESUME_AGE&&!(busy&&Date.now()-sentAt<RETRY_MS))q(true,RETRIES);
+  start();
+}
+document.addEventListener("visibilitychange",function(){document.hidden?stop():resume()});
+window.addEventListener("pageshow",function(e){if(e.persisted)resume()});
+window.addEventListener("focus",resume);
+resume();
+})();`;
 
   if (!isLanding) return base;
 
