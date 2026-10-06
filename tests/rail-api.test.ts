@@ -92,6 +92,8 @@ describe('rail fetchArrivals cache', () => {
     const data = await fetchArrivals();
     expect(data).toEqual([]);
     expect(getRailApiError()).toContain('503');
+    // Freshness keeps counting from the last real data, not the failed attempt.
+    expect(getArrivalsTimestamp()).toBe(1_000_000);
   });
 
   test('concurrent callers share one fetch', async () => {

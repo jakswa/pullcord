@@ -90,7 +90,7 @@ function DirToken({ dir, a }: { dir: string; a: DirArrival }) {
 // Server-side data timestamp + age for #rail-data. The client derives the
 // freshness pill from data-age (skew-free: computed on one clock) so a page
 // opened on old data never claims to be "live". Partials send the same values
-// as X-Data-Ts / X-Data-Age headers (see railDataHeaders).
+// as X-Data-Ts / X-Data-Age headers (see railHeaders in routes/rail.tsx).
 export function railDataInfo(): { ts: number; age: number } | null {
   const ts = getArrivalsTimestamp();
   return ts === null ? null : { ts, age: Math.max(0, Date.now() - ts) };

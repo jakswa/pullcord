@@ -28,7 +28,7 @@ const railHeaders: MiddlewareHandler = async (c, next) => {
     c.header("X-Data-Age", String(info.age));
   }
 };
-app.use("/rail", railHeaders);
+// "/rail/*" also matches "/rail" itself in Hono, so one registration covers both.
 app.use("/rail/*", railHeaders);
 
 // GET /rail — landing page (all stations)

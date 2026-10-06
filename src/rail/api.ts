@@ -46,6 +46,10 @@ type CacheEntry =
   | { kind: "err"; error: string; ts: number };
 
 let cache: CacheEntry | null = null;
+// When the most recent *successful* fetch happened. Kept separately so that
+// during an outage the freshness pill keeps counting up from the last real
+// data instead of resetting to "live" on every cached error.
+let lastOkTs: number | null = null;
 // TTL sits just under the client's 10s poll interval so each poll actually
 // triggers a refresh (via stale-while-revalidate) instead of redundantly
 // re-serving the same cached bytes. 9s leaves slack for small clock skew.
@@ -111,7 +115,14 @@ async function _refresh(): Promise<RailArrival[]> {
     cache = { kind: "err", error: `MARTA rail API returned HTTP ${resp.status}`, ts };
     throw new Error(`Rail API ${resp.status}`);
   }
-  const raw: RawArrival[] = await resp.json();
+  let raw: RawArrival[];
+  try {
+    raw = await resp.json();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    cache = { kind: "err", error: `MARTA rail API returned a bad response (${msg})`, ts };
+    throw e;
+  }
 
   const data = raw.map((r) => ({
     station: r.STATION,
@@ -130,6 +141,7 @@ async function _refresh(): Promise<RailArrival[]> {
   }));
 
   cache = { kind: "ok", data, ts };
+  lastOkTs = ts;
   return data;
 }
 
@@ -139,16 +151,17 @@ export function getRailApiError(): string | null {
   return cache?.kind === "err" ? cache.error : null;
 }
 
-// When the currently cached result was fetched from MARTA (ms epoch), or null
+// When rail data was last successfully fetched from MARTA (ms epoch), or null
 // if nothing has been fetched yet. Rendered to the client so its freshness
 // indicator reflects the real age of the data, not when the page arrived.
 export function getArrivalsTimestamp(): number | null {
-  return cache?.ts ?? null;
+  return lastOkTs;
 }
 
 // Test hook: module-level cache state otherwise leaks between tests.
 export function __resetForTests(): void {
   cache = null;
+  lastOkTs = null;
   inflight = null;
 }
 

@@ -4,12 +4,16 @@
 export function buildInlineJS(isLanding: boolean): string {
   // Base: poll the page's own ?partial=1 and swap #rail-data, tick freshness.
   // Freshness comes from the server's data age (data-age on #rail-data, then
-  // X-Data-Age on each partial) so old data never reads as "live". Resuming the
-  // app (visibilitychange, bfcache pageshow, focus) fetches immediately if the
-  // data is >10s old; a failed resume fetch retries quickly (radio waking up).
+  // X-Data-Age on each partial) so old data never reads as "live". In steady
+  // state the server serves data 10-20s old (9s cache TTL + stale-while-
+  // revalidate, MAX_STALE_MS=20s), so anything under LIVE_S reads "live" and a
+  // seconds count only appears once polling has actually fallen behind.
+  // Resuming the app (visibilitychange, bfcache pageshow, focus) fetches
+  // immediately if the data is older than that; a failed resume fetch retries
+  // quickly (radio waking up).
   const base = `
 (function(){
-var P=1e4,RESUME_AGE=1e4,STALE_S=30,RETRY_MS=2e3,RETRIES=3;
+var P=1e4,LIVE_S=20,RESUME_AGE=2e4,STALE_S=30,RETRY_MS=2e3,RETRIES=3;
 var d=document.getElementById("rail-data"),f=document.getElementById("freshness");
 if(!d||!f)return;
 var b=window.location.pathname,p=null,busy=false,sentAt=0,seq=0,retryT=null;
@@ -18,7 +22,7 @@ function ageMs(v){var n=parseInt(v,10);return isNaN(n)||n<0?0:n}
 var t=Date.now()-ageMs(d.getAttribute("data-age"));
 function u(){
   var a=Math.max(0,Math.floor((Date.now()-t)/1e3));
-  f.textContent=a<2?"live":a+"s";
+  f.textContent=a<LIVE_S?"live":a+"s";
   f.style.color=a>STALE_S?"var(--accent)":"";
   document.body.classList.toggle("is-stale",a>STALE_S);
 }
@@ -32,20 +36,21 @@ function q(force,retries){
   fetch(b+"?partial=1",{cache:"no-store",signal:AbortSignal.timeout(8e3)})
     .then(function(r){
       if(!r.ok)throw new Error("HTTP "+r.status);
-      var age=ageMs(r.headers.get("X-Data-Age"));
+      var age=r.headers.get("X-Data-Age");
       return r.text().then(function(h){return{h:h,age:age}});
     })
     .then(function(x){
       if(my!==seq)return;
       busy=false;
-      d.innerHTML=x.h;t=Date.now()-x.age;u();
+      // No age header = MARTA never answered yet: keep counting from before.
+      d.innerHTML=x.h;if(x.age!==null)t=Date.now()-ageMs(x.age);u();
       typeof reorder==="function"&&reorder();
       typeof postUpdate==="function"&&postUpdate();
     })
     .catch(function(){
       if(my!==seq)return;
       busy=false;
-      if(retries>0)retryT=setTimeout(function(){q(true,retries-1)},RETRY_MS);
+      if(retries>0&&!document.hidden)retryT=setTimeout(function(){q(true,retries-1)},RETRY_MS);
     });
 }
 function start(){if(!p)p=setInterval(function(){q(false,0)},P)}
