@@ -112,6 +112,12 @@ export function railStyles(): string {
     }
 
     .rail-freshness { font-variant-numeric: tabular-nums; }
+    /* Data >30s old (set by the inline poller): dim ETAs so they don't pass as live. */
+    #rail-data, #rail-heroes, #rail-nearby-rows, #rail-all-rows { transition: opacity 0.3s; }
+    .rail-body.is-stale #rail-data,
+    .rail-body.is-stale #rail-heroes,
+    .rail-body.is-stale #rail-nearby-rows,
+    .rail-body.is-stale #rail-all-rows { opacity: 0.5; }
 
     /* ── Sub header (station / train detail) ── */
     .rail-topbar-sub { padding-bottom: 8px; align-items: center; }

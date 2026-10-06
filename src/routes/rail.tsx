@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app.js";
 import { fetchArrivals, stationSlug } from "../rail/api.js";
 import {
@@ -8,9 +8,28 @@ import {
   RailStationDetail,
   RailTrainPage,
   RailTrainTimeline,
+  railDataInfo,
 } from "../views/pages/rail/index.js";
 
 const app = new Hono<AppEnv>();
+
+// Rail pages and partials carry live ETAs: never let a browser, PWA launch or
+// tab restore reuse a cached copy (the rail-host "/" rewrite goes through
+// /rail, so it's covered too). Partials also carry the data timestamp/age in
+// headers (full pages render them as data-ts / data-age on #rail-data) so the
+// client's freshness pill reflects the real age of the data.
+const railHeaders: MiddlewareHandler = async (c, next) => {
+  await next();
+  c.header("Cache-Control", "no-store");
+  if (c.req.query("partial") !== "1") return;
+  const info = railDataInfo();
+  if (info) {
+    c.header("X-Data-Ts", String(info.ts));
+    c.header("X-Data-Age", String(info.age));
+  }
+};
+app.use("/rail", railHeaders);
+app.use("/rail/*", railHeaders);
 
 // GET /rail — landing page (all stations)
 app.get("/rail", async (c) => {

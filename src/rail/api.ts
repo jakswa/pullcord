@@ -38,8 +38,9 @@ const API_KEY = process.env.MARTA_API_KEY || "";
 // Single cache entry holds either a successful response OR the most recent
 // failure. Both kinds honor the same TTL, so an API outage doesn't get
 // hammered every request — we back off and show a stable error until TTL
-// expires. The "serve stale data on failure" approach was removed because
-// cached waitSeconds go stale fast (countdowns into the past = misleading UX).
+// expires. We never serve data older than MAX_STALE_MS: cached waitSeconds go
+// stale fast (countdowns into the past = misleading UX), and the cache only
+// refreshes on demand, so after a quiet stretch it can be minutes old.
 type CacheEntry =
   | { kind: "ok"; data: RailArrival[]; ts: number }
   | { kind: "err"; error: string; ts: number };
@@ -49,6 +50,12 @@ let cache: CacheEntry | null = null;
 // triggers a refresh (via stale-while-revalidate) instead of redundantly
 // re-serving the same cached bytes. 9s leaves slack for small clock skew.
 const CACHE_TTL = 9_000;
+// Between CACHE_TTL and MAX_STALE_MS we serve the cached value and refresh in
+// the background (stale-while-revalidate). Past MAX_STALE_MS — e.g. the first
+// request after nobody has hit the site for a while, typically someone opening
+// the PWA on a platform — the caller waits for a real refresh (bounded by the
+// 4s fetch timeout) rather than getting minutes-old ETAs.
+const MAX_STALE_MS = 20_000;
 // Shared in-flight promise: if a refresh is already running, any caller that
 // needs one piggybacks on it instead of firing its own fetch. This prevents a
 // thundering herd on cold start (100 concurrent /rail loads = 1 MARTA fetch,
@@ -69,13 +76,15 @@ export async function fetchArrivals(): Promise<RailArrival[]> {
   if (cache && now - cache.ts < CACHE_TTL) {
     return cache.kind === "ok" ? cache.data : [];
   }
-  // Stale cache: kick off (or piggyback on) a background refresh, keep serving
-  // the current cached value (empty array if we previously errored).
-  if (cache) {
+  // Slightly stale: kick off (or piggyback on) a background refresh, keep
+  // serving the current cached value (empty array if we previously errored).
+  if (cache && now - cache.ts < MAX_STALE_MS) {
     refresh().catch(() => {});
     return cache.kind === "ok" ? cache.data : [];
   }
-  // Cold start: wait for the shared refresh. On failure return [].
+  // Too stale, or cold start: wait for the shared refresh. On failure return
+  // [] — the failure is cached, so RailApiBanner shows the error instead of
+  // old ETAs masquerading as live.
   try {
     return await refresh();
   } catch {
@@ -128,6 +137,19 @@ async function _refresh(): Promise<RailArrival[]> {
 // (or there's no cache yet).
 export function getRailApiError(): string | null {
   return cache?.kind === "err" ? cache.error : null;
+}
+
+// When the currently cached result was fetched from MARTA (ms epoch), or null
+// if nothing has been fetched yet. Rendered to the client so its freshness
+// indicator reflects the real age of the data, not when the page arrived.
+export function getArrivalsTimestamp(): number | null {
+  return cache?.ts ?? null;
+}
+
+// Test hook: module-level cache state otherwise leaks between tests.
+export function __resetForTests(): void {
+  cache = null;
+  inflight = null;
 }
 
 export function stationSlug(name: string): string {

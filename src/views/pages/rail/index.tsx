@@ -1,6 +1,6 @@
 import { raw } from "hono/html";
 import type { RailArrival } from "../../../rail/api.js";
-import { stationSlug, stationDisplayName, getRailApiError } from "../../../rail/api.js";
+import { stationSlug, stationDisplayName, getRailApiError, getArrivalsTimestamp } from "../../../rail/api.js";
 
 import {
   LINE_COLORS,
@@ -85,6 +85,20 @@ function DirToken({ dir, a }: { dir: string; a: DirArrival }) {
       <span>{s.kind === "now" ? "now" : s.min}</span>
     </span>
   );
+}
+
+// Server-side data timestamp + age for #rail-data. The client derives the
+// freshness pill from data-age (skew-free: computed on one clock) so a page
+// opened on old data never claims to be "live". Partials send the same values
+// as X-Data-Ts / X-Data-Age headers (see railDataHeaders).
+export function railDataInfo(): { ts: number; age: number } | null {
+  const ts = getArrivalsTimestamp();
+  return ts === null ? null : { ts, age: Math.max(0, Date.now() - ts) };
+}
+
+function railDataAttrs(): Record<string, string> {
+  const info = railDataInfo();
+  return info ? { "data-ts": String(info.ts), "data-age": String(info.age) } : {};
 }
 
 // Banner shown when the MARTA rail API is unreachable.
@@ -211,7 +225,7 @@ export function RailLandingPage({ arrivals, standalone = false }: { arrivals: Ra
             </section>
 
             {/* Hidden source list — swapped wholesale on each poll, projected by reorder() */}
-            <div id="rail-data" hidden>
+            <div id="rail-data" hidden {...railDataAttrs()}>
               <RailStationList arrivals={arrivals} />
             </div>
           </main>
@@ -289,7 +303,7 @@ export function RailStationPage({
           </header>
           <main class="rail-main">
             <RailApiBanner />
-            <div id="rail-data">
+            <div id="rail-data" {...railDataAttrs()}>
               <RailStationDetail stationName={stationName} arrivals={arrivals} />
             </div>
           </main>
@@ -436,7 +450,7 @@ export function RailTrainPage({
           </header>
           <main class="rail-main">
             <RailApiBanner />
-            <div id="rail-data">
+            <div id="rail-data" {...railDataAttrs()}>
               <RailTrainTimeline trainId={trainId} arrivals={arrivals} />
             </div>
           </main>
