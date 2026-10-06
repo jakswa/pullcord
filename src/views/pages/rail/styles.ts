@@ -53,6 +53,19 @@ export function railStyles(): string {
       }
     }
 
+    /* Opaque cover over the top safe-area inset so scrolled content never
+       renders under the iOS status bar (black-translucent PWA / Safari edge
+       blur). Zero height when there is no inset. */
+    .rail-body::before {
+      content: "";
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: env(safe-area-inset-top, 0px);
+      background: var(--bg);
+      z-index: 20;
+      pointer-events: none;
+    }
+
     .mono { font-family: var(--mono); }
 
     .rail-shell {
