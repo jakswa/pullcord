@@ -58,7 +58,7 @@
 
     // Re-render markers on zoom/pan
     map.on('moveend', renderMarkers);
-    map.on('zoomend', () => { if (routeMap) styleRouteStops(); });
+    map.on('zoomend', () => { if (routeMap && !routeMap.empty) styleRouteStops(); });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && (routeMap || pendingSelection)) deselectStop();
     });
@@ -107,7 +107,7 @@
     // so nearby stops show without a tap. Never prompts on its own.
     if (!pendingFilter && navigator.permissions?.query) {
       navigator.permissions.query({ name: 'geolocation' })
-        .then(p => { if (p.state === 'granted') locateUser(); })
+        .then(p => { if (p.state === 'granted') locateUser({ auto: true }); })
         .catch(() => {});
     }
   }
@@ -142,7 +142,7 @@
     // Clear existing
     markers.forEach(m => map.removeLayer(m));
     markers = [];
-    if (routeMap) return; // route-map mode draws its own stops
+    if (routeMap && !routeMap.empty) return; // a selection draws its own stops
 
     const bounds = map.getBounds();
     const zoom = map.getZoom();
@@ -188,6 +188,7 @@
       });
 
       marker.on('click', () => selectStop(stop));
+      marker.on('dblclick', noDoubleTapZoom);
       marker.addTo(map);
       markers.push(marker);
     });
@@ -267,7 +268,8 @@
   // dot switches the selection without moving the map.
 
   function selectStop(stop, { fit = true } = {}) {
-    if (routeMap && routeMap.stop.stop_id === stop.stop_id) {
+    const selectedId = pendingSelection?.stop.stop_id ?? routeMap?.stop.stop_id;
+    if (selectedId === stop.stop_id) {
       deselectStop();
       return;
     }
@@ -288,11 +290,30 @@
     } catch (err) {
       if (token !== routeMapToken) return;
       console.error('Failed to load routes:', err);
-      setSheetHint('Couldn’t load routes for this stop', true);
+      if (routeMap) {
+        // Switching failed: keep showing the stop whose routes are on the map
+        pendingSelection = null;
+        resetIsolation();
+        renderSheet(routeMap.stop, routeMap.routes);
+        setSheetHint('Couldn’t load that stop’s routes', true);
+      } else {
+        setSheetHint('Couldn’t load routes for this stop', true);
+      }
       return;
     }
     if (token !== routeMapToken) return;
+    // A locate during the load may have replaced the view to return to
+    prevView = pendingSelection?.prevView || prevView;
     pendingSelection = null;
+
+    // Rail-only stops have no bus routes: keep the regular markers
+    if (!data.routes.length) {
+      removeRouteLayers();
+      routeMap = { stop, routes: [], dots: [], layer: null, isolated: null, prevView, empty: true };
+      renderSheet(stop, []);
+      renderMarkers();
+      return;
+    }
 
     removeRouteLayers();
     // One shared canvas renderer; a new one per selection would leave stale
@@ -331,6 +352,7 @@
       dot.on('click', () => selectStop(stopsById.get(sr.id) ||
         { stop_id: sr.id, stop_name: sr.name, stop_lat: sr.lat, stop_lon: sr.lon,
           routes: sr.routes.map(r => r.route_short_name).join(',') }, { fit: false }));
+      dot.on('dblclick', noDoubleTapZoom);
       dot.addTo(layer);
       dots.push({ dot, sr });
     });
@@ -339,7 +361,8 @@
     const focus = L.circleMarker([stop.stop_lat, stop.stop_lon], {
       renderer, radius: 11, fillColor: '#E85D3A', fillOpacity: 1, color: '#fff', weight: 3,
     }).addTo(layer);
-    focus.on('click', deselectStop);
+    focus.on('click', () => deselectStop());
+    focus.on('dblclick', noDoubleTapZoom);
 
     routeMap = { stop, routes, dots, layer, isolated: null, prevView };
     renderMarkers(); // clears the regular stop markers
@@ -355,16 +378,21 @@
   function deselectStop({ restoreView = true } = {}) {
     routeMapToken++;
     const prevView = routeMap?.prevView || pendingSelection?.prevView;
+    const moved = routeMap && !routeMap.empty; // an empty selection never moved the map
     pendingSelection = null;
     removeRouteLayers();
     routeMap = null;
     closeSheet();
-    if (restoreView && prevView) map.setView(prevView.center, prevView.zoom);
+    if (restoreView && moved && prevView) map.setView(prevView.center, prevView.zoom);
     renderMarkers();
   }
 
   function removeRouteLayers() {
-    if (routeMap) map.removeLayer(routeMap.layer);
+    if (routeMap?.layer) map.removeLayer(routeMap.layer);
+  }
+
+  function noDoubleTapZoom(e) {
+    L.DomEvent.stop(e);
   }
 
   // ─── Bottom sheet ───
@@ -375,6 +403,8 @@
     if (!el) {
       el = document.createElement('div');
       el.className = 'explore-route-legend';
+      el.setAttribute('role', 'region');
+      el.setAttribute('aria-label', 'Selected stop');
       L.DomEvent.disableClickPropagation(el);
       L.DomEvent.disableScrollPropagation(el);
       shell.appendChild(el);
@@ -387,13 +417,14 @@
           style="--chip-color:${r.color}" aria-pressed="false">${esc(r.route_short_name)}</button>`).join('')
       : stop.routes.split(',').map(r =>
           `<span class="explore-route-chip explore-route-chip-pending">${esc(r)}</span>`).join('');
+    const hadFocus = el.contains(document.activeElement);
     el.innerHTML = `
       <div class="explore-route-legend-head">
         <span class="explore-route-legend-title"></span>
         <button type="button" class="explore-route-legend-close" aria-label="Back to all stops">✕</button>
       </div>
       <div class="explore-route-legend-chips">${chips}</div>
-      <div class="explore-route-legend-hint"></div>
+      <div class="explore-route-legend-hint" aria-live="polite"></div>
       <a class="explore-route-legend-link" href="/bus?stop=${encodeURIComponent(stop.stop_id)}">View arrivals →</a>
     `;
     el.querySelector('.explore-route-legend-title').textContent = stop.stop_name;
@@ -404,7 +435,9 @@
       btn.addEventListener('click', () => isolateRoute(Number(btn.dataset.i)));
     });
     setSheetHint(!routes ? 'Loading routes…'
-      : routes.length > 1 ? 'Tap a route to show only that line' : (routes[0]?.route_long_name || ''));
+      : !routes.length ? 'No bus routes stop here'
+      : routes.length > 1 ? 'Tap a route to show only that line' : (routes[0].route_long_name || ''));
+    if (hadFocus) el.querySelector('.explore-route-legend-close').focus();
     liftControlsAboveLegend();
   }
 
@@ -451,6 +484,13 @@
       const b = L.latLngBounds(only.shapes.flat());
       if (b.isValid()) map.fitBounds(b, { padding: [24, 24], maxZoom: 15 });
     }
+  }
+
+  function resetIsolation() {
+    if (!routeMap || routeMap.isolated === null) return;
+    routeMap.isolated = null;
+    routeMap.routes.forEach(r => { if (!routeMap.layer.hasLayer(r.lines)) routeMap.layer.addLayer(r.lines); });
+    styleRouteStops();
   }
 
   // Dot size tracks zoom; hidden routes' dots drop out when one is isolated
@@ -513,14 +553,19 @@
 
   // ─── Geolocation ───
 
-  function locateUser() {
+  function locateUser({ auto = false } = {}) {
     const btn = document.getElementById('explore-locate-btn');
     if (btn) btn.classList.add('explore-locating');
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        map.setView([latitude, longitude], 16);
+        const view = { center: L.latLng(latitude, longitude), zoom: 16 };
+        // With a stop selected, the located view becomes where cancelling returns
+        // to; the automatic locate at load never pulls the map off a selection
+        const selection = routeMap || pendingSelection;
+        if (selection) selection.prevView = view;
+        if (!(auto && selection)) map.setView(view.center, view.zoom);
 
         if (userMarker) map.removeLayer(userMarker);
         userMarker = L.circleMarker([latitude, longitude], {

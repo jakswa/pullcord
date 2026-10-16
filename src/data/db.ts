@@ -537,11 +537,14 @@ function buildRouteMapRoute(versions: Route[], today: string): StopRouteMapRoute
       SELECT service_id FROM calendar WHERE start_date <= ? AND end_date >= ?
       UNION SELECT service_id FROM calendar_dates WHERE date = ? AND exception_type = 1
     )
+    ORDER BY route_id DESC
   `).all(...ids, today, today, today) as Array<{ route_id: string; shape_id: string }>;
   const rows = current.length > 0
     ? current
-    : db.db.prepare(`SELECT DISTINCT route_id, shape_id FROM trips WHERE route_id IN (${ph})`)
+    : db.db.prepare(`SELECT DISTINCT route_id, shape_id FROM trips WHERE route_id IN (${ph}) ORDER BY route_id DESC`)
         .all(...ids) as Array<{ route_id: string; shape_id: string }>;
+  // Newest release first (MARTA's route_ids increase per release), so the
+  // name shown is deterministic when several versions are active
   const activeIds = [...new Set(rows.map((r) => r.route_id))];
   const primary = versions.find((r) => r.route_id === activeIds[0]) ?? versions[0];
 
