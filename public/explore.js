@@ -332,7 +332,8 @@
       lines: L.layerGroup(),
     }));
 
-    // Stops shared by several routes get one neutral dot; others take the route color
+    // One dot per stop in a route's color; stops shared by several shown
+    // routes take the first one's color with a dark outline
     const stopRoutes = new Map(); // stop_id -> { stop, routes: [] }
     routes.forEach(r => r.stops.forEach(([id, name, lat, lon]) => {
       if (!stopRoutes.has(id)) stopRoutes.set(id, { id, name, lat, lon, routes: [] });
@@ -352,7 +353,7 @@
     stopRoutes.forEach(sr => {
       const dot = L.circleMarker([sr.lat, sr.lon], {
         renderer,
-        fillColor: sr.routes.length > 1 ? '#fff' : sr.routes[0].color,
+        fillColor: sr.routes[0].color,
         fillOpacity: 1,
         color: sr.routes.length > 1 ? '#1f2937' : '#fff',
         weight: 2,
@@ -464,7 +465,7 @@
       const shared = !only && sr.routes.length > 1;
       dot.setStyle({
         radius,
-        fillColor: shared ? '#fff' : (only || sr.routes[0]).color,
+        fillColor: (only || sr.routes[0]).color,
         color: shared ? '#1f2937' : '#fff',
         weight: z >= 14 ? 2 : 1,
       });

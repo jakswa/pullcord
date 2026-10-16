@@ -494,41 +494,86 @@ export interface StopRouteMapRoute {
 }
 
 const routeMapCache = new Map<string, { route: StopRouteMapRoute; cachedAt: number }>();
+let routeMapCacheDay = "";
+
+// YYYYMMDD in Atlanta time, for GTFS calendar comparisons
+function atlantaToday(): string {
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+  return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+}
 
 // Every bus route serving a stop (paired stops merged), each with every
 // distinct shape it runs (thinned) and every stop it serves — for the
 // explore map's "show routes" view (#99).
+//
+// The DB keeps several feed versions side by side (a route number can have
+// 2–3 route_ids: current and upcoming schedule periods), so routes are
+// grouped by short name, and only versions whose service window covers today
+// are drawn (falling back to all versions if none do).
 export function getStopRouteMap(stopId: string): StopRouteMapRoute[] {
-  const shapeIdsStmt = db.db.prepare(
-    `SELECT DISTINCT shape_id FROM trips WHERE route_id = ? AND shape_id != '' ORDER BY shape_id`
-  );
+  const today = atlantaToday();
+  if (today !== routeMapCacheDay) { routeMapCache.clear(); routeMapCacheDay = today; }
+  const groups = new Map<string, Route[]>();
+  for (const r of db.getRoutesForStop(stopId)) {
+    const g = groups.get(r.route_short_name);
+    if (g) g.push(r); else groups.set(r.route_short_name, [r]);
+  }
+  return [...groups.values()].map((versions) => {
+    const key = `${versions.map((r) => r.route_id).sort().join(",")}`;
+    const hit = routeMapCache.get(key);
+    if (hit && Date.now() - hit.cachedAt < 3600000) return hit.route;
+    const route = buildRouteMapRoute(versions, today);
+    routeMapCache.set(key, { route, cachedAt: Date.now() });
+    return route;
+  });
+}
+
+function buildRouteMapRoute(versions: Route[], today: string): StopRouteMapRoute {
+  const ids = versions.map((r) => r.route_id);
+  const ph = ids.map(() => "?").join(",");
+  const current = db.db.prepare(`
+    SELECT DISTINCT route_id, shape_id FROM trips
+    WHERE route_id IN (${ph}) AND service_id IN (
+      SELECT service_id FROM calendar WHERE start_date <= ? AND end_date >= ?
+      UNION SELECT service_id FROM calendar_dates WHERE date = ? AND exception_type = 1
+    )
+  `).all(...ids, today, today, today) as Array<{ route_id: string; shape_id: string }>;
+  const rows = current.length > 0
+    ? current
+    : db.db.prepare(`SELECT DISTINCT route_id, shape_id FROM trips WHERE route_id IN (${ph})`)
+        .all(...ids) as Array<{ route_id: string; shape_id: string }>;
+  const activeIds = [...new Set(rows.map((r) => r.route_id))];
+  const primary = versions.find((r) => r.route_id === activeIds[0]) ?? versions[0];
+
   const shapeStmt = db.db.prepare(
     `SELECT shape_pt_lat, shape_pt_lon FROM shapes WHERE shape_id = ? ORDER BY shape_pt_sequence`
   );
-  const stopsStmt = db.db.prepare(`
+  const seenGeom = new Set<string>();
+  const shapes: StopRouteMapRoute["shapes"] = [];
+  for (const shapeId of [...new Set(rows.map((r) => r.shape_id).filter(Boolean))].sort()) {
+    const pts = thinShape(
+      (shapeStmt.all(shapeId) as Array<{ shape_pt_lat: number; shape_pt_lon: number }>)
+        .map((p) => [p.shape_pt_lat, p.shape_pt_lon] as [number, number])
+    );
+    const geom = JSON.stringify(pts);
+    if (pts.length < 2 || seenGeom.has(geom)) continue;
+    seenGeom.add(geom);
+    shapes.push(pts);
+  }
+
+  const aph = activeIds.map(() => "?").join(",");
+  const stops = (db.db.prepare(`
     SELECT DISTINCT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
     FROM route_stops rs JOIN stops s ON s.stop_id = rs.stop_id
-    WHERE rs.route_id = ?
-  `);
-  return db.getRoutesForStop(stopId).map((r) => {
-    const hit = routeMapCache.get(r.route_id);
-    if (hit && Date.now() - hit.cachedAt < 3600000) return hit.route;
-    const shapes = (shapeIdsStmt.all(r.route_id) as Array<{ shape_id: string }>).map(({ shape_id }) =>
-      thinShape(
-        (shapeStmt.all(shape_id) as Array<{ shape_pt_lat: number; shape_pt_lon: number }>)
-          .map((p) => [p.shape_pt_lat, p.shape_pt_lon] as [number, number])
-      )
-    ).filter((pts) => pts.length > 1);
-    const stops = (stopsStmt.all(r.route_id) as Array<{ stop_id: string; stop_name: string; stop_lat: number; stop_lon: number }>)
-      .map((s) => [s.stop_id, s.stop_name, s.stop_lat, s.stop_lon] as [string, string, number, number]);
-    const route: StopRouteMapRoute = {
-      route_id: r.route_id,
-      route_short_name: r.route_short_name,
-      route_long_name: r.route_long_name,
-      shapes,
-      stops,
-    };
-    routeMapCache.set(r.route_id, { route, cachedAt: Date.now() });
-    return route;
-  });
+    WHERE rs.route_id IN (${aph})
+  `).all(...activeIds) as Array<{ stop_id: string; stop_name: string; stop_lat: number; stop_lon: number }>)
+    .map((s) => [s.stop_id, s.stop_name, s.stop_lat, s.stop_lon] as [string, string, number, number]);
+
+  return {
+    route_id: primary.route_id,
+    route_short_name: primary.route_short_name,
+    route_long_name: primary.route_long_name,
+    shapes,
+    stops,
+  };
 }
