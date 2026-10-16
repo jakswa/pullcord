@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import path from "path";
+import { thinShape } from "./geo.js";
 
 const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), "data", "marta.db");
 
@@ -484,3 +485,39 @@ export function getAllStopsWithRoutes() {
 }
 
 export type { Route, Stop, Trip, RouteStop, RouteDetail };
+export interface StopRouteMapRoute {
+  route_id: string;
+  route_short_name: string;
+  route_long_name: string;
+  shapes: Array<Array<[number, number]>>; // one polyline per direction
+  stops: Array<[string, string, number, number]>; // [stop_id, stop_name, lat, lon], deduped
+}
+
+const routeMapCache = new Map<string, { route: StopRouteMapRoute; cachedAt: number }>();
+
+// Every bus route serving a stop (paired stops merged), each with thinned
+// shapes and its stops — for the explore map's "show routes" view (#99).
+export function getStopRouteMap(stopId: string): StopRouteMapRoute[] {
+  return db.getRoutesForStop(stopId).flatMap((r) => {
+    const hit = routeMapCache.get(r.route_id);
+    if (hit && Date.now() - hit.cachedAt < 3600000) return [hit.route];
+    const detail = db.getRouteDetail(r.route_id);
+    if (!detail) return [];
+    const seen = new Set<string>();
+    const stops: StopRouteMapRoute["stops"] = [];
+    for (const s of detail.stops) {
+      if (seen.has(s.stop_id)) continue;
+      seen.add(s.stop_id);
+      stops.push([s.stop_id, s.stop_name, s.stop_lat, s.stop_lon]);
+    }
+    const route: StopRouteMapRoute = {
+      route_id: r.route_id,
+      route_short_name: r.route_short_name,
+      route_long_name: r.route_long_name,
+      shapes: Object.values(detail.shapes).map((pts) => thinShape(pts)),
+      stops,
+    };
+    routeMapCache.set(r.route_id, { route, cachedAt: Date.now() });
+    return [route];
+  });
+}

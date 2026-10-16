@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRoutesForStops, getRouteHeadsigns, getAllStopsWithRoutes, getTripStopSequences } from "../data/db.js";
+import { getRoutes, getRoute, searchStops, getStopsForRoute, getNearbyStops, getStop, getRouteDetail, getTripLookup, getRoutesForStop, getRoutesForStops, getRouteHeadsigns, getAllStopsWithRoutes, getTripStopSequences, getStopRouteMap } from "../data/db.js";
 import { getVehicles, findArrivals, getStopArrivals } from "../data/realtime.js";
 import { getMockVehicles, getMockPredictions } from "../data/mock.js";
 import { getVapidPublicKey, registerCord, cancelCord, cordExists, getActiveCordCount } from "../data/push.js";
@@ -296,6 +296,21 @@ app.get("/stops/:stopId/arrivals", async (c) => {
   } catch (error) {
     console.error("Error fetching stop arrivals:", error);
     return c.json({ error: "Failed to fetch arrivals" }, 500);
+  }
+});
+
+// GET /api/stops/:stopId/route-map — every route serving a stop, with
+// thinned shapes and stops (explore map "show routes", #99)
+app.get("/stops/:stopId/route-map", (c) => {
+  try {
+    const stopId = c.req.param("stopId");
+    if (!validStopId(stopId)) return c.json({ error: "Invalid stopId" }, 400);
+    if (!getStop(stopId)) return c.json({ error: "Stop not found" }, 404);
+    c.header("Cache-Control", "public, max-age=3600");
+    return c.json({ stop_id: stopId, routes: getStopRouteMap(stopId) });
+  } catch (error) {
+    console.error("Error fetching stop route map:", error);
+    return c.json({ error: "Failed to fetch route map" }, 500);
   }
 });
 
