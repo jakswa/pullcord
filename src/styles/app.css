@@ -2017,7 +2017,8 @@
   font-weight: 700;
 }
 
-.explore-popup-link {
+.explore-popup-link,
+.leaflet-container a.explore-popup-link {
   display: block;
   margin-top: 0.5rem;
   padding: 0.5rem 0.75rem;
@@ -2341,3 +2342,108 @@
 
 /* ===== UTILITIES ===== */
 .hidden { display: none !important; }
+/* Map tiles: OpenStreetMap has no dark style, so darken it in dark mode (#98) */
+@media (prefers-color-scheme: dark) {
+  .map-tiles {
+    filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.85) saturate(0.6);
+  }
+}
+
+/* Explore: stop's routes on the map (#99) */
+.explore-popup-routes-btn {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  background: transparent;
+  color: var(--coral);
+  border: 1px solid var(--coral);
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.explore-route-legend {
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  z-index: 1000;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: 0.6rem 0.75rem 0.65rem;
+  background: var(--bg-primary);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.explore-route-legend-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+
+.explore-route-legend-title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.explore-route-legend-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: var(--hover-bg);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.explore-route-legend-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.explore-route-chip {
+  min-width: 2.5rem;
+  padding: 0.3rem 0.55rem;
+  border: 2px solid var(--chip-color);
+  border-radius: 0.4rem;
+  background: var(--chip-color);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.explore-route-chip.dimmed {
+  opacity: 0.35;
+}
+
+.explore-route-chip[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--chip-color);
+}
+
+.explore-route-legend-hint {
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.explore-routes-open .leaflet-bottom {
+  bottom: var(--route-legend-h, 0px);
+}

@@ -133,9 +133,6 @@
       : [33.749, -84.388];
 
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const tileUrl = prefersDark
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 
     map = L.map('ride-map', {
       center,
@@ -144,7 +141,14 @@
       attributionControl: false,
     });
 
-    L.tileLayer(tileUrl, { maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+    // OpenStreetMap tiles; .map-tiles is darkened via CSS filter in dark mode (#98)
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      className: 'map-tiles',
+    }).addTo(map);
+    L.control.attribution({ position: 'bottomright', prefix: false })
+      .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>')
+      .addTo(map);
     L.control.zoom({ position: 'topleft' }).addTo(map);
 
     // Route line

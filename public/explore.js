@@ -17,6 +17,15 @@
   let markers = []; // currently rendered markers
   let userMarker = null;
   let pendingFilter = null;
+  let stopsById = new Map();
+
+  // Route-map mode (#99): tap "Show routes" on a stop to draw every route
+  // serving it, each in its own color, with dots for that route's stops.
+  // Distinct hues (MARTA's own route_color repeats across dozens of routes).
+  const ROUTE_PALETTE = ['#2563EB', '#DC2626', '#16A34A', '#9333EA', '#EA580C',
+    '#0891B2', '#DB2777', '#65A30D', '#4F46E5', '#B45309'];
+  let routeMap = null; // { stopId, routes, layer, isolated, legend }
+  let routeMapToken = 0;
 
   // ─── Init ───
 
@@ -30,15 +39,14 @@
       attributionControl: false,
     });
 
-    // Tile layer — CartoDB Positron for clean look
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    // Tile layer — OpenStreetMap standard (CARTO basemaps now require an API key, #98)
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: MAX_ZOOM,
-      subdomains: 'abcd',
     }).addTo(map);
 
     // Attribution in corner
     L.control.attribution({ position: 'bottomright', prefix: false })
-      .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OSM</a> · <a href="https://carto.com/">CARTO</a>')
+      .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>')
       .addTo(map);
 
     // Zoom control top-right
@@ -49,6 +57,7 @@
 
     // Re-render markers on zoom/pan
     map.on('moveend', renderMarkers);
+    map.on('zoomend', () => { if (routeMap) styleRouteStops(); });
 
     // Geolocation — header button
     document.getElementById('explore-locate-btn')?.addEventListener('click', locateUser);
@@ -89,6 +98,14 @@
         searchInput.placeholder = 'Filter by route or stop name...';
       }
     }
+
+    // Center on the user's location at load when they've already granted it,
+    // so nearby stops show without a tap. Never prompts on its own.
+    if (!pendingFilter && navigator.permissions?.query) {
+      navigator.permissions.query({ name: 'geolocation' })
+        .then(p => { if (p.state === 'granted') locateUser(); })
+        .catch(() => {});
+    }
   }
 
   // ─── Data ───
@@ -98,6 +115,7 @@
       const res = await fetch('/api/stops/all');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       allStops = await res.json();
+      stopsById = new Map(allStops.map(s => [s.stop_id, s]));
       document.getElementById('explore-loading')?.classList.add('hidden');
 
       // Apply pending filter from URL param
@@ -120,6 +138,7 @@
     // Clear existing
     markers.forEach(m => map.removeLayer(m));
     markers = [];
+    if (routeMap) return; // route-map mode draws its own stops
 
     const bounds = map.getBounds();
     const zoom = map.getZoom();
@@ -240,17 +259,26 @@
   function showStopPopup(stop, marker) {
     const routes = stop.routes.split(',');
 
-    const routeBadges = routes.map(r =>
-      `<span class="explore-popup-badge">${esc(r)}</span>`
-    ).join(' ');
+    const routeBadges = routes.map(r => {
+      const color = routeMap && routeMap.colors.get(r);
+      const style = color ? ` style="background:${color}"` : '';
+      return `<span class="explore-popup-badge"${style}>${esc(r)}</span>`;
+    }).join(' ');
 
-    const content = `
+    const showingThis = routeMap && routeMap.stopId === stop.stop_id;
+    // A DOM node (not an HTML string) so the button's listener survives
+    // Leaflet re-rendering the popup when the marker is tapped again
+    const content = document.createElement('div');
+    content.innerHTML = `
       <div class="explore-popup">
         <div class="explore-popup-name">${esc(stop.stop_name)}</div>
         <div class="explore-popup-routes">${routeBadges}</div>
         <a href="/bus?stop=${esc(stop.stop_id)}" class="explore-popup-link">
           View arrivals →
         </a>
+        ${showingThis ? '' : `<button type="button" class="explore-popup-routes-btn">
+          Show ${routes.length === 1 ? 'route' : 'routes'} on map
+        </button>`}
       </div>
     `;
 
@@ -261,6 +289,197 @@
       closeButton: false,
       offset: [0, -4],
     }).openPopup();
+
+    content.querySelector('.explore-popup-routes-btn')
+      ?.addEventListener('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        marker.closePopup();
+        showRouteMap(stop);
+      });
+  }
+
+  // ─── Route map (#99) ───
+
+  async function showRouteMap(stop) {
+    // A newer request, a filter change or closing the legend supersedes this one
+    const token = ++routeMapToken;
+    const loading = document.getElementById('explore-loading');
+    if (loading) {
+      loading.innerHTML = '<div class="d-spinner"></div><span>Loading routes...</span>';
+      loading.classList.remove('hidden');
+    }
+    let data;
+    try {
+      const res = await fetch(`/api/stops/${encodeURIComponent(stop.stop_id)}/route-map`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      data = await res.json();
+    } catch (err) {
+      if (token !== routeMapToken) return;
+      console.error('Failed to load route map:', err);
+      if (loading) loading.innerHTML = '<span style="color:var(--coral)">Failed to load routes</span>';
+      setTimeout(() => loading?.classList.add('hidden'), 2000);
+      return;
+    }
+    if (token !== routeMapToken) return;
+    loading?.classList.add('hidden');
+    if (!data.routes.length) return;
+
+    clearRouteMap();
+    const renderer = L.canvas({ padding: 0.5 });
+    const routes = data.routes.map((r, i) => ({
+      ...r,
+      color: ROUTE_PALETTE[i % ROUTE_PALETTE.length],
+      lines: L.layerGroup(),
+    }));
+
+    // Stops shared by several routes get one neutral dot; others take the route color
+    const stopRoutes = new Map(); // stop_id -> { stop, routes: [] }
+    routes.forEach(r => r.stops.forEach(([id, name, lat, lon]) => {
+      if (!stopRoutes.has(id)) stopRoutes.set(id, { id, name, lat, lon, routes: [] });
+      stopRoutes.get(id).routes.push(r);
+    }));
+
+    const layer = L.layerGroup().addTo(map);
+    routes.forEach(r => {
+      r.shapes.forEach(pts => {
+        L.polyline(pts, { renderer, color: '#fff', weight: 8, opacity: 0.9, interactive: false }).addTo(r.lines);
+        L.polyline(pts, { renderer, color: r.color, weight: 4.5, opacity: 0.95, interactive: false }).addTo(r.lines);
+      });
+      r.lines.addTo(layer);
+    });
+
+    const dots = [];
+    stopRoutes.forEach(sr => {
+      const dot = L.circleMarker([sr.lat, sr.lon], {
+        renderer,
+        fillColor: sr.routes.length > 1 ? '#fff' : sr.routes[0].color,
+        fillOpacity: 1,
+        color: sr.routes.length > 1 ? '#1f2937' : '#fff',
+        weight: 2,
+      });
+      dot.on('click', () => {
+        const stop = stopsById.get(sr.id) ||
+          { stop_id: sr.id, stop_name: sr.name, stop_lat: sr.lat, stop_lon: sr.lon,
+            routes: sr.routes.map(r => r.route_short_name).join(',') };
+        showStopPopup(stop, dot);
+      });
+      dot.addTo(layer);
+      dots.push({ dot, sr });
+    });
+
+    // The tapped stop, drawn on top
+    const focus = L.circleMarker([stop.stop_lat, stop.stop_lon], {
+      renderer, radius: 11, fillColor: '#E85D3A', fillOpacity: 1, color: '#fff', weight: 3,
+    }).addTo(layer);
+    focus.on('click', () => showStopPopup(stop, focus));
+
+    routeMap = {
+      stopId: stop.stop_id,
+      routes,
+      dots,
+      layer,
+      isolated: null,
+      colors: new Map(routes.map(r => [r.route_short_name, r.color])),
+      legend: buildLegend(stop, routes),
+    };
+    renderMarkers(); // clears the regular stop markers
+    styleRouteStops();
+
+    const bounds = L.latLngBounds(routes.flatMap(r => r.shapes.flat()));
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
+  }
+
+  function buildLegend(stop, routes) {
+    const el = document.createElement('div');
+    el.className = 'explore-route-legend';
+    el.innerHTML = `
+      <div class="explore-route-legend-head">
+        <span class="explore-route-legend-title">${esc(stop.stop_name)}</span>
+        <button type="button" class="explore-route-legend-close" aria-label="Close routes">✕</button>
+      </div>
+      <div class="explore-route-legend-chips">
+        ${routes.map((r, i) => `<button type="button" class="explore-route-chip" data-i="${i}"
+            style="--chip-color:${r.color}" aria-pressed="false">${esc(r.route_short_name)}</button>`).join('')}
+      </div>
+      <div class="explore-route-legend-hint">${routes.length > 1 ? 'Tap a route to show only that line' : esc(routes[0].route_long_name || '')}</div>
+    `;
+    L.DomEvent.disableClickPropagation(el);
+    L.DomEvent.disableScrollPropagation(el);
+    el.querySelector('.explore-route-legend-close').addEventListener('click', () => {
+      clearRouteMap();
+      renderMarkers();
+    });
+    el.querySelectorAll('.explore-route-chip').forEach(btn => {
+      btn.title = routes[Number(btn.dataset.i)].route_long_name || '';
+      btn.addEventListener('click', () => isolateRoute(Number(btn.dataset.i)));
+    });
+    const shell = document.querySelector('.explore-shell');
+    shell.appendChild(el);
+    shell.classList.add('explore-routes-open');
+    liftControlsAboveLegend();
+    window.addEventListener('resize', liftControlsAboveLegend);
+    return el;
+  }
+
+  // Lift the bottom map controls (locate, attribution) clear of the legend
+  function liftControlsAboveLegend() {
+    const shell = document.querySelector('.explore-shell');
+    const el = shell?.querySelector('.explore-route-legend');
+    if (!el) return;
+    const gap = shell.getBoundingClientRect().bottom - el.getBoundingClientRect().top;
+    shell.style.setProperty('--route-legend-h', `${Math.ceil(gap) + 8}px`);
+  }
+
+  // Toggle showing a single route (helps at busy stops where lines overlap)
+  function isolateRoute(i) {
+    if (!routeMap || routeMap.routes.length < 2) return;
+    routeMap.isolated = routeMap.isolated === i ? null : i;
+    const only = routeMap.isolated === null ? null : routeMap.routes[i];
+    routeMap.routes.forEach(r => {
+      const show = !only || r === only;
+      if (show && !routeMap.layer.hasLayer(r.lines)) routeMap.layer.addLayer(r.lines);
+      if (!show) routeMap.layer.removeLayer(r.lines);
+    });
+    routeMap.legend.querySelectorAll('.explore-route-chip').forEach(btn => {
+      const on = Number(btn.dataset.i) === routeMap.isolated;
+      btn.setAttribute('aria-pressed', String(on));
+      btn.classList.toggle('dimmed', !!only && !on);
+    });
+    styleRouteStops();
+    if (only) {
+      const b = L.latLngBounds(only.shapes.flat());
+      if (b.isValid()) map.fitBounds(b, { padding: [24, 24], maxZoom: 15 });
+    }
+  }
+
+  // Dot size tracks zoom; hidden route's dots drop out when one is isolated
+  function styleRouteStops() {
+    const z = map.getZoom();
+    const radius = z >= 16 ? 7 : z >= 14 ? 5 : z >= 12 ? 3.5 : 2.5;
+    const only = routeMap.isolated === null ? null : routeMap.routes[routeMap.isolated];
+    routeMap.dots.forEach(({ dot, sr }) => {
+      const visible = !only || sr.routes.includes(only);
+      if (visible && !routeMap.layer.hasLayer(dot)) routeMap.layer.addLayer(dot);
+      if (!visible) { routeMap.layer.removeLayer(dot); return; }
+      const shared = !only && sr.routes.length > 1;
+      dot.setStyle({
+        radius,
+        fillColor: shared ? '#fff' : (only || sr.routes[0]).color,
+        color: shared ? '#1f2937' : '#fff',
+        weight: z >= 14 ? 2 : 1,
+      });
+    });
+  }
+
+  function clearRouteMap() {
+    routeMapToken++;
+    document.getElementById('explore-loading')?.classList.add('hidden');
+    if (!routeMap) return;
+    window.removeEventListener('resize', liftControlsAboveLegend);
+    map.removeLayer(routeMap.layer);
+    routeMap.legend.remove();
+    document.querySelector('.explore-shell')?.classList.remove('explore-routes-open');
+    routeMap = null;
   }
 
   // ─── Filter ───
@@ -269,6 +488,7 @@
     const query = e.target.value.trim().toLowerCase();
     // Auto-detect: all digits = route filter, otherwise name filter
     const type = /^\d+$/.test(query) ? 'route' : 'name';
+    clearRouteMap();
     applyFilter(query, type);
     renderMarkers();
   }
