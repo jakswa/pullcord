@@ -2,7 +2,9 @@
 
 Real-time MARTA bus tracker. Pull the cord. Catch your ride.
 
-**Live:** [pullcord.home.jake.town](https://pullcord.home.jake.town)
+**Live:**
+- buses: [bus.marta.io](https://bus.marta.io)
+- trains: [marta.io](https://marta.io)
 
 ## Features
 
