@@ -25,6 +25,7 @@
   const ROUTE_PALETTE = ['#2563EB', '#DC2626', '#16A34A', '#9333EA', '#EA580C',
     '#0891B2', '#DB2777', '#65A30D', '#4F46E5', '#B45309'];
   let routeMap = null; // { stopId, routes, layer, isolated, legend }
+  let routeMapToken = 0;
 
   // ─── Init ───
 
@@ -265,7 +266,10 @@
     }).join(' ');
 
     const showingThis = routeMap && routeMap.stopId === stop.stop_id;
-    const content = `
+    // A DOM node (not an HTML string) so the button's listener survives
+    // Leaflet re-rendering the popup when the marker is tapped again
+    const content = document.createElement('div');
+    content.innerHTML = `
       <div class="explore-popup">
         <div class="explore-popup-name">${esc(stop.stop_name)}</div>
         <div class="explore-popup-routes">${routeBadges}</div>
@@ -286,7 +290,7 @@
       offset: [0, -4],
     }).openPopup();
 
-    marker.getPopup().getElement()?.querySelector('.explore-popup-routes-btn')
+    content.querySelector('.explore-popup-routes-btn')
       ?.addEventListener('click', (e) => {
         L.DomEvent.stopPropagation(e);
         marker.closePopup();
@@ -297,6 +301,8 @@
   // ─── Route map (#99) ───
 
   async function showRouteMap(stop) {
+    // A newer request, a filter change or closing the legend supersedes this one
+    const token = ++routeMapToken;
     const loading = document.getElementById('explore-loading');
     if (loading) {
       loading.innerHTML = '<div class="d-spinner"></div><span>Loading routes...</span>';
@@ -308,11 +314,13 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       data = await res.json();
     } catch (err) {
+      if (token !== routeMapToken) return;
       console.error('Failed to load route map:', err);
       if (loading) loading.innerHTML = '<span style="color:var(--coral)">Failed to load routes</span>';
       setTimeout(() => loading?.classList.add('hidden'), 2000);
       return;
     }
+    if (token !== routeMapToken) return;
     loading?.classList.add('hidden');
     if (!data.routes.length) return;
 
@@ -391,8 +399,7 @@
       </div>
       <div class="explore-route-legend-chips">
         ${routes.map((r, i) => `<button type="button" class="explore-route-chip" data-i="${i}"
-            style="--chip-color:${r.color}" title="${esc(r.route_long_name || '')}"
-            aria-pressed="false">${esc(r.route_short_name)}</button>`).join('')}
+            style="--chip-color:${r.color}" aria-pressed="false">${esc(r.route_short_name)}</button>`).join('')}
       </div>
       <div class="explore-route-legend-hint">${routes.length > 1 ? 'Tap a route to show only that line' : esc(routes[0].route_long_name || '')}</div>
     `;
@@ -403,14 +410,24 @@
       renderMarkers();
     });
     el.querySelectorAll('.explore-route-chip').forEach(btn => {
+      btn.title = routes[Number(btn.dataset.i)].route_long_name || '';
       btn.addEventListener('click', () => isolateRoute(Number(btn.dataset.i)));
     });
     const shell = document.querySelector('.explore-shell');
     shell.appendChild(el);
-    // Lift the bottom map controls (locate, attribution) above the legend
-    shell.style.setProperty('--route-legend-h', `${el.offsetHeight + 16}px`);
     shell.classList.add('explore-routes-open');
+    liftControlsAboveLegend();
+    window.addEventListener('resize', liftControlsAboveLegend);
     return el;
+  }
+
+  // Lift the bottom map controls (locate, attribution) clear of the legend
+  function liftControlsAboveLegend() {
+    const shell = document.querySelector('.explore-shell');
+    const el = shell?.querySelector('.explore-route-legend');
+    if (!el) return;
+    const gap = shell.getBoundingClientRect().bottom - el.getBoundingClientRect().top;
+    shell.style.setProperty('--route-legend-h', `${Math.ceil(gap) + 8}px`);
   }
 
   // Toggle showing a single route (helps at busy stops where lines overlap)
@@ -455,7 +472,10 @@
   }
 
   function clearRouteMap() {
+    routeMapToken++;
+    document.getElementById('explore-loading')?.classList.add('hidden');
     if (!routeMap) return;
+    window.removeEventListener('resize', liftControlsAboveLegend);
     map.removeLayer(routeMap.layer);
     routeMap.legend.remove();
     document.querySelector('.explore-shell')?.classList.remove('explore-routes-open');

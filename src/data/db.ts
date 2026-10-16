@@ -489,35 +489,46 @@ export interface StopRouteMapRoute {
   route_id: string;
   route_short_name: string;
   route_long_name: string;
-  shapes: Array<Array<[number, number]>>; // one polyline per direction
+  shapes: Array<Array<[number, number]>>; // one polyline per distinct shape_id
   stops: Array<[string, string, number, number]>; // [stop_id, stop_name, lat, lon], deduped
 }
 
 const routeMapCache = new Map<string, { route: StopRouteMapRoute; cachedAt: number }>();
 
-// Every bus route serving a stop (paired stops merged), each with thinned
-// shapes and its stops — for the explore map's "show routes" view (#99).
+// Every bus route serving a stop (paired stops merged), each with every
+// distinct shape it runs (thinned) and every stop it serves — for the
+// explore map's "show routes" view (#99).
 export function getStopRouteMap(stopId: string): StopRouteMapRoute[] {
-  return db.getRoutesForStop(stopId).flatMap((r) => {
+  const shapeIdsStmt = db.db.prepare(
+    `SELECT DISTINCT shape_id FROM trips WHERE route_id = ? AND shape_id != '' ORDER BY shape_id`
+  );
+  const shapeStmt = db.db.prepare(
+    `SELECT shape_pt_lat, shape_pt_lon FROM shapes WHERE shape_id = ? ORDER BY shape_pt_sequence`
+  );
+  const stopsStmt = db.db.prepare(`
+    SELECT DISTINCT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
+    FROM route_stops rs JOIN stops s ON s.stop_id = rs.stop_id
+    WHERE rs.route_id = ?
+  `);
+  return db.getRoutesForStop(stopId).map((r) => {
     const hit = routeMapCache.get(r.route_id);
-    if (hit && Date.now() - hit.cachedAt < 3600000) return [hit.route];
-    const detail = db.getRouteDetail(r.route_id);
-    if (!detail) return [];
-    const seen = new Set<string>();
-    const stops: StopRouteMapRoute["stops"] = [];
-    for (const s of detail.stops) {
-      if (seen.has(s.stop_id)) continue;
-      seen.add(s.stop_id);
-      stops.push([s.stop_id, s.stop_name, s.stop_lat, s.stop_lon]);
-    }
+    if (hit && Date.now() - hit.cachedAt < 3600000) return hit.route;
+    const shapes = (shapeIdsStmt.all(r.route_id) as Array<{ shape_id: string }>).map(({ shape_id }) =>
+      thinShape(
+        (shapeStmt.all(shape_id) as Array<{ shape_pt_lat: number; shape_pt_lon: number }>)
+          .map((p) => [p.shape_pt_lat, p.shape_pt_lon] as [number, number])
+      )
+    ).filter((pts) => pts.length > 1);
+    const stops = (stopsStmt.all(r.route_id) as Array<{ stop_id: string; stop_name: string; stop_lat: number; stop_lon: number }>)
+      .map((s) => [s.stop_id, s.stop_name, s.stop_lat, s.stop_lon] as [string, string, number, number]);
     const route: StopRouteMapRoute = {
       route_id: r.route_id,
       route_short_name: r.route_short_name,
       route_long_name: r.route_long_name,
-      shapes: Object.values(detail.shapes).map((pts) => thinShape(pts)),
+      shapes,
       stops,
     };
     routeMapCache.set(r.route_id, { route, cachedAt: Date.now() });
-    return [route];
+    return route;
   });
 }
