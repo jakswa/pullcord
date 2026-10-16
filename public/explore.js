@@ -30,15 +30,14 @@
       attributionControl: false,
     });
 
-    // Tile layer — CartoDB Positron for clean look
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    // Tile layer — OpenStreetMap standard (CARTO basemaps now require an API key, #98)
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: MAX_ZOOM,
-      subdomains: 'abcd',
     }).addTo(map);
 
     // Attribution in corner
     L.control.attribution({ position: 'bottomright', prefix: false })
-      .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OSM</a> · <a href="https://carto.com/">CARTO</a>')
+      .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>')
       .addTo(map);
 
     // Zoom control top-right

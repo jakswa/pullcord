@@ -2341,3 +2341,9 @@
 
 /* ===== UTILITIES ===== */
 .hidden { display: none !important; }
+/* Map tiles: OpenStreetMap has no dark style, so darken it in dark mode (#98) */
+@media (prefers-color-scheme: dark) {
+  .map-tiles {
+    filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.85) saturate(0.6);
+  }
+}
