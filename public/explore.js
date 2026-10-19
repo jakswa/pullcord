@@ -23,8 +23,8 @@
   // MARTA's own route_color repeats across dozens of routes.
   const ROUTE_PALETTE = ['#2563EB', '#DC2626', '#16A34A', '#9333EA', '#EA580C',
     '#0891B2', '#DB2777', '#65A30D', '#4F46E5', '#B45309'];
-  let routeMap = null; // selected stop's drawn routes: { stop, routes, dots, layer, isolated, prevView }
-  let pendingSelection = null; // { stop, prevView } while its routes load
+  let routeMap = null; // selected stop's drawn routes: { stop, routes, dots, layer, isolated }
+  let pendingSelection = null; // { stop } while its routes load
   let routeMapToken = 0;
   let routeRenderer = null;
 
@@ -263,25 +263,23 @@
   //
   // Tapping a stop selects it: every route serving it is drawn in its own
   // color with dots for its stops, and a bottom sheet shows the stop with a
-  // link to arrivals. Tapping the selected stop again (or ✕ / Esc) cancels
-  // and restores the view from before the selection. Tapping another stop's
-  // dot switches the selection without moving the map.
+  // link to arrivals. Tapping the selected stop again (or ✕ / Esc) cancels.
+  // Selecting, switching, and cancelling never move or zoom the map: the
+  // routes are colored in place around wherever the user is looking.
 
-  function selectStop(stop, { fit = true } = {}) {
+  function selectStop(stop) {
     const selectedId = pendingSelection?.stop.stop_id ?? routeMap?.stop.stop_id;
     if (selectedId === stop.stop_id) {
       deselectStop();
       return;
     }
     const token = ++routeMapToken;
-    const prevView = routeMap?.prevView || pendingSelection?.prevView ||
-      { center: map.getCenter(), zoom: map.getZoom() };
-    pendingSelection = { stop, prevView };
+    pendingSelection = { stop };
     renderSheet(stop, null);
-    loadSelection(stop, token, prevView, fit);
+    loadSelection(stop, token);
   }
 
-  async function loadSelection(stop, token, prevView, fit) {
+  async function loadSelection(stop, token) {
     let data;
     try {
       const res = await fetch(`/api/stops/${encodeURIComponent(stop.stop_id)}/route-map`);
@@ -302,14 +300,12 @@
       return;
     }
     if (token !== routeMapToken) return;
-    // A locate during the load may have replaced the view to return to
-    prevView = pendingSelection?.prevView || prevView;
     pendingSelection = null;
 
     // Rail-only stops have no bus routes: keep the regular markers
     if (!data.routes.length) {
       removeRouteLayers();
-      routeMap = { stop, routes: [], dots: [], layer: null, isolated: null, prevView, empty: true };
+      routeMap = { stop, routes: [], dots: [], layer: null, isolated: null, empty: true };
       renderSheet(stop, []);
       renderMarkers();
       return;
@@ -351,7 +347,7 @@
       });
       dot.on('click', () => selectStop(stopsById.get(sr.id) ||
         { stop_id: sr.id, stop_name: sr.name, stop_lat: sr.lat, stop_lon: sr.lon,
-          routes: sr.routes.map(r => r.route_short_name).join(',') }, { fit: false }));
+          routes: sr.routes.map(r => r.route_short_name).join(',') }));
       dot.on('dblclick', noDoubleTapZoom);
       dot.addTo(layer);
       dots.push({ dot, sr });
@@ -364,26 +360,18 @@
     focus.on('click', () => deselectStop());
     focus.on('dblclick', noDoubleTapZoom);
 
-    routeMap = { stop, routes, dots, layer, isolated: null, prevView };
+    routeMap = { stop, routes, dots, layer, isolated: null };
     renderMarkers(); // clears the regular stop markers
     renderSheet(stop, routes);
     styleRouteStops();
-
-    if (fit) {
-      const bounds = L.latLngBounds(routes.flatMap(r => r.shapes.flat()));
-      if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
-    }
   }
 
-  function deselectStop({ restoreView = true } = {}) {
+  function deselectStop() {
     routeMapToken++;
-    const prevView = routeMap?.prevView || pendingSelection?.prevView;
-    const moved = routeMap && !routeMap.empty; // an empty selection never moved the map
     pendingSelection = null;
     removeRouteLayers();
     routeMap = null;
     closeSheet();
-    if (restoreView && moved && prevView) map.setView(prevView.center, prevView.zoom);
     renderMarkers();
   }
 
@@ -480,10 +468,6 @@
       btn.classList.toggle('dimmed', !!only && !on);
     });
     styleRouteStops();
-    if (only) {
-      const b = L.latLngBounds(only.shapes.flat());
-      if (b.isValid()) map.fitBounds(b, { padding: [24, 24], maxZoom: 15 });
-    }
   }
 
   function resetIsolation() {
@@ -518,7 +502,7 @@
     const query = e.target.value.trim().toLowerCase();
     // Auto-detect: all digits = route filter, otherwise name filter
     const type = /^\d+$/.test(query) ? 'route' : 'name';
-    if (routeMap || pendingSelection) deselectStop({ restoreView: false });
+    if (routeMap || pendingSelection) deselectStop();
     applyFilter(query, type);
     renderMarkers();
   }
@@ -560,12 +544,8 @@
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        const view = { center: L.latLng(latitude, longitude), zoom: 16 };
-        // With a stop selected, the located view becomes where cancelling returns
-        // to; the automatic locate at load never pulls the map off a selection
-        const selection = routeMap || pendingSelection;
-        if (selection) selection.prevView = view;
-        if (!(auto && selection)) map.setView(view.center, view.zoom);
+        // The automatic locate at load never pulls the map off a selection
+        if (!(auto && (routeMap || pendingSelection))) map.setView([latitude, longitude], 16);
 
         if (userMarker) map.removeLayer(userMarker);
         userMarker = L.circleMarker([latitude, longitude], {
