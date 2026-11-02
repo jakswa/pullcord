@@ -8,11 +8,8 @@ export interface RailArrival {
   waitSeconds: number;
   waitTime: string;
   trainId: string;
-  tripId: string;
   nextArr: string;
   isRealtime: boolean;
-  hasStarted: boolean;
-  isFirstStop: boolean;
   eventTime: string;
 }
 
@@ -24,15 +21,24 @@ interface RawArrival {
   WAITING_SECONDS: string;
   WAITING_TIME: string;
   TRAIN_ID: string;
-  TRIP_ID: string;
   NEXT_ARR: string;
   IS_REALTIME: string;
-  HAS_STARTED_TRIP: string;
-  IS_FIRST_STOP: string;
   EVENT_TIME: string;
 }
 
-const API_URL = "https://developerservices.itsmarta.com:18096/itsmarta/railrealtimearrivals/traindata";
+// MARTA's error envelope, returned instead of the arrivals array (e.g. on a
+// bad key: HTTP 400 {"ErrorCode":"400","ErrorMessage":"Bad Request",
+// "ErrorDetails":"Invalid API Key"}).
+interface RawError {
+  ErrorCode?: string;
+  ErrorMessage?: string;
+  ErrorDetails?: string;
+}
+
+// Migrated Oct 2026 (#105): the old :18096 endpoint was retired. The new feed
+// dropped TRIP_ID, HAS_STARTED_TRIP and IS_FIRST_STOP; everything else matches.
+const API_URL =
+  "https://developerservices.itsmarta.com/mcsmrail/itsmarta/railrealtimearrivals/developerservices/traindata";
 const API_KEY = process.env.MARTA_API_KEY || "";
 
 // Single cache entry holds either a successful response OR the most recent
@@ -112,10 +118,15 @@ async function _refresh(): Promise<RailArrival[]> {
     throw e;
   }
   if (!resp.ok) {
-    cache = { kind: "err", error: `MARTA rail API returned HTTP ${resp.status}`, ts };
+    const details = errorDetails(await resp.json().catch(() => null));
+    cache = {
+      kind: "err",
+      error: `MARTA rail API returned HTTP ${resp.status}${details ? ` (${details})` : ""}`,
+      ts,
+    };
     throw new Error(`Rail API ${resp.status}`);
   }
-  let raw: RawArrival[];
+  let raw: unknown;
   try {
     raw = await resp.json();
   } catch (e) {
@@ -123,8 +134,20 @@ async function _refresh(): Promise<RailArrival[]> {
     cache = { kind: "err", error: `MARTA rail API returned a bad response (${msg})`, ts };
     throw e;
   }
+  // Anything but an array (e.g. an error envelope served with HTTP 200) would
+  // otherwise blow up in .map() below without caching the error, leaving the
+  // banner blank and retrying MARTA on every request.
+  if (!Array.isArray(raw)) {
+    const details = errorDetails(raw);
+    cache = {
+      kind: "err",
+      error: `MARTA rail API returned an unexpected response${details ? ` (${details})` : ""}`,
+      ts,
+    };
+    throw new Error("Rail API unexpected response");
+  }
 
-  const data = raw.map((r) => ({
+  const data = (raw as RawArrival[]).map((r) => ({
     station: r.STATION,
     line: r.LINE as RailArrival["line"],
     destination: r.DESTINATION,
@@ -132,17 +155,22 @@ async function _refresh(): Promise<RailArrival[]> {
     waitSeconds: parseInt(r.WAITING_SECONDS) || 0,
     waitTime: r.WAITING_TIME,
     trainId: r.TRAIN_ID,
-    tripId: r.TRIP_ID,
     nextArr: r.NEXT_ARR,
     isRealtime: r.IS_REALTIME === "true",
-    hasStarted: r.HAS_STARTED_TRIP === "true",
-    isFirstStop: r.IS_FIRST_STOP === "true",
     eventTime: r.EVENT_TIME,
   }));
 
   cache = { kind: "ok", data, ts };
   lastOkTs = ts;
   return data;
+}
+
+// Pull a human-readable reason out of MARTA's error envelope, if present.
+function errorDetails(body: unknown): string | null {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const e = body as RawError;
+  const d = e.ErrorDetails || e.ErrorMessage;
+  return typeof d === "string" && d ? d : null;
 }
 
 // Current cached error message, or null if the last cached result was a success

@@ -16,9 +16,8 @@ let nextResponse: () => Promise<Response>;
 function raw(station: string) {
   return [{
     STATION: station, LINE: 'RED', DESTINATION: 'North Springs', DIRECTION: 'N',
-    WAITING_SECONDS: '120', WAITING_TIME: '2 min', TRAIN_ID: '101', TRIP_ID: 't1',
-    NEXT_ARR: '', IS_REALTIME: 'true', HAS_STARTED_TRIP: 'true', IS_FIRST_STOP: 'false',
-    EVENT_TIME: '',
+    WAITING_SECONDS: '120', WAITING_TIME: '2 min', TRAIN_ID: '101',
+    NEXT_ARR: '11:58:54 AM', IS_REALTIME: 'true', EVENT_TIME: '10/29/2026 11:56:11 AM',
   }];
 }
 const ok = (station: string) => () => Promise.resolve(new Response(JSON.stringify(raw(station))));
@@ -96,6 +95,30 @@ describe('rail fetchArrivals cache', () => {
     expect(getArrivalsTimestamp()).toBe(1_000_000);
   });
 
+  test('HTTP error surfaces MARTA ErrorDetails in the banner message', async () => {
+    nextResponse = () => Promise.resolve(new Response(
+      JSON.stringify({ ErrorCode: '400', ErrorMessage: 'Bad Request', ErrorDetails: 'Invalid API Key' }),
+      { status: 400 },
+    ));
+    const data = await fetchArrivals();
+    expect(data).toEqual([]);
+    expect(getRailApiError()).toBe('MARTA rail API returned HTTP 400 (Invalid API Key)');
+  });
+
+  test('200 with a non-array body caches an error instead of throwing past it', async () => {
+    nextResponse = () => Promise.resolve(new Response(
+      JSON.stringify({ ErrorCode: '500', ErrorMessage: 'Internal Error', ErrorDetails: 'Upstream down' }),
+    ));
+    const data = await fetchArrivals();
+    expect(data).toEqual([]);
+    expect(getRailApiError()).toBe('MARTA rail API returned an unexpected response (Upstream down)');
+    // Error is cached: within TTL we don't hit MARTA again.
+    calls = 0;
+    now += 1_000;
+    expect(await fetchArrivals()).toEqual([]);
+    expect(calls).toBe(0);
+  });
+
   test('concurrent callers share one fetch', async () => {
     await seed('A');
     now += 60_000;
@@ -132,5 +155,26 @@ describe('rail response headers', () => {
     const station = await app.request('/rail/five-points?partial=1');
     expect(station.headers.get('Cache-Control')).toBe('no-store');
     expect(station.headers.get('X-Data-Age')).toBe('3000');
+  });
+
+  test('train timeline shows only the current trip when a train ID spans two', async () => {
+    const { default: app } = await import('../src/routes/rail');
+    const row = (station: string, dir: string, dest: string, secs: string) => ({
+      STATION: station, LINE: 'RED', DESTINATION: dest, DIRECTION: dir,
+      WAITING_SECONDS: secs, WAITING_TIME: '', TRAIN_ID: '408',
+      NEXT_ARR: '', IS_REALTIME: 'true', EVENT_TIME: '',
+    });
+    nextResponse = () => Promise.resolve(new Response(JSON.stringify([
+      // Current trip: southbound to Airport.
+      row('COLLEGE PARK STATION', 'S', 'Airport', '60'),
+      row('AIRPORT STATION', 'S', 'Airport', '240'),
+      // Next trip after turnaround: northbound from Airport.
+      row('EAST POINT STATION', 'N', 'North Springs', '900'),
+    ])));
+    const res = await app.request('/rail/train/408?partial=1');
+    const html = await res.text();
+    expect(html).toContain('college park');
+    expect(html).toContain('airport');
+    expect(html).not.toContain('east point');
   });
 });

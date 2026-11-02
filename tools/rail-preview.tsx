@@ -25,17 +25,14 @@ function a(
     waitSeconds,
     waitTime: waitSeconds < 60 ? "Boarding" : `${Math.round(waitSeconds / 60)} min`,
     trainId,
-    tripId: trainId + "-trip",
     nextArr: "",
     isRealtime: true,
-    hasStarted: true,
-    isFirstStop: false,
     eventTime: "",
     ...opts,
   };
 }
 
-// A spread of stations covering 1/2/4-direction layouts + scheduled + boarding.
+// A spread of stations covering 1/2/4-direction layouts + scheduled.
 const arrivals: RailArrival[] = [
   // Midtown — N (gold soon, red later), S (red)
   a("MIDTOWN STATION", "GOLD", "DORAVILLE STATION", "N", 60, "401"),
