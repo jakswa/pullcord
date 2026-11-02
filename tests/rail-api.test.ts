@@ -16,9 +16,8 @@ let nextResponse: () => Promise<Response>;
 function raw(station: string) {
   return [{
     STATION: station, LINE: 'RED', DESTINATION: 'North Springs', DIRECTION: 'N',
-    WAITING_SECONDS: '120', WAITING_TIME: '2 min', TRAIN_ID: '101', TRIP_ID: 't1',
-    NEXT_ARR: '', IS_REALTIME: 'true', HAS_STARTED_TRIP: 'true', IS_FIRST_STOP: 'false',
-    EVENT_TIME: '',
+    WAITING_SECONDS: '120', WAITING_TIME: '2 min', TRAIN_ID: '101',
+    NEXT_ARR: '', IS_REALTIME: 'true', EVENT_TIME: '',
   }];
 }
 const ok = (station: string) => () => Promise.resolve(new Response(JSON.stringify(raw(station))));
@@ -94,6 +93,19 @@ describe('rail fetchArrivals cache', () => {
     expect(getRailApiError()).toContain('503');
     // Freshness keeps counting from the last real data, not the failed attempt.
     expect(getArrivalsTimestamp()).toBe(1_000_000);
+  });
+
+  test('a 200 with an error object caches the error instead of throwing uncaught', async () => {
+    nextResponse = () => Promise.resolve(new Response(JSON.stringify({
+      ErrorCode: '400', ErrorMessage: 'Bad Request', ErrorDetails: 'Invalid API Key',
+    })));
+    const data = await fetchArrivals();
+    expect(data).toEqual([]);
+    expect(getRailApiError()).toBe('MARTA rail API returned an unexpected response (Invalid API Key)');
+    // Cached: a second call within TTL doesn't refetch.
+    calls = 0;
+    expect(await fetchArrivals()).toEqual([]);
+    expect(calls).toBe(0);
   });
 
   test('concurrent callers share one fetch', async () => {

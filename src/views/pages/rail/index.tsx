@@ -354,7 +354,6 @@ export function RailStationDetail({
           const s = etaState(a.waitSeconds, a.isRealtime);
           const isNow = s.kind === "now";
           const isApprox = s.kind === "approx";
-          const isBoarding = a.isRealtime && !a.hasStarted && a.isFirstStop;
           const color = lineColor(a.line);
 
           const Tag = a.isRealtime ? "a" : "div";
@@ -370,7 +369,6 @@ export function RailStationDetail({
               <span class="rail-brow-dir mono">{a.direction}</span>
               <span class="rail-brow-dest">
                 {stationDisplayName(a.destination).toLowerCase()}
-                {isBoarding && <em class="rail-boarding mono" style={`color:${color}`}>boarding</em>}
               </span>
               <span class={`rail-rowtime mono${isApprox ? " is-approx" : ""}${isNow ? " is-now" : ""}`}>
                 {isApprox && "~"}

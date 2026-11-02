@@ -8,11 +8,8 @@ export interface RailArrival {
   waitSeconds: number;
   waitTime: string;
   trainId: string;
-  tripId: string;
   nextArr: string;
   isRealtime: boolean;
-  hasStarted: boolean;
-  isFirstStop: boolean;
   eventTime: string;
 }
 
@@ -24,15 +21,12 @@ interface RawArrival {
   WAITING_SECONDS: string;
   WAITING_TIME: string;
   TRAIN_ID: string;
-  TRIP_ID: string;
   NEXT_ARR: string;
   IS_REALTIME: string;
-  HAS_STARTED_TRIP: string;
-  IS_FIRST_STOP: string;
   EVENT_TIME: string;
 }
 
-const API_URL = "https://developerservices.itsmarta.com:18096/itsmarta/railrealtimearrivals/traindata";
+const API_URL = "https://developerservices.itsmarta.com/mcsmrail/itsmarta/railrealtimearrivals/developerservices/traindata";
 const API_KEY = process.env.MARTA_API_KEY || "";
 
 // Single cache entry holds either a successful response OR the most recent
@@ -115,7 +109,7 @@ async function _refresh(): Promise<RailArrival[]> {
     cache = { kind: "err", error: `MARTA rail API returned HTTP ${resp.status}`, ts };
     throw new Error(`Rail API ${resp.status}`);
   }
-  let raw: RawArrival[];
+  let raw: unknown;
   try {
     raw = await resp.json();
   } catch (e) {
@@ -123,8 +117,16 @@ async function _refresh(): Promise<RailArrival[]> {
     cache = { kind: "err", error: `MARTA rail API returned a bad response (${msg})`, ts };
     throw e;
   }
+  // MARTA reports some errors as a JSON object ({ErrorCode, ErrorDetails, ...})
+  // rather than an array. Cache it like any other failure so the banner shows it.
+  if (!Array.isArray(raw)) {
+    const details = (raw as { ErrorDetails?: unknown } | null)?.ErrorDetails;
+    const suffix = typeof details === "string" ? ` (${details})` : "";
+    cache = { kind: "err", error: `MARTA rail API returned an unexpected response${suffix}`, ts };
+    throw new Error("Rail API unexpected response");
+  }
 
-  const data = raw.map((r) => ({
+  const data = (raw as RawArrival[]).map((r) => ({
     station: r.STATION,
     line: r.LINE as RailArrival["line"],
     destination: r.DESTINATION,
@@ -132,11 +134,8 @@ async function _refresh(): Promise<RailArrival[]> {
     waitSeconds: parseInt(r.WAITING_SECONDS) || 0,
     waitTime: r.WAITING_TIME,
     trainId: r.TRAIN_ID,
-    tripId: r.TRIP_ID,
     nextArr: r.NEXT_ARR,
     isRealtime: r.IS_REALTIME === "true",
-    hasStarted: r.HAS_STARTED_TRIP === "true",
-    isFirstStop: r.IS_FIRST_STOP === "true",
     eventTime: r.EVENT_TIME,
   }));
 
