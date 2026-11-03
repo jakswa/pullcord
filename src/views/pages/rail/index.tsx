@@ -354,7 +354,6 @@ export function RailStationDetail({
           const s = etaState(a.waitSeconds, a.isRealtime);
           const isNow = s.kind === "now";
           const isApprox = s.kind === "approx";
-          const isBoarding = a.isRealtime && !a.hasStarted && a.isFirstStop;
           const color = lineColor(a.line);
 
           const Tag = a.isRealtime ? "a" : "div";
@@ -370,7 +369,6 @@ export function RailStationDetail({
               <span class="rail-brow-dir mono">{a.direction}</span>
               <span class="rail-brow-dest">
                 {stationDisplayName(a.destination).toLowerCase()}
-                {isBoarding && <em class="rail-boarding mono" style={`color:${color}`}>boarding</em>}
               </span>
               <span class={`rail-rowtime mono${isApprox ? " is-approx" : ""}${isNow ? " is-now" : ""}`}>
                 {isApprox && "~"}
@@ -387,6 +385,17 @@ export function RailStationDetail({
   );
 }
 
+// Rows for one train's current trip. The feed has no trip ID (#105), so we key
+// off TRAIN_ID. Near a terminus the same train can also list arrivals for its
+// next trip in the opposite direction; keep only the direction (and line) of
+// its soonest arrival so the timeline doesn't mix both trips.
+function currentTripArrivals(arrivals: RailArrival[], trainId: string): RailArrival[] {
+  const rows = arrivals.filter((a) => a.trainId === trainId);
+  if (rows.length === 0) return rows;
+  const soonest = rows.reduce((m, a) => (a.waitSeconds < m.waitSeconds ? a : m));
+  return rows.filter((a) => a.direction === soonest.direction && a.line === soonest.line);
+}
+
 // ── Train timeline page ──
 export function RailTrainPage({
   trainId,
@@ -397,7 +406,7 @@ export function RailTrainPage({
   arrivals: RailArrival[];
   standalone?: boolean;
 }) {
-  const trainArrivals = arrivals.filter((a) => a.trainId === trainId);
+  const trainArrivals = currentTripArrivals(arrivals, trainId);
   const hasData = trainArrivals.length > 0;
   const line = hasData ? trainArrivals[0].line : "";
   const destination = hasData ? stationDisplayName(trainArrivals[0].destination) : "Unknown";
@@ -471,7 +480,7 @@ export function RailTrainTimeline({
   trainId: string;
   arrivals: RailArrival[];
 }) {
-  const trainArrivals = arrivals.filter((a) => a.trainId === trainId);
+  const trainArrivals = currentTripArrivals(arrivals, trainId);
 
   if (trainArrivals.length === 0) {
     if (getRailApiError()) {

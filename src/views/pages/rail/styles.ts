@@ -382,11 +382,6 @@ export function railStyles(): string {
       font-weight: 600; font-size: 21px; letter-spacing: -0.02em; flex: 1; min-width: 0;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .rail-boarding {
-      font-family: var(--mono);
-      font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
-      text-transform: uppercase; margin-left: 10px;
-    }
     .rail-brow.is-approx .rail-brow-dest, .rail-brow.is-approx .rail-brow-dir { color: var(--muted); font-weight: 500; }
     .rail-brow.is-approx .rail-brow-bar { opacity: 0.35; }
     .rail-rowtime {
