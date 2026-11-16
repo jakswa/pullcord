@@ -142,12 +142,31 @@
       // OpenFreeMap has no SLA: if the style, TileJSON or tiles fail before any
       // vector tile has loaded, swap to OSM raster instead of showing a blank map.
       var healthy = false;
-      var timer = setTimeout(function () { if (!healthy) fallBack('timed out'); }, GL_TIMEOUT_MS);
+      var timer = null;
+      // MapLibre only fetches tiles while it renders, which pauses in hidden
+      // tabs, so start the clock once the page is visible.
+      function startTimer() {
+        if (timer || healthy || fellBack) return;
+        timer = setTimeout(function () { if (!healthy) fallBack('timed out'); }, GL_TIMEOUT_MS);
+      }
+      if (document.visibilityState === 'visible') startTimer();
+      else document.addEventListener('visibilitychange', function onVis() {
+        if (document.visibilityState !== 'visible') return;
+        document.removeEventListener('visibilitychange', onVis);
+        startTimer();
+      });
       glMap.on('data', function (e) {
         if (!healthy && e.dataType === 'source' && e.tile) { healthy = true; clearTimeout(timer); }
       });
       glMap.on('error', function (e) {
-        if (!healthy) { clearTimeout(timer); fallBack((e && e.error && e.error.message) || 'map error'); }
+        if (healthy) return;
+        var msg = (e && e.error && e.error.message) || 'map error';
+        // A single tile or the sprite failing isn't an outage; the timeout
+        // still catches the case where no tile ever loads.
+        if (e && e.tile) return;
+        if (/\/sprites\/|\/fonts\//.test(msg)) return;
+        clearTimeout(timer);
+        fallBack(msg);
       });
 
       // Follow live OS theme changes, as the old CSS filter did.
