@@ -1565,16 +1565,8 @@ class PullcordApp {
       attributionControl: false
     }).setView([stop.lat, stop.lon], 15);
 
-    // OpenStreetMap tiles; .map-tiles is darkened via CSS filter in dark mode
-    // (CARTO basemaps now require an API key, #98)
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      className: 'map-tiles'
-    }).addTo(this.map);
-
-    L.control.attribution({ position: 'bottomright', prefix: false })
-      .addAttribution('© <a href="https://www.openstreetmap.org/copyright" style="color:#64748b">OpenStreetMap</a>')
-      .addTo(this.map);
+    // Basemap + attribution (public/basemap.js, #103): light or dark per OS theme
+    addBasemap(this.map, { followTheme: true });
 
     L.control.zoom({ position: 'topleft' }).addTo(this.map);
 
