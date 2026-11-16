@@ -36,12 +36,18 @@
   var OSM_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   var OSM_ATTRIBUTION = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
   var MAX_ZOOM = 19;
+  // If no vector tile has loaded by then, assume OpenFreeMap is down.
+  var GL_TIMEOUT_MS = 15000;
 
   function webglSupported() {
     try {
       var c = document.createElement('canvas');
-      return !!(window.WebGL2RenderingContext && c.getContext('webgl2')) ||
-        !!(window.WebGLRenderingContext && c.getContext('webgl'));
+      var gl = (window.WebGL2RenderingContext && c.getContext('webgl2')) ||
+        (window.WebGLRenderingContext && c.getContext('webgl'));
+      // Release the probe context; browsers cap live WebGL contexts.
+      var lose = gl && gl.getExtension('WEBGL_lose_context');
+      if (lose) lose.loseContext();
+      return !!gl;
     } catch (e) {
       return false;
     }
@@ -109,14 +115,52 @@
     // Paint the style's land color while MapLibre loads, instead of Leaflet's grey.
     map.getContainer().style.background = style.background;
 
-    loadMapLibre().then(function () {
-      // attributionControl: false stops the plugin adding the style's credit too.
-      L.maplibreGL({ style: style.url, attributionControl: false }).addTo(map);
-      attribution.addAttribution(ATTRIBUTION);
-    }).catch(function (err) {
-      console.warn('[basemap] vector tiles unavailable, using OSM raster:', err && err.message);
+    var glLayer = null;
+    var fellBack = false;
+    function fallBack(reason) {
+      if (fellBack) return;
+      fellBack = true;
+      console.warn('[basemap] vector tiles unavailable, using OSM raster:', reason);
+      if (glLayer) {
+        attribution.removeAttribution(ATTRIBUTION);
+        var layer = glLayer;
+        glLayer = null;
+        // Defer: removing tears down the MapLibre map, which may be mid-event.
+        setTimeout(function () { try { map.removeLayer(layer); } catch (e) { /* half-built */ } }, 0);
+      }
       map.getContainer().style.background = '';
       addOsmFallback(map, attribution, followTheme);
+    }
+
+    loadMapLibre().then(function () {
+      // attributionControl: false stops the plugin adding the style's credit too.
+      glLayer = L.maplibreGL({ style: style.url, attributionControl: false });
+      attribution.addAttribution(ATTRIBUTION);
+      glLayer.addTo(map);
+      var glMap = glLayer.getMaplibreMap();
+
+      // OpenFreeMap has no SLA: if the style, TileJSON or tiles fail before any
+      // vector tile has loaded, swap to OSM raster instead of showing a blank map.
+      var healthy = false;
+      var timer = setTimeout(function () { if (!healthy) fallBack('timed out'); }, GL_TIMEOUT_MS);
+      glMap.on('data', function (e) {
+        if (!healthy && e.dataType === 'source' && e.tile) { healthy = true; clearTimeout(timer); }
+      });
+      glMap.on('error', function (e) {
+        if (!healthy) { clearTimeout(timer); fallBack((e && e.error && e.error.message) || 'map error'); }
+      });
+
+      // Follow live OS theme changes, as the old CSS filter did.
+      if (followTheme && window.matchMedia('(prefers-color-scheme: dark)').addEventListener) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (mq) {
+          if (!glLayer) return;
+          var next = mq.matches ? STYLES.dark : STYLES.light;
+          map.getContainer().style.background = next.background;
+          glMap.setStyle(next.url);
+        });
+      }
+    }).catch(function (err) {
+      fallBack(err && err.message);
     });
   };
 })();
