@@ -14,6 +14,7 @@ const JS_HASH = fileHash("public/app.js");
 const CSS_HASH = fileHash("public/styles.css");
 const ETA_HASH = fileHash("public/eta.js");
 const STALENESS_HASH = fileHash("public/staleness.js");
+const BASEMAP_HASH = fileHash("public/basemap.js");
 const OG_HASH = fileHash("public/icons/og-image.png");
 
 export interface LayoutProps {
@@ -91,6 +92,9 @@ export const Layout = (props: LayoutProps) => {
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
           crossorigin=""
         ></script>
+
+        {/* Shared basemap (OpenFreeMap via MapLibre, lazy-loaded) — #103 */}
+        <script src={`/public/basemap.js?v=${BASEMAP_HASH}`}></script>
 
         {/* Rail line colors — emitted from src/data/rail-colors.ts (single source of truth) */}
         <script dangerouslySetInnerHTML={{ __html: `window.LINE_COLORS=${JSON.stringify(LINE_COLORS)};` }} />

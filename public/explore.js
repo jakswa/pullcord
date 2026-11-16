@@ -40,15 +40,8 @@
       attributionControl: false,
     });
 
-    // Tile layer — OpenStreetMap standard (CARTO basemaps now require an API key, #98)
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: MAX_ZOOM,
-    }).addTo(map);
-
-    // Attribution in corner
-    L.control.attribution({ position: 'bottomright', prefix: false })
-      .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>')
-      .addTo(map);
+    // Basemap + attribution (public/basemap.js, #103). Explore stays light.
+    addBasemap(map);
 
     // Zoom control top-right
     L.control.zoom({ position: 'topright' }).addTo(map);

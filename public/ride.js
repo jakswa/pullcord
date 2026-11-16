@@ -141,14 +141,8 @@
       attributionControl: false,
     });
 
-    // OpenStreetMap tiles; .map-tiles is darkened via CSS filter in dark mode (#98)
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      className: 'map-tiles',
-    }).addTo(map);
-    L.control.attribution({ position: 'bottomright', prefix: false })
-      .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>')
-      .addTo(map);
+    // Basemap + attribution (public/basemap.js, #103): light or dark per OS theme
+    addBasemap(map, { followTheme: true });
     L.control.zoom({ position: 'topleft' }).addTo(map);
 
     // Route line
